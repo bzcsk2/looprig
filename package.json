@@ -3,14 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "bun run packages/cli/src/index.ts",
     "test": "bun test",
     "typecheck": "tsc --noEmit --project tsconfig.json"
   },
-  "dependencies": {},
   "devDependencies": {
     "typescript": "^5.7.0",
+    "vitest": "^2.1.0",
     "@types/node": "^22.0.0"
   }
 }

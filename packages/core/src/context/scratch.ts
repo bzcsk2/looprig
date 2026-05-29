@@ -1,4 +1,5 @@
 import type { ChatMessage } from "../types.js"
+import { cloneChatMessage, cloneChatMessages } from "./message.js"
 
 /**
  * VolatileScratch — 每轮临时状态（易失区域）
@@ -15,12 +16,12 @@ export class VolatileScratch {
   private entries: ChatMessage[] = []
 
   setMessages(msgs: ChatMessage[]): void {
-    this.entries = [...msgs]
+    this.entries = cloneChatMessages(msgs)
   }
 
   // 追加单条消息到暂存区
   append(message: ChatMessage): void {
-    this.entries.push(message)
+    this.entries.push(cloneChatMessage(message))
   }
 
   // 重置暂存区：清空所有消息（每轮开始前调用）
@@ -30,6 +31,6 @@ export class VolatileScratch {
 
   // 获取当前暂存区消息的只读视图
   get messages(): readonly ChatMessage[] {
-    return this.entries
+    return cloneChatMessages(this.entries)
   }
 }

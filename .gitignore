@@ -3,3 +3,5 @@ dist/
 *.node
 *.log
 .env
+api-key
+.deepicode/

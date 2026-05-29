@@ -1,8 +1,10 @@
 import type { ChatMessage } from "../types.js"
+import { createHash } from "node:crypto"
+import { cloneChatMessages } from "./message.js"
 
 export class ImmutablePrefix {
   private prefix: ChatMessage[] = []
-  private hash = 0n
+  private hash = ""
 
   build(systemPrompt: string): void {
     this.prefix = [{ role: "system", content: systemPrompt }]
@@ -10,18 +12,24 @@ export class ImmutablePrefix {
   }
 
   get messages(): readonly ChatMessage[] {
-    return this.prefix
+    return cloneChatMessages(this.prefix)
   }
 
   get cacheKey(): string {
-    return this.hash.toString(36)
+    return this.hash
   }
 
-  private computeHash(msgs: ChatMessage[]): bigint {
-    let buf = ""
-    for (const m of msgs) {
-      buf += m.role + (m.content ?? "")
-    }
-    return BigInt(Bun.hash(buf))
+  private computeHash(msgs: readonly ChatMessage[]): string {
+    const stablePayload = JSON.stringify(
+      msgs.map((m) => ({
+        role: m.role,
+        content: m.content,
+        tool_calls: m.tool_calls ?? null,
+        tool_call_id: m.tool_call_id ?? null,
+        name: m.name ?? null,
+        is_error: m.is_error ?? false,
+      })),
+    )
+    return createHash("sha256").update(stablePayload).digest("hex")
   }
 }

@@ -19,9 +19,5 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {},
-  "devDependencies": {
-    "vitest": "^2.1.0",
-    "@types/node": "^22.0.0"
-  }
+  "dependencies": {}
 }

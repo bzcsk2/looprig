@@ -1,7 +1,6 @@
-// Zen API 默认配置（开放接口，无需真实 API key 即可使用）
-export const ZEN_BASE_URL = "https://opencode.ai/zen/v1"
-export const ZEN_API_KEY = "public"
-export const ZEN_MODEL = "deepseek-v4-flash-free"
+// DeepSeek 官方 API 默认配置
+export const DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+export const DEEPSEEK_MODEL = "deepseek-v4-flash"
 
 // 消息角色类型：system（系统提示）、user（用户）、assistant（助手）、tool（工具结果）
 export type Role = "system" | "user" | "assistant" | "tool"
@@ -13,6 +12,7 @@ export interface ChatMessage {
   tool_calls?: ToolCall[]  // assistant 消息中携带的工具调用列表
   tool_call_id?: string    // tool 消息关联的 tool call ID
   name?: string            // tool 消息的工具名称
+  is_error?: boolean       // tool 消息是否为错误结果
 }
 
 // ToolCall：LLM 发起的工具调用

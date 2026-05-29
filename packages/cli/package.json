@@ -9,15 +9,10 @@
     "deepicode": "src/index.ts"
   },
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "bun run src/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@deepicode/core": "*"
-  },
-  "devDependencies": {
-    "tsx": "^4.19.0",
-    "typescript": "^5.7.0",
-    "@types/node": "^22.0.0"
+    "@deepicode/core": "workspace:*"
   }
 }

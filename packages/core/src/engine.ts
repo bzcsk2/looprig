@@ -1,20 +1,23 @@
-import { streamSimple } from "./vendor/pi.js"
-import type { Model, SimpleStreamOptions } from "./vendor/pi.js"
 import type { DeepicodeConfig } from "./config.js"
-import { buildPiModel } from "./config.js"
 import { ContextManager } from "./context/manager.js"
 import type { ChatMessage, ToolCall, ToolSpec } from "./types.js"
-import type { CoreEngine, AgentConfig, AgentTool, LoopEvent, AgentState, ToolContext, SessionStats } from "./interface.js"
+import type { CoreEngine, AgentConfig, AgentTool, LoopEvent, AgentState, ToolContext, SessionStats, ToolResult } from "./interface.js"
+import { DeepSeekClient } from "./client.js"
+import { StreamingToolExecutor } from "./streaming-executor.js"
+import { AsyncSessionWriter } from "./session.js"
 
 let sessionCounter = 0
 
 export class ReasonixEngine implements CoreEngine {
   private config: DeepicodeConfig
-  private model: Model
   private ctx: ContextManager
   private tools: Map<string, AgentTool> = new Map()
+  private client: DeepSeekClient
+  private toolExecutor: StreamingToolExecutor
   private _interrupted = false
+  private activeAbortController?: AbortController
   private sessionId: string
+  private sessionWriter?: AsyncSessionWriter
   private stats: SessionStats = {
     promptTokens: 0, completionTokens: 0,
     cacheHitTokens: 0, cacheMissTokens: 0,
@@ -23,9 +26,16 @@ export class ReasonixEngine implements CoreEngine {
 
   constructor(config: DeepicodeConfig) {
     this.config = config
-    this.model = buildPiModel(config)
     this.ctx = new ContextManager()
+    this.client = new DeepSeekClient()
     this.sessionId = `session-${++sessionCounter}-${Date.now()}`
+    this.toolExecutor = new StreamingToolExecutor(this.tools, this.sessionId)
+
+    // best-effort session persistence
+    const sessionPath = `${process.cwd()}/.deepicode/sessions/${this.sessionId}.jsonl`
+    const writer = new AsyncSessionWriter(sessionPath)
+    writer.init().catch(() => {})
+    this.sessionWriter = writer
   }
 
   setSystemPrompt(prompt: string): void {
@@ -42,6 +52,7 @@ export class ReasonixEngine implements CoreEngine {
 
   interrupt(): void {
     this._interrupted = true
+    this.activeAbortController?.abort()
   }
 
   switchAgent(_agentName: string): void {}
@@ -61,218 +72,143 @@ export class ReasonixEngine implements CoreEngine {
 
   async *submit(userInput: string, _agentConfig?: AgentConfig): AsyncGenerator<LoopEvent> {
     this._interrupted = false
+    const abortController = new AbortController()
+    this.activeAbortController = abortController
     this.ctx.startTurn()
     this.ctx.log.append({ role: "user", content: userInput })
+    this.sessionWriter?.enqueue({ ts: Date.now(), type: "messages", payload: this.ctx.buildMessages() })
 
-    const toolSpecs: ToolSpec[] = []
-    for (const tool of this.tools.values()) {
-      toolSpecs.push({
-        type: "function",
-        function: {
-          name: tool.name,
-          description: tool.description,
-          parameters: tool.parameters,
-        },
-      })
-    }
-
-    let turnCount = 0
-    const maxTurns = 10
-
-    while (turnCount < maxTurns) {
-      turnCount++
-      if (this._interrupted) {
-        yield { role: "status", content: "interrupted" }
-        return
+    try {
+      const toolSpecs: ToolSpec[] = []
+      for (const tool of this.tools.values()) {
+        toolSpecs.push({
+          type: "function",
+          function: {
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.parameters,
+          },
+        })
       }
 
-      const { systemPrompt, messages, ompTools } = buildOmpContext(this.ctx, toolSpecs)
+      let turnCount = 0
+      const maxTurns = 10
 
-      const options: SimpleStreamOptions = {
-        apiKey: this.config.apiKey,
-        maxTokens: this.config.maxTokens,
-        temperature: this.config.temperature,
-      }
-
-      const stream = streamSimple(
-        this.model,
-        { systemPrompt, messages, tools: ompTools },
-        options,
-      )
-
-      let fullContent = ""
-      let fullReasoning = ""
-      const toolCalls: ToolCall[] = []
-
-      for await (const event of stream) {
+      while (turnCount < maxTurns) {
+        turnCount++
         if (this._interrupted) {
           yield { role: "status", content: "interrupted" }
           return
         }
 
-        if (event.type === "text_delta") {
-          fullContent += event.delta
-          yield { role: "assistant_delta", content: event.delta }
-        } else if (event.type === "thinking_delta") {
-          fullReasoning += event.delta
-          yield { role: "reasoning_delta", content: event.delta }
-        } else if (event.type === "toolcall_end") {
-          const tc: ToolCall = {
-            id: event.toolCall.id,
-            type: "function",
-            function: {
-              name: event.toolCall.name,
-              arguments: JSON.stringify(event.toolCall.arguments),
-            },
-          }
-          toolCalls.push(tc)
-          yield {
-            role: "tool_call_delta",
-            toolName: event.toolCall.name,
-            content: JSON.stringify(event.toolCall.arguments),
-          }
-        } else if (event.type === "done") {
-          if (event.message.usage) {
-            const u = event.message.usage
-            this.stats.promptTokens += u.input
-            this.stats.completionTokens += u.output
-            this.stats.cacheHitTokens += u.cacheRead
-            this.stats.cacheMissTokens += u.cacheWrite
-            this.stats.apiCalls++
+        let fullContent = ""
+        let fullReasoning = ""
+        const toolCalls: ToolCall[] = []
+
+        for await (const event of this.client.chatCompletionsStream(this.ctx.buildMessages(), {
+          apiKey: this.config.apiKey,
+          baseUrl: this.config.baseUrl,
+          model: this.config.model,
+          maxTokens: this.config.maxTokens,
+          temperature: this.config.temperature,
+          signal: abortController.signal,
+          tools: toolSpecs.length > 0 ? toolSpecs : undefined,
+        })) {
+          if (this._interrupted) {
+            yield { role: "status", content: "interrupted" }
+            return
           }
 
-          if (event.reason === "toolUse") {
-            this.ctx.log.append({
-              role: "assistant",
-              content: fullContent || fullReasoning || null,
-              tool_calls: toolCalls,
-            })
-
-            const abortController = new AbortController()
-
-            const exclusive: AgentTool[] = []
-            const shared: AgentTool[] = []
-            for (const tc of toolCalls) {
-              const handler = this.tools.get(tc.function.name)
-              if (!handler) continue
-              if (handler.concurrency === "exclusive") exclusive.push(handler)
-              else shared.push(handler)
-            }
-
-            for (const tc of toolCalls) {
-              this.stats.toolCalls++
-              yield { role: "tool_start", toolName: tc.function.name, toolCallIndex: 0 }
-
-              const handler = this.tools.get(tc.function.name)
-              const toolCtx: ToolContext = { cwd: process.cwd(), sessionId: this.sessionId, signal: abortController.signal }
-
-              try {
-                if (!handler) {
-                  const err = JSON.stringify({ error: `Unknown tool: ${tc.function.name}` })
-                  this.ctx.log.append({ role: "tool", tool_call_id: tc.id, content: err, name: tc.function.name })
-                  yield { role: "error", content: err, severity: "error" }
-                  continue
-                }
-
-                const args = JSON.parse(tc.function.arguments) as Record<string, unknown>
-                const result = await handler.execute(args, toolCtx)
-                this.ctx.log.append({
-                  role: "tool", tool_call_id: tc.id,
-                  content: result, name: tc.function.name,
-                })
-                yield { role: "tool", toolName: tc.function.name, content: result }
-              } catch (e) {
-                if (abortController.signal.aborted) {
-                  yield { role: "status", content: "tool_cancelled" }
-                  return
-                }
-                const err = JSON.stringify({ error: String(e) })
-                this.ctx.log.append({ role: "tool", tool_call_id: tc.id, content: err, name: tc.function.name })
-                yield { role: "error", content: err, severity: "error" }
+          switch (event.type) {
+            case "text_delta":
+              fullContent += event.delta
+              yield { role: "assistant_delta", content: event.delta }
+              this.sessionWriter?.enqueue({ ts: Date.now(), type: "event", payload: { role: "assistant_delta", content: event.delta } })
+              break
+            case "reasoning_delta":
+              fullReasoning += event.delta
+              yield { role: "reasoning_delta", content: event.delta }
+              this.sessionWriter?.enqueue({ ts: Date.now(), type: "event", payload: { role: "reasoning_delta", content: event.delta } })
+              break
+            case "tool_call_end": {
+              const tc: ToolCall = {
+                id: event.id,
+                type: "function",
+                function: {
+                  name: event.name,
+                  arguments: event.arguments,
+                },
               }
+              toolCalls.push(tc)
+              yield { role: "tool_call_delta", toolName: event.name, content: event.arguments }
+              this.sessionWriter?.enqueue({ ts: Date.now(), type: "event", payload: { role: "tool_call_delta", toolName: event.name, content: event.arguments } })
+              break
             }
-          } else {
-            this.ctx.log.append({ role: "assistant", content: fullContent })
-          }
+            case "usage":
+              this.stats.promptTokens += event.usage.promptTokens
+              this.stats.completionTokens += event.usage.completionTokens
+              this.stats.cacheHitTokens += event.usage.cacheHitTokens ?? 0
+              this.stats.cacheMissTokens += event.usage.cacheMissTokens ?? 0
+              this.stats.apiCalls++
+              this.sessionWriter?.enqueue({ ts: Date.now(), type: "stats", payload: { ...this.stats } })
+              break
+            case "done": {
+              const reason = event.finishReason ?? "stop"
+              // tool-calling reasons vary across providers; accept common variants.
+              const isToolUse =
+                reason === "tool_calls" || reason === "tool_use" || reason === "toolUse" || reason === "toolCall" || reason === "tool"
 
-          yield { role: "done", metadata: { reason: event.reason } as Record<string, unknown> }
-          if (event.reason !== "toolUse") return
-          break
-        } else if (event.type === "error") {
-          yield { role: "error", content: event.error.errorMessage || "Unknown error", severity: "error" }
-          return
+              if (isToolUse) {
+                this.ctx.log.append({
+                  role: "assistant",
+                  content: fullContent || fullReasoning || null,
+                  tool_calls: toolCalls,
+                })
+                this.sessionWriter?.enqueue({ ts: Date.now(), type: "messages", payload: this.ctx.buildMessages() })
+
+                for await (const toolEvent of this.toolExecutor.run(toolCalls, abortController.signal, (tc, result) => this.appendToolResult(tc, result))) {
+                  yield toolEvent
+                  this.sessionWriter?.enqueue({ ts: Date.now(), type: "event", payload: toolEvent })
+                }
+                yield { role: "status", content: "tools_completed" }
+                this.sessionWriter?.enqueue({ ts: Date.now(), type: "event", payload: { role: "status", content: "tools_completed" } })
+              } else {
+                this.ctx.log.append({ role: "assistant", content: fullContent })
+                yield { role: "done", metadata: { reason } as Record<string, unknown> }
+                this.sessionWriter?.enqueue({ ts: Date.now(), type: "messages", payload: this.ctx.buildMessages() })
+                this.sessionWriter?.enqueue({ ts: Date.now(), type: "event", payload: { role: "done", metadata: { reason } } })
+                return
+              }
+
+              break
+            }
+            case "error":
+              yield { role: "error", content: event.message, severity: "error", metadata: event.status ? { status: event.status } : undefined }
+              this.sessionWriter?.enqueue({ ts: Date.now(), type: "event", payload: { role: "error", content: event.message, status: event.status } })
+              return
+          }
         }
+      }
+
+      yield { role: "warning", content: `Reached maximum tool loop count (${maxTurns}).`, severity: "warning" }
+      yield { role: "done", metadata: { reason: "maxTurns" } }
+    } finally {
+      if (this.activeAbortController === abortController) {
+        this.activeAbortController = undefined
       }
     }
   }
-}
 
-function buildOmpContext(
-  ctx: ContextManager,
-  toolSpecs: ToolSpec[],
-): { systemPrompt: string[] | undefined; messages: unknown[]; ompTools: unknown[] | undefined } {
-  const raw = ctx.buildMessages()
-  const systemPrompt: string[] = []
-  const messages: unknown[] = []
-  const now = Date.now()
-
-  for (const m of raw) {
-    switch (m.role) {
-      case "system":
-        if (m.content) systemPrompt.push(m.content)
-        break
-      case "user":
-        messages.push({ role: "user", content: m.content ?? "", timestamp: now })
-        break
-      case "assistant": {
-        const content: unknown[] = []
-        if (m.content) content.push({ type: "text", text: m.content })
-        if (m.tool_calls) {
-          for (const tc of m.tool_calls) {
-            content.push({
-              type: "toolCall",
-              id: tc.id,
-              name: tc.function.name,
-              arguments: JSON.parse(tc.function.arguments),
-            })
-          }
-        }
-        messages.push({
-          role: "assistant",
-          content,
-          api: "opencode",
-          provider: "opencode",
-          model: "",
-          usage: { input: 0, output: 0, totalTokens: 0, cacheRead: 0, cacheWrite: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
-          stopReason: "stop",
-          timestamp: now,
-        })
-        break
-      }
-      case "tool":
-        messages.push({
-          role: "toolResult",
-          toolCallId: m.tool_call_id ?? "",
-          toolName: m.name ?? "",
-          content: [{ type: "text", text: m.content ?? "" }],
-          isError: false,
-          timestamp: now,
-        })
-        break
-    }
-  }
-
-  const ompTools = toolSpecs.length > 0
-    ? toolSpecs.map((s) => ({
-        name: s.function.name,
-        description: s.function.description,
-        parameters: s.function.parameters,
-      }))
-    : undefined
-
-  return {
-    systemPrompt: systemPrompt.length > 0 ? systemPrompt : undefined,
-    messages,
-    ompTools,
+  private appendToolResult(tc: ToolCall, result: ToolResult): void {
+    this.stats.toolCalls++
+    this.ctx.log.append({
+      role: "tool",
+      tool_call_id: tc.id,
+      content: result.content,
+      name: tc.function.name,
+      is_error: result.isError,
+    })
   }
 }
+
+// buildOmpContext removed: engine now talks directly to DeepSeek official API.

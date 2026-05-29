@@ -1,4 +1,5 @@
 import type { ChatMessage } from "../types.js"
+import { cloneChatMessage, cloneChatMessages } from "./message.js"
 
 /**
  * AppendOnlyLog — 对话历史（只追加区域）
@@ -16,16 +17,16 @@ export class AppendOnlyLog {
 
   // 追加单条消息到日志末尾
   append(message: ChatMessage): void {
-    this.entries.push(message)
+    this.entries.push(cloneChatMessage(message))
   }
 
   appendMany(messages: ChatMessage[]): void {
-    this.entries.push(...messages)
+    this.entries.push(...cloneChatMessages(messages))
   }
 
   // 获取日志消息的只读视图
   get messages(): readonly ChatMessage[] {
-    return this.entries
+    return cloneChatMessages(this.entries)
   }
 
   // 获取当前日志长度（消息条数）
