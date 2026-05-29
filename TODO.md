@@ -2,6 +2,14 @@
 
   主要问题
 
+  ✅ 已修复：
+  
+  4. ~~shared 工具结果顺序不稳定~~ → 已完成：并发执行后按声明 index 顺序提交到上下文
+  5. ~~toolCallIndex 映射可能丢失~~ → 已完成：executeToolResult 保留原始 index
+  6. ~~assistant_final / reasoning_content~~ → 已完成：协议边界 + 历史 round-trip
+
+  待修复：
+
   1. 工具参数缺少运行时校验，可能执行错误命令
       - deepicode/packages/tools/src/shell-exec.ts:21 直接 String(args.command)，如果
         模型漏传 command，会执行字符串 "undefined"。
@@ -13,17 +21,6 @@
         认、沙箱、cwd 限制。
       - deepicode/packages/tools/src/file-ops.ts:120 可读任意路径。
       - deepicode/packages/tools/src/edit.ts:297 可写任意路径。
-  4. shared 工具结果顺序不稳定
-      - deepicode/packages/core/src/streaming-executor.ts:31 用 Promise.race 按完成顺
-        序 yield 并写入 log。
-      - 如果模型发出 [toolA, toolB]，但 B 先完成，历史里的 tool result 可能先写 B。
-      - 协议上更稳的是：并发执行，但按模型声明顺序提交到上下文。
-  5. toolCallIndex 映射可能丢失
-      - deepicode/packages/core/src/engine.ts:133 收到 tool_call_end 后只 push(tc)，没
-        有保留 event.toolCallIndex。
-      - 后面 executor 用数组下标重新编号：deepicode/packages/core/src/streaming-
-        executor.ts:41。
-      - 如果上游 index 不连续或到达顺序变化，事件 index 会错。
   6. Session writer 是 best-effort，但错误会变成隐性风险
       - deepicode/packages/core/src/engine.ts:37 writer.init() 没 await，随后可能立刻
         enqueue。
@@ -32,11 +29,10 @@
       - 建议：enqueue 内部吞掉写入错误或暴露诊断事件。
         packages/tools/src/hash-edit.ts:184 比较的是 sha256(oldString) ===
         needleHash，恒真。
-      - 当前实际是“流式 exact replace once”，不是 hash-anchored edit。
-      - 文档里标“最小完成”是对的，代码命名后续要么补真 hash anchor，要么改名避免误导。
+      - 当前实际是"流式 exact replace once"，不是 hash-anchored edit。
+      - 文档里标"最小完成"是对的，代码命名后续要么补真 hash anchor，要么改名避免误导。
 
-  我建议优先修：参数校验、abort catch、工具结果按声明顺序提交、最小安全 denylist。然后
-  再做 assistant_final / reasoning_content。
+  建议下一步：参数校验、安全 denylist、abort catch、session writer 错误吞没。
 
 
 本文记录下一阶段任务。优先级从高到低排列，建议每个任务完成后同步更新 `DONE.md`。
