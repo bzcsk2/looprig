@@ -2,99 +2,6 @@
 
 本文记录下一阶段任务，优先级从高到低排列。每个任务完成后同步更新 `DONE.md`。
 
-## P0：阻断性修复（本轮审查新发现）
-
-### N1. 上下文无界增长的硬终止防护
-
-状态：✅ 已完成（commit 预计）
-
-实现方式：
-- `config.ts`：新增 `maxContextRounds` 配置项（默认 20）
-- `ContextManager`：`buildMessages()` 中按 user 消息计数截断，保留最近 N 轮
-- 完整工具调用轮次（user → assistant + tool_calls → tool results → assistant）保持完整
-- 5 个新单测覆盖：默认值、不截断、截断、包含工具消息的截断、禁用截断
-
-长期方案（配合 #11）：
-
-- 接入 Tokenizer Worker Pool，精确 token 计数 + 65%/75%/80% 三级 Fold 决策。
-
-验收：
-
-- ✅ 模拟超过 30 轮对话后，`buildMessages()` 返回的消息数不超过配置上限。
-- ✅ API 调用不因 context_length_exceeded 而报错。
-
----
-
-## P0：已完成的阻断项 ✅
-
-以下项目已在 794d414 / d76f3c0 中修复：
-
-- **B1**：SSE `done` 事件重复发射 → 工具调用轮提前终止 ✅
-- **B2**：缺少 `write_file` 工具 ✅
-- **B3**：`bash` 工具 `cwd` 未 `resolve()` ✅
-- **C1**：缺少 `list_dir` / `grep` 工具 ✅
-- **B4**：`hash-edit.ts` 临时文件 `Date.now()` 碰撞 ✅
-- **B5**：`fuzzy-edit.ts` 正则转义交叉干扰 ✅
-- **D1**：`SENSITIVE_FILE_PATTERNS` 重复定义 ✅
-- **D2**：`known_hosts` 保护未在 edit 中生效 ✅
-- **D3**：`getState()` 硬编码 `isStreaming: false` ✅
-
----
-
-## P1：数据完整性与资源安全
-
-### N4. Stale-read 全局状态改为会话级
-
-状态：✅ 已完成
-
-实现方式：
-- `ReasonixEngine` 构造函数接受可选 `onStart` 回调
-- 新引擎创建时自动调用 `clearReadTracker()`
-- `tui.ts` 中传入 `clearReadTracker` 作为回调
-
-长期方案（正确架构）：
-
-- `ReadTracker` 改为实例化类，由 `ReasonixEngine` 创建并通过 `ToolContext` 注入到工具。
-
-### N3. hash-edit 临时文件异常路径泄漏
-
-状态：✅ 已完成
-
-实现方式：
-- `hashAnchoredReplaceOnce` 用 try-finally 包裹整个逻辑
-- `tmpCreated` 标记追踪 tmpPath 是否已创建
-- finally 块中按需清理残留临时文件
-- rename 成功后取消标记，避免误删
-
-### 7. 完整化 Hash-Anchored Edit
-
-状态：✅ 已完成
-
-实现方式：
-- `hashAnchoredReplaceOnce` 增加可选 `oldHash` 参数
-- 传入时校验 `sha256(oldString) === oldHash`，不匹配直接返回 null 不写入
-- `edit.ts` 工具增加 `old_hash` 参数暴露给 LLM
-- 6 个单测覆盖：精确替换、多行替换、未找到、hash 不匹配、hash 匹配、空字符串
-
-### 8. 完整化 9-Pass Fuzzy Edit
-
-状态：✅ 已完成（9/9 pass）
-
-pass 列表：
-1. exact — 精确匹配
-2. trimmed_full — 整体 trim
-3. trimmed_lines — 每行右 trim
-4. trimmedBoundary — 每行左右 trim
-5. blockAnchor — 首尾锚点行定位
-6. contextAware — 上下文锚点 + 近似中间行
-7. escapeNormalized — 转义序列归一化
-8. flexible_whitespace — 灵活空白（最激进）
-9. multiOccurrence — 多匹配时取最后一次
-
-所有 pass 有独立单测（共 9 个）。
-
----
-
 ## P1.5：事件体系
 
 ### 9. 展示事件与协议事件分层
@@ -236,7 +143,7 @@ pass 列表：
 - D4（空 messages 空哈希，实际不触发）。
 - D5（`buildPiModel` + `vendor/pi.d.ts` 死代码清理，不阻塞功能）。
 
-原因：这些任务会显著扩大实现面。建议先把 N1（上下文保护）、session 恢复、测试闭环稳定后再推进。
+原因：这些任务会显著扩大实现面。建议先把 session 恢复、测试闭环稳定后再推进。
 
 ---
 
@@ -250,6 +157,8 @@ pass 列表：
 | 4 | bash 最小权限确认 | — |
 | 5 | read_file 路径与大文件保护 | — |
 | 6 | Stale-read Validation 最小版 | — |
+| 7 | Hash-Anchored Edit 完整化（oldHash） | a3ace0a |
+| 8 | 9-Pass Fuzzy Edit 完整化（9/9 pass） | a3ace0a |
 | 10 | prefix fingerprint 覆盖 toolSpecs/fewShots | — |
 | 13 | API 重试与错误分类 | — |
 | B1 | SSE done 事件重复 | 794d414 |
@@ -261,3 +170,6 @@ pass 列表：
 | D1 | SENSITIVE_FILE_PATTERNS 重复 | d76f3c0 |
 | D2 | known_hosts 保护缺失 | 794d414 |
 | D3 | getState 硬编码 | d76f3c0 |
+| N1 | 上下文无界增长截断 | 4821054 |
+| N3 | hash-edit 临时文件泄漏修复 | a3ace0a |
+| N4 | stale-read 全局状态清理 | a3ace0a |

@@ -6,7 +6,7 @@
 - `最小完成`：具备可用闭环，但未达到实施计划中的完整版要求。
 - `部分完成`：只完成子集能力，仍需后续补齐。
 
-最后更新：2026-05-29
+最后更新：2026-05-29（N1/N3/N4/#7/#8 已完成）
 
 ## Phase 0：脚手架搭建
 
@@ -129,6 +129,7 @@
 
 - prefix fingerprint 覆盖 toolSpecs 和 fewShots（不限于 system prompt）
 - 单元测试覆盖 system / toolSpecs / fewShots 三类变化
+- N1 上下文截断：`buildMessages()` 按 user 消息计数截断，保留最近 `maxContextRounds` 轮（默认 20），5 个单测
 
 未完成：
 
@@ -250,34 +251,32 @@
 
 ### Step 4.2 Hash-Anchored Edit
 
-状态：最小完成（B4 已修复）
+状态：完成
 
 - 新增 `packages/tools/src/hash-edit.ts`。
 - 使用 `createReadStream` / `createWriteStream` 实现流式替换。
 - 临时文件后缀使用 `randomUUID()` 替代 `Date.now()` 避免碰撞（B4）。
-
-未达到计划完整版的部分：
-
-- 尚未实现 oldHash 入参校验。
-- 尚未实现多编辑操作。
-- 尚未实现完整 hash-anchor 协议。
+- N3 临时文件泄漏修复：try-finally 包裹 + `tmpCreated` 标记追踪。
+- #7 oldHash 校验：可选参数，传入时验证 `sha256(oldString) === oldHash`，不匹配不写入。
+- 6 个单测覆盖精确替换、多行替换、未找到、hash 匹配/不匹配、空字符串。
 
 ### Step 4.3 9-Pass Fuzzy Edit
 
-状态：部分完成（B5 已修复）
+状态：完成
 
 - 新增 `packages/tools/src/fuzzy-edit.ts`。
-- 当前支持：
-  - exact
-  - trimRightLines
-  - normalizeWhitespace
-  - normalizeIndent
+- 完整 9-pass：
+  1. exact — 精确匹配（多 occurrence 时取最后一次）
+  2. trimmed_full — 整体 trim
+  3. trimmed_lines — 每行右 trim
+  4. trimmedBoundary — 每行左右 trim
+  5. blockAnchor — 首尾锚点行定位
+  6. contextAware — 上下文锚点 + 近似中间行
+  7. escapeNormalized — 转义序列归一化
+  8. flexible_whitespace — 灵活空白（最激进）
+  9. multiOccurrence — 多匹配时取最后一次
 - B5 修复：flexible_whitespace pass 改为按 whitespace 分段转义后 join `\s+`
-
-未完成：
-
-- 尚未实现完整 9-pass。
-- fuzzy 匹配回写映射仍是简化版。
+- 9 个单测覆盖每个 pass
 
 ### Step 4.4 Stale-read Validation
 
@@ -288,6 +287,7 @@
 - `read_file` 成功读取后调用 `recordRead()` 记录。
 - `edit` 执行前调用 `checkStale()`，mtime/size 变化则返回 `{isError: true}`，提示先 re-read。
 - 不校验从未 read 过的文件（兼容 CLI 等外部写入场景）。
+- N4 修复：`ReasonixEngine` 构造时通过回调 `clearReadTracker()`，避免全局状态跨会话污染。
 
 ### Step 4.5 基础工具集
 
@@ -352,7 +352,7 @@ bun test
 结果：
 
 - `bun run typecheck`：通过。
-- `bun test`：43 pass / 3 skip / 0 fail（含双重 done 去重 + 工具回归测试）。
+- `bun test`：65 pass / 3 skip / 0 fail。
 
 测试文件：
 
@@ -360,6 +360,7 @@ bun test
 - `packages/core/__tests__/engine-tools.test.ts`
 - `packages/core/__tests__/integration.test.ts`（默认 skip）
 - `packages/core/__tests__/tools-regression.test.ts`
+- `packages/tools/__tests__/edit.test.ts`（新增）
 
 ## 关键设计决策
 
@@ -389,16 +390,19 @@ bun test
 | C1 | 缺少 list_dir/grep/todowrite | 新增 3 个工具文件 | 结构化目录列表、rg/grep 搜索、任务跟踪 |
 | D1 | SENSITIVE_FILE_PATTERNS 三处重复 | `sensitive.ts` (新增) | 提取到共享模块，3 个工具统一引用 |
 | D2 | edit.ts 缺 known_hosts 保护 | `edit.ts` | 补上 `known_hosts` 模式 |
-| D3 | getState() 硬编码默认值 | `engine.ts` | 改为参数化接口 `getState(isStreaming, streamingMessage, pendingToolCalls)` |
+| D3 | getState() 硬编码默认值 | `engine.ts` | 改为参数化接口 |
+| N1 | 上下文无界增长 → 会话硬终止 | `context/manager.ts` / `config.ts` | buildMessages() 按 user 消息计数截断（默认 20 轮） |
+| N3 | hash-edit 临时文件泄漏 | `hash-edit.ts` | try-finally + tmpCreated 标记 |
+| N4 | stale-read 全局状态跨会话污染 | `engine.ts` / `tui.ts` | 构造函数回调 clearReadTracker() |
 
 此外：
 - 系统提示词重写：全中文、环境注入、todowrite 任务跟踪、7 工具指南、闭环工作流
 - `grep` 工具回退机制修复：rg 不可用时 grep `--include` 参数格式错误
+- #7: hash-anchored edit 增加 oldHash 参数校验，6 个单测
+- #8: 9-pass fuzzy edit 完整实现（新增 5 pass），9 个单测
 
 ## 已知限制
 
-- `edit` 工具仍是最小版本，不具备完整 9-pass。
 - 展示事件与协议事件尚未分层（`tool_progress` 未实现）。
 - `session.ts` 尚不能恢复历史。
 - `grep` 工具使用同步 `execSync` 调用 rg/grep，不适合大代码库搜索。
-- `hashAnchoredReplaceOnce` 临时文件名用 `randomUUID()` 无碰撞风险（B4 已修）。
