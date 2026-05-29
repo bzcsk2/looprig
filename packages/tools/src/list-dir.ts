@@ -29,14 +29,14 @@ export function createListDirTool(): AgentTool {
         return { content: safeStringify({ error: `Directory not found: ${args.path}` }), isError: true }
       }
 
-      const items: Array<{ name: string; type: "file" | "dir"; size?: number }> = []
+      const items: Array<{ name: string; type: "file" | "dir" | "unknown"; size?: number }> = []
       for (const name of entries) {
         const full = resolve(dir, name)
         try {
           const st = await stat(full)
           items.push({ name, type: st.isDirectory() ? "dir" : "file", size: st.size })
         } catch {
-          items.push({ name, type: "file" })
+          items.push({ name, type: "unknown" })
         }
       }
 

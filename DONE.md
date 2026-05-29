@@ -464,6 +464,7 @@ bun test
 - #9: tool_progress 事件分层（interface/executor/tui）
 - #11: token 估算与 fold 决策（token-estimator.ts + ContextManager）
 - #12: session JSONL 恢复（SessionLoader + Recover 工厂）
+- reasoning_content 不入上下文：client.ts 不再回传 + engine.ts 三处 log.append 不再写入
 
 ## 已知限制
 

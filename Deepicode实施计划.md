@@ -170,7 +170,7 @@ deepicode/
 ### Step 1.1：DeepSeekClient 实现
 1. 创建 `packages/core/src/client.ts`。
 2. **SSE 解析**：解析 `contentDelta`、`toolCallDelta`、`reasoningDelta`。
-3. **R1 thought harvesting**：提取 `reasoning_content`，传递给 TUI 渲染（可折叠显示），同时写入 assistant 历史消息保留多轮连续性。但 `reasoning_content` **不计入 prefix-cache 的 cacheKey 计算**，因此不影响前缀稳定性。是否最终写入历史可留待性能测试后决定——若 reasoning 内容过长导致上下文膨胀，可改为仅保留最近 N 轮的 reasoning。
+3. **R1 thought harvesting**：提取 `reasoning_content`，传递给 TUI 渲染（可折叠显示），**不写入上下文（AppendOnlyLog），不进入 API 请求体**。理由：reasoning 内容可能极长（数千 token），写入历史会快速耗尽上下文窗口；且模型读取自己上一轮的思考过程存在自我强化偏差风险。用户仍可通过 TUI 查看 reasoning 内容。
 4. **Usage 提取与重试**：实现指数退避重试（429/500/502/503重试，400/401不重试）。提取 cache hit/miss tokens 供统计。
 
 ### Step 1.2：SegmentedLog 与 Session 持久化
@@ -210,7 +210,7 @@ deepicode/
 2. 事件 yield 策略（实时推送增量、状态、工具回调等）。
 
 **Phase 1 验收检查清单**：
-- [ ] DeepSeekClient SSE 解析与 reasoning 分离正确（写入历史但不影响 cacheKey）
+- [x] DeepSeekClient SSE 解析与 reasoning 分离正确（仅 TUI 展示，不入上下文和 API 请求）
 - [ ] SegmentedLog 与异步批量 JSONL 写入正常
 - [ ] 阈值旁路机制下，短对话 TUI 零延迟
 - [ ] Tokenizer Map 回收无泄漏
@@ -556,7 +556,7 @@ deepicode/
 | 分类器 | 纯规则（无 ML） | 零额外成本，行为可预期；接受约 60-70% 准确率 | task-classifier.ts |
 | Token 计数 | 增量旁路 + Map池 | <2000字符 O(1) 估算，≥2000字符 offload Worker，杜绝 O(n) Array 搜索 | context.ts, tokenizer-pool.ts |
 | Session 持久化 | JSONL + 异步批量 | 崩溃可恢复，IO 不阻塞 | session.ts |
-| reasoning 策略 | 写入历史但不影响 cacheKey | 保留多轮连续性；reasoning 不参与 prefix-cache 指纹计算 | client.ts, engine.ts, immutable.ts |
+| reasoning 策略 | 不入上下文，仅 TUI 展示 | reasoning 不写入 AppendOnlyLog，不进入 API 请求，不占用 token 窗口 | client.ts, engine.ts |
 | 不引入 Vercel SDK | 是（MCP 除外） | Vercel SDK 破坏 DeepSeek cache 优化；MCP 是外部工具集成标准，不影响核心推理链路 | 全局 |
 
 ---

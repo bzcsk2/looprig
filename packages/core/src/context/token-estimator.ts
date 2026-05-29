@@ -8,11 +8,12 @@ export interface FoldDecision {
 const CHARS_PER_TOKEN = 4
 const MSG_OVERHEAD = 10
 
-export function estimateTokens(messages: Array<{ role?: string; content?: string | null }>): number {
+export function estimateTokens(messages: Array<{ role?: string; content?: string | null; reasoning_content?: string | null }>): number {
   let total = 0
   for (const msg of messages) {
     total += MSG_OVERHEAD
     if (msg.content) total += Math.ceil(msg.content.length / CHARS_PER_TOKEN)
+    if (msg.reasoning_content) total += Math.ceil(msg.reasoning_content.length / CHARS_PER_TOKEN)
   }
   return total
 }

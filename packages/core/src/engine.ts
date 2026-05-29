@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto"
 import type { DeepicodeConfig } from "./config.js"
 import { ContextManager } from "./context/manager.js"
-import type { ChatMessage, ToolCall, ToolSpec } from "./types.js"
-import type { CoreEngine, AgentConfig, AgentTool, LoopEvent, AgentState, SessionStats, ToolContext, ToolResult } from "./interface.js"
-import { DeepSeekClient } from "./client.js"
+import type { ToolCall, ToolSpec } from "./types.js"
+import type { CoreEngine, AgentConfig, AgentTool, LoopEvent, AgentState, SessionStats, ToolResult } from "./interface.js"
+import { DeepSeekClient, isToolUseFinishReason } from "./client.js"
 import { StreamingToolExecutor } from "./streaming-executor.js"
 import { AsyncSessionWriter, SessionLoader } from "./session.js"
 
@@ -231,21 +231,24 @@ export class ReasonixEngine implements CoreEngine {
             // 流结束：根据 finish_reason 决定下一步
             case "done": {
               const reason = event.finishReason ?? "stop"
-              // 不同厂商对 tool call 的 finish_reason 命名不同，统一处理
-              const isToolUse =
-                reason === "tool_calls" || reason === "tool_use" || reason === "toolUse" || reason === "toolCall" || reason === "tool"
+              const isToolUse = isToolUseFinishReason(reason)
 
               // 先 yield 最终助手消息（包含完整内容和推理）
               yield { role: "assistant_final", content: fullContent, metadata: { reasoning: fullReasoning || undefined } }
 
               if (isToolUse) {
+                // 防御：API 宣称 tool_calls 但无实际调用，视为错误
+                if (toolCalls.length === 0) {
+                  yield { role: "warning", content: "API returned tool_calls finish_reason but no tool calls found", severity: "warning" }
+                  break
+                }
                 // 本次需要执行工具调用
                 finishedWithToolUse = true
                 // 将助手响应及工具调用存入上下文
+                // reasoning_content 不入库——用户可通过 assistant_final 查看，不参与 API 上下文
                 this.ctx.log.append({
                   role: "assistant",
                   content: fullContent || null,
-                  reasoning_content: fullReasoning || null,
                   tool_calls: toolCalls,
                 })
                 this.sessionWriter?.enqueue({ ts: Date.now(), type: "messages", payload: this.ctx.buildMessages() })
@@ -261,7 +264,7 @@ export class ReasonixEngine implements CoreEngine {
                 // 防御性分支：client fix 后二次 done 不应出现，但保留以防 API 行为变化
               } else {
                 // 纯文本响应（无工具调用），保存后结束
-                this.ctx.log.append({ role: "assistant", content: fullContent, reasoning_content: fullReasoning || null })
+                this.ctx.log.append({ role: "assistant", content: fullContent })
                 yield { role: "done", metadata: { reason } as Record<string, unknown> }
                 this.sessionWriter?.enqueue({ ts: Date.now(), type: "messages", payload: this.ctx.buildMessages() })
                 this.sessionWriter?.enqueue({ ts: Date.now(), type: "event", payload: { role: "done", metadata: { reason } } })
@@ -288,7 +291,7 @@ export class ReasonixEngine implements CoreEngine {
           }
           // 如果有部分内容，先保存再重试
           if (fullContent) {
-            this.ctx.log.append({ role: "assistant", content: fullContent, reasoning_content: fullReasoning || null })
+            this.ctx.log.append({ role: "assistant", content: fullContent })
           }
           consecutiveErrors++
           if (consecutiveErrors >= 3) {

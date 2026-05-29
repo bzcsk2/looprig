@@ -84,10 +84,9 @@ export class DeepSeekClient {
           }
         }
         if (m.role === "assistant") {
+          // reasoning_content 不进入 API 请求——用户可在 TUI 查看，
+          // 但不应占用上下文窗口或影响模型的下一轮推理
           const msg: any = { role: "assistant", content: m.content }
-          if (m.reasoning_content !== undefined && m.reasoning_content !== null) {
-            msg.reasoning_content = m.reasoning_content
-          }
           if (m.tool_calls) msg.tool_calls = m.tool_calls
           return msg
         }
@@ -214,7 +213,7 @@ export class DeepSeekClient {
           }
 
           // finalize tool calls when finish_reason triggers or message.tool_calls present
-          if (choice?.finish_reason === "tool_calls" || choice?.finish_reason === "tool_use" || choice?.finish_reason === "toolUse") {
+          if (isToolUseFinishReason(choice?.finish_reason ?? null)) {
             for (const [index, state] of toolState.entries()) {
               if (finalized.has(index)) continue
               if (!state.id || !state.name) continue
@@ -248,6 +247,10 @@ export class DeepSeekClient {
       yield { type: "done", finishReason: null }
     }
   }
+}
+
+export function isToolUseFinishReason(reason: string | null): boolean {
+  return reason === "tool_calls" || reason === "tool_use" || reason === "toolUse" || reason === "toolCall" || reason === "tool"
 }
 
 function ensureBaseUrl(baseUrl: string): string {

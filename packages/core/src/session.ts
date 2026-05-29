@@ -35,19 +35,6 @@ export class SessionLoader {
   }
 }
 
-export class SegmentedLog {
-  archive: ChatMessage[] = []
-  active: ChatMessage[] = []
-
-  append(messages: ChatMessage[]): void {
-    this.active.push(...messages)
-  }
-
-  snapshot(): ChatMessage[] {
-    return [...this.archive, ...this.active]
-  }
-}
-
 export class AsyncSessionWriter {
   private path: string
   private queue: string[] = []
