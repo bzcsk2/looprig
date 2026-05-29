@@ -128,6 +128,51 @@ deepicode/
 | **CC** | Claude Code | /vol4/Agent/best-claude-code | TUI 渲染引擎（Ink/React 框架）+ 布局系统复制自 `packages/@ant/ink/`；StreamingToolExecutor 思路、Deny-first 权限规则、工具设计 | Ink 框架完整复制（~150 文件 / ~27K 行），仅修改 ~10 行适配；其余代码全新 |
 | **OC** | OpenCode | /vol4/Agent/opencode | 9-Pass Fuzzy Edit、Stale-read validation、多 Agent 模式 | 理念参考 |
 
+### 代码借引逐模块明细
+
+> 下表精确标注 deepicode 每个模块应从哪个参考项目的哪个文件取代码/设计。**复制** = 整文件搬运 + 适配 import；**移植** = 拆解后重写但保留核心算法；**理念** = 仅参考设计思路,代码全新。
+
+#### 已完成模块
+
+| deepicode 模块 | 参考来源 | 参考文件 | 取用方式 | 说明 |
+|---------------|---------|---------|---------|------|
+| `packages/ink/` (全部 146 文件) | **CC** | `packages/@ant/ink/src/**` | **复制** | 3 处微改：删 `feature('AUTO_THEME')`、`USER_TYPE==='ant'`→`false`、删 MACRO 注释 |
+| `packages/tui/src/FullscreenLayout.tsx` | **CC** | `src/components/FullscreenLayout.tsx` | **复制+适配** | 替换 ~10 个 import（ModalContext、plural、browser 等用 deepicode stub） |
+| `packages/tui/src/fullscreen.ts` | **CC** | `src/utils/fullscreen.ts` | **移植** | 精简为 ~30 行，删 tmux 探测和 ant 逻辑 |
+| `packages/tui/src/DeepiPromptInput.tsx` | **CC** | `src/components/PromptInput/` + `@anthropic/ink` 的 `useInput` | **理念** | 结构参考 CC 的 PromptInput，UI 直接用 Ink 的 `useInput` hook |
+| `packages/core/src/client.ts` (DeepSeekClient) | **RNX** | `src/client.ts` | **理念** | SSE 解析结构 + 退避重试策略参考 Reasonix |
+| `packages/core/src/engine.ts` (ReasonixEngine) | **RNX** | `src/loop.ts` + `src/index.ts` | **理念** | AsyncGenerator 主循环架构 + submit/interrupt/recover 接口 |
+| `packages/core/src/loop.ts` (CacheFirstLoop) | **RNX** | `src/loop.ts` (七阶段流程) | **移植** | 7 阶段流程结构 + fold 决策 + 错误恢复逻辑参考 Reasonix |
+| `packages/core/src/session.ts` (SegmentedLog+Writer) | **RNX** | `src/loop.ts` (compact/fold 语义) | **理念** | FoldedArchive+ActiveWindow 双区模型，JSONL 格式自研 |
+| `packages/core/src/context/manager.ts` | **RNX** | `src/context-manager.ts` | **理念** | ImmutablePrefix+AppendOnlyLog+VolatileScratch 三段结构 |
+| `packages/core/src/context/repair.ts` | **RNX** | `src/loop.ts` (内嵌 repair 逻辑) | **移植** | Scavenge/Truncation/Storm 三阶段设计，拆解为独立模块 |
+| `packages/core/src/context/tokenizer-pool.ts` | **RNX** | `src/tokenizer.ts` | **理念** | Worker Pool 模式 + Map 调度优化（O(1) 任务回收自研） |
+| `packages/core/src/streaming-executor.ts` | **CC** | `src/QueryEngine.ts` + `src/Tool.ts` | **理念** | `isConcurrencySafe` 读写分离策略 + shared/exclusive 并发控制 |
+| `packages/tools/src/hash-edit.ts` | **CC** | `packages/builtin-tools/src/tools/FileEditTool/` | **理念** | hash-anchored 替换概念，流式异步化完全自研 |
+| `packages/tools/src/fuzzy-edit.ts` (9-Pass) | **OC** | `packages/opencode/src/tool/edit.ts` (711 行) | **移植** | 9 pass 策略链借鉴 OpenCode，每 pass 实现自研 |
+| `packages/tools/src/stale-read.ts` | **OC** | `packages/opencode/src/tool/read.ts` | **理念** | ReadTracker 记录 mtime/size → checkStale() 检测模式 |
+| `packages/tools/src/shell-exec.ts` (bash) | **CC** + **OC** | CC `packages/builtin-tools/src/tools/BashTool/` + OC `packages/opencode/src/tool/shell.ts` | **理念** | CC 的 tool spec 结构 + OC 的危险命令 denylist |
+| `packages/tools/src/file-ops.ts` (read_file) | **OC** | `packages/opencode/src/tool/read.ts` | **理念** | 敏感文件拒绝列表 + 大小限制 + truncation 提示 |
+| `packages/tools/src/todowrite.ts` | **CC** | `packages/builtin-tools/src/tools/TaskCreateTool/` | **理念** | 任务创建/更新/列表的 JSON schema 结构 |
+| `packages/tui/src/bridge.tsx` | **CC** | `src/screens/REPL.tsx` (事件→状态桥接) | **理念** | AsyncGenerator 事件流 → React useState 的 switch-case 模式 |
+| `packages/tui/src/App.tsx` | **CC** | `src/screens/REPL.tsx` (布局结构) | **理念** | AlternateScreen + FullscreenLayout + scrollable/bottom slot 模式 |
+| `packages/tui/src/DeepiMessages.tsx` | **CC** | `src/components/Messages.tsx` | **理念** | 消息列表渲染 + 流式文本追加的模式，内容渲染逻辑自研 |
+
+#### 待实现模块
+
+| deepicode 模块 (计划) | 参考来源 | 参考文件 | 取用方式 | 说明 |
+|----------------------|---------|---------|---------|------|
+| `packages/security/src/permission.ts` (Deny-first) | **CC** | `src/hooks/toolPermission/PermissionContext.ts` + `src/utils/permissions/` | **移植** | 三级判定（Deny→Allow→Ask）+ 多级模式（default/acceptEdits/dontAsk） |
+| `packages/security/src/hooks.ts` (Hook 系统) | **CC** | `src/hooks/toolPermission/handlers/` | **理念** | beforeToolCall/afterToolCall/onLoopEvent 三类 hook 点 |
+| `packages/security/src/git-snapshot.ts` | **OC** | `packages/opencode/src/git/` | **理念** | 单文件 shadow 备份 + revert() |
+| `packages/shell/src/state.ts` (AgentState) | **CC** | `src/state/AppState.tsx` | **理念** | 不可变状态更新 + processEvents 事件→状态派生 |
+| `packages/shell/src/events.ts` (EventStream) | **CC** | `src/QueryEngine.ts` (事件流模式) | **理念** | 拉模式 AsyncGenerator → 推模式 EventBus 转换 |
+| `packages/shell/src/agents/` (多 Agent) | **OC** | `packages/opencode/src/tool/task.ts` + `plan.ts` | **理念** | Build/Plan Agent 配置 + Tab 切换 + Plan→Build 上下文注入 |
+| `packages/core/src/strategy/` (Tier 系统) | **RNX** | `src/loop.ts` (strategy select 内嵌) | **移植** | TaskClassifier + ChainEstimator + StrategySelector 从 Reasonix loop 拆解 |
+| `packages/tools/src/lsp-client.ts` | **OC** | `packages/opencode/src/tool/lsp.ts` | **理念** | vscode-languageclient 集成 + 编辑后 3s 自动诊断 |
+| `packages/tools/src/mcp-client.ts` | **CC** | `src/services/mcp/` + `packages/mcp-client/` | **理念** | MCP 协议客户端 + 工具自动发现 |
+| `packages/tools/src/web-fetch.ts` | **OC** | `packages/opencode/src/tool/webfetch.ts` | **理念** | GET/POST 请求 + 超时 + HTML→text |
+
 ### 测试约定
 - 所有测试使用 **Vitest**
 - 单元测试与源文件同目录，命名为 `*.test.ts`

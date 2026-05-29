@@ -10,9 +10,10 @@ interface StatusBarProps {
 
 export function StatusBar({ model, provider, inputTokens, outputTokens }: StatusBarProps) {
   return (
-    <Box width="100%">
+    <Box width="100%" flexDirection="row">
       <Text inverse>{` ${provider}`}</Text>
       <Text inverse>{` ${model} `}</Text>
+      <Box flexGrow={1} />
       <Text inverse>{` ↑${inputTokens}`}</Text>
       <Text inverse>{` ↓${outputTokens} `}</Text>
     </Box>

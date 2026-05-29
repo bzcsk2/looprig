@@ -29,9 +29,17 @@ export function FullscreenLayout({ scrollable, bottom, scrollRef }: Props): Reac
   }
 
   return (
-    <>
-      {scrollable}
-      {bottom}
-    </>
+    <Box flexDirection="column" flexGrow={1} overflow="hidden" width="100%">
+      <Box flexGrow={1} flexDirection="column" overflow="hidden">
+        <ScrollBox ref={scrollRef} flexGrow={1} flexDirection="column" paddingTop={1} stickyScroll>
+          {scrollable}
+        </ScrollBox>
+      </Box>
+      <Box flexDirection="column" flexShrink={0} width="100%">
+        <Box flexDirection="column" width="100%" flexGrow={1}>
+          {bottom}
+        </Box>
+      </Box>
+    </Box>
   );
 }

@@ -108,6 +108,7 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
           stats.completionTokens += event.usage.completionTokens
           stats.cacheHitTokens += event.usage.cacheHitTokens ?? 0
           stats.cacheMissTokens += event.usage.cacheMissTokens ?? 0
+          yield { role: "usage", metadata: { input: event.usage.promptTokens, output: event.usage.completionTokens } as Record<string, unknown> }
           sessionWriter?.enqueue({ ts: Date.now(), type: "stats", payload: { ...stats } })
           break
 

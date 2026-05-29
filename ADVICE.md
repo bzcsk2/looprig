@@ -1,86 +1,38 @@
 ## deepicode 项目代码审查报告
 
-**审查时间**: 2026-05-29 / 2026-05-30（第五轮 TUI 审查，已全部修复） · **审查范围**: `packages/` 全部源代码
+**审查时间**: 2026-05-29 / 2026-05-30（第五轮核心审查 + 第六轮 TUI 重做审查） · **审查范围**: `packages/` 全部源代码
+
+> 前五轮审查共修复 63 项（核心引擎 + 工具层 + 旧 TUI），详见 `DONE.md` § ADVICE修复汇总。
+> 旧 TUI 代码（oh-my-pi 移植版）已在 TUI 重构中整体删除，其修复记录保留在 DONE.md 作为历史参考。
 
 ---
 
-## 已修复
+## ✅ 已修复（2026-05-30 第七轮）
 
-| # | 问题 | 位置 |
-|---|------|------|
-| B1 | SSE `done` 事件重复发射 | `client.ts` + `engine.ts` |
-| B2 | 缺少 `write_file` 工具 | `tools/src/index.ts` |
-| B3 | `bash` cwd 未 resolve | `shell-exec.ts` |
-| B4 | 临时文件 `Date.now()` 碰撞 | `hash-edit.ts` |
-| B5 | fuzzy regex 转义交叉干扰 | `fuzzy-edit.ts` |
-| C1 | 缺少 `list_dir` / `grep` | 新增工具 |
-| C4 | 9-Pass Fuzzy Edit 缺 pass | `fuzzy-edit.ts` |
-| C2 | Session 不可恢复 | `session.ts` 新增 `SessionLoader` |
-| C5 | 事件体系未分层 | 新增 `tool_progress` 事件 |
-| P1-1 | finish_reason 不一致 | `client.ts` + `engine.ts` → `isToolUseFinishReason` |
-| P1-2 | 空 toolCalls 死循环 | `engine.ts` → guard + warning |
-| P1-3 | token-estimator 忽略 reasoning | `token-estimator.ts` |
-| P2-1 | read_file 截断无提示 | `file-ops.ts` |
-| P2-2 | list-dir unknown 类型 | `list-dir.ts` |
-| P2-5 | SegmentedLog 死代码 | `session.ts` |
-| D1 | SENSITIVE_FILE_PATTERNS 重复 | 提取到 `sensitive.ts` |
-| D2 | `getState()` 硬编码 | `engine.ts` |
-| N1 | 上下文无界增长 | `context/manager.ts` |
-| N3 | hash-edit 临时文件泄漏 | `hash-edit.ts` |
-| N4 | stale-read 全局污染 | `stale-read.ts` |
-| #7 | Hash-Anchored Edit 完整化 | `hash-edit.ts` + `edit.ts` |
-| P0-1 | grep 命令注入 | `grep.ts` → `spawnSync` |
-| P0-2 | write_file 无 mkdir | `write-file.ts` |
-| P1-1 | buildMessages 截断破坏消息对 | `context/manager.ts` |
-| P1-2 | multiOccurrence 静默误替换 | `fuzzy-edit.ts` → `return null` |
-| P1-3 | interrupt 延迟一轮 | `engine.ts` |
-| P2-1 | truncate 无提示 | `shell-exec.ts` |
-| P2-2 | sessionId Date.now 碰撞 | `engine.ts` → `randomUUID()` |
-| P2-3 | reasoning_content 不入 API 上下文 | `client.ts` + `engine.ts` |
-| P2-3b | SSE JSON 解析静默丢弃 | `client.ts` → `DEEPICODE_DEBUG` |
-| P2-5 | sleep 监听器残留 | `client.ts` → `removeEventListener` |
-| P2-6 | 防御性死代码分支 | `engine.ts` 保留并加注释 |
-| P2-4-1 | Session 恢复重复 system 消息 | `engine.ts` → filter `role !== "system"` |
-| P2-4-2 | enqueue JSON.stringify 无异常保护 | `session.ts` → try-catch |
-| P2-4-3 | tool_progress shared 路径时序错误 | `streaming-executor.ts` → running 提前到 Promise.all 前 |
-| P2-4-4 | tokenizer Worker 与主线程估算不一致 | `token-estimator.ts` + `tokenizer-worker.js` → 共享 `refinedEstimate` |
-| P3-4-1 | apiCalls 重复计数 | `loop.ts` → 移到 done 事件 |
-| P3-4-3 | todowrite 未验证 todo 项结构 | `todowrite.ts` → 运行时校验 |
-| P3-4-4 | sensitive.ts 缺少常见模式 | `sensitive.ts` → 补充 `.env.*`/`*.pem`/`.npmrc` 等 8 模式 |
-
-### 第五轮 TUI 修复
-
-| # | 问题 | 位置 |
-|---|------|------|
-| P0-5-1 | bridge.ts assistant_delta 覆盖 user 消息 | `bridge.ts` → `assistantStarted` 标志 + 占位消息 |
-| P0-5-2 | tool-call-view 同名工具状态覆盖 | `tool-call-view.ts` → `toolCallIndex` 唯一标识 + 状态机不回退 |
-| P1-5-1 | bridge.ts 未处理 reasoning_delta | `bridge.ts` → 新增 case → statusLine |
-| P1-5-2 | bridge.ts error 误更新 toolView | `bridge.ts` → 仅 `event.toolName` 存在时更新 |
-| P1-5-3 | tool_progress 与 tool 事件竞争 | `tool-call-view.ts` → `STATUS_ORDER` 防止降级 |
-| P1-5-4 | bridge.ts for-await 异常未捕获 | `bridge.ts` → try-catch |
-| P1-5-5 | loader.ts timer 泄漏 | `loader.ts` → `destroy()` |
-| P2-5-1 | warning/status 事件被忽略 | `bridge.ts` → statusLine 渲染 |
-| P2-5-2 | strategy-notify timer 泄漏 + cardW 负数 | `strategy-notify.ts` → 清理旧 timer + `Math.max(3,...)` |
-| P2-5-3 | input 文本溢出终端宽度 | `input.ts` → 水平滚动 + cursor 跟随 |
-| P2-5-4 | input 历史无上限 | `input.ts` → `MAX_HISTORY=1000` |
-| P2-5-5 | markdown table 列宽为 0 | `markdown.ts` → `colWidth` min 3 |
-| P2-5-6 | markdown cache 无 LRU | `markdown.ts` → 50 条淘汰 |
-| P2-5-7 | diff-preview s.length | `diff-preview.ts` → `visibleWidth` |
-| P2-5-8 | streaming cwd 硬编码 | `streaming-executor.ts` → 构造函数 `cwd` 参数 |
-| P3-5-1 | select-list filter 逻辑 | `select-list.ts` → 比较实际 item |
-| P3-5-2 | stdin pasteSeqs 循环内清空 | `stdin-buffer.ts` → 循环前拷贝 |
-| P3-5-3 | tui diffLines lc 强制覆盖 | `tui.ts` → 仅纯追加场景覆盖 |
-| P3-5-4 | input ctrl+d 未处理 | `input.ts` → `\x04` → `__CANCEL__` |
-| P3-5-5 | chat-view scroll 死代码 | `chat-view.ts` → 重写移除 |
-
----
-
-## 待处理
-
-| # | 问题 | 位置 | 说明 |
-|---|------|------|------|
-| P3-4-2 | prefix.build 每次 submit 无短路 | `engine.ts:140` | 纯性能优化 |
-| P3-4-5 | fold 竞态孤儿 tokenizer 任务 | `loop.ts:40-43` | pool 5s 超时自动清理；已加注释 |
+| # | 问题 | 修复方式 |
+|---|------|----------|
+| TUI-P0-1 | tool_progress 硬编码 `status: 'running'` | `bridge.tsx`：tool_progress 检查 content，`done` 时不回退 |
+| TUI-P1-1 | error/warning 状态不渲染 | `App.tsx`：scrollable 区域底部添加 error/warning 显示 |
+| TUI-P1-2 | Token 统计永远 ↑0 ↓0 | `loop.ts`：yield usage 事件 → `bridge.tsx` 累加到 tokens state |
+| TUI-P1-3 | 同名工具状态更新歧义 | `bridge.tsx`：改为 `toolCallIndex` 精确匹配 |
+| TUI-P1-4 | reasoning_delta 完全忽略 | `bridge.tsx`：追踪 reasoningText → `DeepiMessages.tsx` 显示 reasoning 行 |
+| TUI-P1-5 | cursorPos closure 陈旧 | `DeepiPromptInput.tsx`：改用 `useRef` 存储光标位置 |
+| TUI-P2-1 | tool_call_delta 事件忽略 | `bridge.tsx`：添加 case |
+| TUI-P2-2 | status 事件忽略 | `bridge.tsx`：非 interrupt/tools_completed 的状态作为 warning 显示 |
+| TUI-P2-3 | done 事件未被明确处理 | `bridge.tsx`：添加 case（空处理，finally 已负责清理） |
+| TUI-P2-4 | warning 与 error 状态混淆 | `bridge.tsx`：warning 改为独立 `warnings[]` 数组 |
+| TUI-P2-5 | Pipe 模式 error 输出到 stdout | `cli/src/tui.ts`：error/warning 改用 `errorOutput` (stderr) |
+| TUI-P2-6 | Pipe 模式缺事件处理 | `cli/src/tui.ts`：添加 reasoning_delta / tool_call_delta / tool_progress / status / warning |
+| TUI-P2-7 | 输入框无光标 | `DeepiPromptInput.tsx`：在输入位置渲染 `▊` 光标 |
+| TUI-P2-8 | 快捷键缺失 | `DeepiPromptInput.tsx`：添加 Ctrl+D / Ctrl+U / Ctrl+K / Home / End / Ctrl+A / Ctrl+E |
+| TUI-P2-9 | /exit 不优雅 | `App.tsx`：interrupt() + 延迟 300ms 退出 |
+| TUI-P3-2 | CLAUDE_CODE 环境变量前缀 | `fullscreen.ts`：兼容 `DEEPCODE_NO_FLICKER` / `DEEPCODE_DISABLE_MOUSE` |
+| TUI-P3-4 | StatusBar 无 flex 分隔 | `StatusBar.tsx`：添加 `<Box flexGrow={1} />` 分隔 |
+| TUI-P3-6 | Pipe 模式 done 重复换行 | `cli/src/tui.ts`：移除 done case 的 `output.write("\n")` |
+| TUI-P3-7 | messages 用 index 作 React key | `DeepiMessages.tsx`：改为 `role + index + content 前缀` 组合 key |
+| TUI-P3-8 | Tool 消息截断无提示 | `DeepiMessages.tsx`：`slice(0, 200) + '...'` |
+| TUI-P3-3 | 非全屏无滚动容器 | `FullscreenLayout.tsx`：非全屏路径也包 ScrollBox |
+| P3-4-2 | prefix.build 每次 submit 无短路 | `engine.ts`：计算 cacheKey，未变化时跳过 rebuild |
 
 ---
 
@@ -94,6 +46,9 @@
 | 4 | Fuzzy Edit flexible_whitespace 误匹配 | 前 7 pass 约束 |
 | 5 | Prompt 注入 | system prompt 声明即可 |
 | 6 | 设计文档功能缺口 | Phase 2 未实现 |
+| 7 | P3-4-5 fold 竞态孤儿 tokenizer | pool 5s 超时自动清理 |
+| 8 | TUI-P3-1 Help 消息硬编码 | 不影响功能，后续扩展 `/model` 时自然解决 |
+| 9 | TUI-P3-5 promptOverlayContext 空占位 | MVP 不需要斜杠命令建议 |
 
 ---
 
@@ -115,7 +70,7 @@
 
 | 级别 | 数量 |
 |------|------|
-| 🟡 待处理 | 2 |
-| ⬜ 关注 | 6 |
-| ✅ 已修复 | 61 |
+| ✅ 已修复 | 22（本轮） |
+| ⬜ 关注 | 9 |
+| ✅ 已修复（移入 DONE.md） | 63 |
 | ❌ 驳回 | 11 |

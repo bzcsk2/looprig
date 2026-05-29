@@ -12,8 +12,10 @@ export interface BridgeState {
   messages: ChatMessage[];
   isLoading: boolean;
   streamingText: string | null;
+  reasoningText: string | null;
   activeTools: Map<string, ToolStatus>;
   tokens: { input: number; output: number };
+  warnings: string[];
   error: string | null;
 }
 
@@ -25,6 +27,7 @@ export function createBridge(
   cancel: () => void;
 } {
   let assistantContent = "";
+  let reasoningContent = "";
   let activeAssistantMsg: ChatMessage | null = null;
 
   const submit = async (text: string) => {
@@ -33,10 +36,13 @@ export function createBridge(
       messages: [...prev.messages, { role: 'user' as const, content: text }],
       isLoading: true,
       streamingText: null,
+      reasoningText: null,
       error: null,
+      warnings: [],
     }));
 
     assistantContent = "";
+    reasoningContent = "";
     activeAssistantMsg = null;
 
     try {
@@ -64,12 +70,15 @@ export function createBridge(
             break;
 
           case "reasoning_delta":
+            reasoningContent += event.content ?? "";
+            setState(prev => ({ ...prev, reasoningText: reasoningContent }));
             break;
 
           case "tool_start":
             setState(prev => {
               const newTools = new Map(prev.activeTools);
-              newTools.set(`tool_${event.toolCallIndex ?? Date.now()}`, {
+              const key = `tool_${event.toolCallIndex ?? Date.now()}`;
+              newTools.set(key, {
                 name: event.toolName ?? 'unknown',
                 status: 'running',
               });
@@ -78,29 +87,41 @@ export function createBridge(
             break;
 
           case "tool_progress":
-            if (event.toolName) {
-              setState(prev => {
-                const newTools = new Map(prev.activeTools);
-                for (const [key, tool] of newTools) {
-                  if (tool.name === event.toolName) {
-                    newTools.set(key, { ...tool, status: 'running' });
-                  }
-                }
-                return { ...prev, activeTools: newTools };
-              });
-            }
+            setState(prev => {
+              const newTools = new Map(prev.activeTools);
+              const key = `tool_${event.toolCallIndex}`;
+              const existing = newTools.get(key);
+              if (existing) {
+                const newStatus = event.content === 'done' ? 'done' : 'running';
+                newTools.set(key, { ...existing, status: newStatus });
+              }
+              return { ...prev, activeTools: newTools };
+            });
+            break;
+
+          case "tool_call_delta":
             break;
 
           case "tool":
             setState(prev => {
               const newTools = new Map(prev.activeTools);
-              for (const [key, tool] of newTools) {
-                if (tool.name === event.toolName && tool.status === 'running') {
-                  newTools.set(key, { ...tool, status: 'done', output: event.content });
-                }
+              const key = `tool_${event.toolCallIndex}`;
+              const existing = newTools.get(key);
+              if (existing) {
+                newTools.set(key, { ...existing, status: 'done', output: event.content });
               }
               return { ...prev, activeTools: newTools };
             });
+            break;
+
+          case "usage":
+            setState(prev => ({
+              ...prev,
+              tokens: {
+                input: prev.tokens.input + (typeof event.metadata?.input === 'number' ? event.metadata.input : 0),
+                output: prev.tokens.output + (typeof event.metadata?.output === 'number' ? event.metadata.output : 0),
+              },
+            }));
             break;
 
           case "error":
@@ -113,11 +134,20 @@ export function createBridge(
           case "warning":
             setState(prev => ({
               ...prev,
-              error: `⚠ ${event.content ?? ''}`,
+              warnings: [...prev.warnings, event.content ?? 'Unknown warning'],
             }));
             break;
 
           case "status":
+            if (event.content && event.content !== 'interrupted' && event.content !== 'tools_completed') {
+              setState(prev => ({
+                ...prev,
+                warnings: [...prev.warnings, event.content!],
+              }));
+            }
+            break;
+
+          case "done":
             break;
         }
       }
@@ -129,6 +159,7 @@ export function createBridge(
         ...prev,
         isLoading: false,
         streamingText: null,
+        reasoningText: null,
         activeTools: new Map(),
       }));
     }

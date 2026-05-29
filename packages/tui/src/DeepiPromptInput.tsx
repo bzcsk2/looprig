@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Box, Text, useInput } from '@deepicode/ink';
 
 interface DeepiPromptInputProps {
@@ -13,7 +13,7 @@ export function DeepiPromptInput({ onSubmit, isLoading, disabled }: DeepiPromptI
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState(-1);
-  const [cursorPos, setCursorPos] = useState(0);
+  const cursorRef = useRef(0);
 
   const submitLine = useCallback(() => {
     const text = input.trim();
@@ -21,7 +21,7 @@ export function DeepiPromptInput({ onSubmit, isLoading, disabled }: DeepiPromptI
     setHistory(prev => [text, ...prev].slice(0, MAX_HISTORY));
     setHistoryIdx(-1);
     setInput('');
-    setCursorPos(0);
+    cursorRef.current = 0;
     onSubmit(text);
   }, [input, onSubmit]);
 
@@ -38,7 +38,7 @@ export function DeepiPromptInput({ onSubmit, isLoading, disabled }: DeepiPromptI
         const next = Math.min(prev + 1, history.length - 1);
         if (next >= 0) {
           setInput(history[next] ?? '');
-          setCursorPos((history[next] ?? '').length);
+          cursorRef.current = (history[next] ?? '').length;
         }
         return next;
       });
@@ -50,48 +50,91 @@ export function DeepiPromptInput({ onSubmit, isLoading, disabled }: DeepiPromptI
         const next = prev - 1;
         if (next < 0) {
           setInput('');
-          setCursorPos(0);
+          cursorRef.current = 0;
           return -1;
         }
         setInput(history[next] ?? '');
-        setCursorPos((history[next] ?? '').length);
+        cursorRef.current = (history[next] ?? '').length;
         return next;
       });
       return;
     }
 
     if (key.leftArrow) {
-      setCursorPos(prev => Math.max(0, prev - 1));
+      cursorRef.current = Math.max(0, cursorRef.current - 1);
       return;
     }
 
     if (key.rightArrow) {
-      setCursorPos(prev => Math.min(input.length, prev + 1));
+      cursorRef.current = Math.min(input.length, cursorRef.current + 1);
+      return;
+    }
+
+    if (_input === 'a' && key.ctrl) {
+      cursorRef.current = 0;
+      return;
+    }
+
+    if (_input === 'e' && key.ctrl) {
+      cursorRef.current = input.length;
+      return;
+    }
+
+    if (key.home) {
+      cursorRef.current = 0;
+      return;
+    }
+
+    if (key.end) {
+      cursorRef.current = input.length;
       return;
     }
 
     if (key.backspace || key.delete) {
-      if (cursorPos > 0) {
-        setInput(prev => prev.slice(0, cursorPos - 1) + prev.slice(cursorPos));
-        setCursorPos(prev => prev - 1);
+      const pos = cursorRef.current;
+      if (pos > 0) {
+        setInput(prev => prev.slice(0, pos - 1) + prev.slice(pos));
+        cursorRef.current = pos - 1;
       }
       return;
     }
 
-    if (key.ctrl && _input === 'c') {
+    if (_input === 'c' && key.ctrl) {
       setInput('');
-      setCursorPos(0);
+      cursorRef.current = 0;
+      return;
+    }
+
+    if (_input === 'd' && key.ctrl) {
+      const pos = cursorRef.current;
+      if (pos < input.length) {
+        setInput(prev => prev.slice(0, pos) + prev.slice(pos + 1));
+      }
+      return;
+    }
+
+    if (_input === 'u' && key.ctrl) {
+      setInput('');
+      cursorRef.current = 0;
+      return;
+    }
+
+    if (_input === 'k' && key.ctrl) {
+      const pos = cursorRef.current;
+      setInput(prev => prev.slice(0, pos));
       return;
     }
 
     if (_input) {
-      setInput(prev => prev.slice(0, cursorPos) + _input + prev.slice(cursorPos));
-      setCursorPos(prev => prev + _input.length);
+      const pos = cursorRef.current;
+      setInput(prev => prev.slice(0, pos) + _input + prev.slice(pos));
+      cursorRef.current = pos + _input.length;
     }
   });
 
   const displayText = input || (isLoading ? '' : '输入消息...');
   const isPlaceholder = !input && !isLoading;
+  const pos = cursorRef.current;
 
   return (
     <Box flexDirection="column" width="100%" borderStyle="round" paddingX={1}>
@@ -99,7 +142,11 @@ export function DeepiPromptInput({ onSubmit, isLoading, disabled }: DeepiPromptI
         {isPlaceholder ? (
           <Text dimColor>{displayText}</Text>
         ) : (
-          <Text>{input}</Text>
+          <>
+            <Text>{input.slice(0, pos)}</Text>
+            <Text color="success">▊</Text>
+            <Text>{input.slice(pos)}</Text>
+          </>
         )}
       </Text>
     </Box>

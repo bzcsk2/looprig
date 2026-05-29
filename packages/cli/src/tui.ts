@@ -1,4 +1,4 @@
-import { stdin as input, stdout as output } from "node:process"
+import { stdin as input, stdout as output, stderr as errorOutput } from "node:process"
 import { loadConfig } from "../../core/src/config.js"
 import { ReasonixEngine } from "../../core/src/engine.js"
 import { buildSystemPrompt } from "../../core/src/system-prompt.js"
@@ -62,11 +62,16 @@ async function runPipeMode(engine: ReasonixEngine): Promise<void> {
         output.write(event.content ?? "")
         break
       case "assistant_final":
-      case "done":
         output.write("\n")
+        break
+      case "reasoning_delta":
+        break
+      case "tool_call_delta":
         break
       case "tool_start":
         output.write(`\n[tool] ${event.toolName ?? "unknown"} ...\n`)
+        break
+      case "tool_progress":
         break
       case "tool": {
         const c = event.content ?? ""
@@ -74,8 +79,18 @@ async function runPipeMode(engine: ReasonixEngine): Promise<void> {
         catch { output.write(c + "\n") }
         break
       }
+      case "status":
+        if (event.content && event.content !== "tools_completed" && event.content !== "interrupted") {
+          output.write(`\n# ${event.content}\n`)
+        }
+        break
+      case "warning":
+        errorOutput.write(`\nwarning: ${event.content ?? ""}\n`)
+        break
       case "error":
-        output.write(`\nerror: ${event.content ?? ""}\n`)
+        errorOutput.write(`\nerror: ${event.content ?? ""}\n`)
+        break
+      case "done":
         break
     }
   }

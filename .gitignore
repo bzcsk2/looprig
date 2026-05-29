@@ -5,3 +5,4 @@ dist/
 .env
 api-key
 .deepicode/
+Deepicode*.md

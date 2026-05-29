@@ -6,7 +6,7 @@
 - `最小完成`：具备可用闭环，但未达到实施计划中的完整版要求。
 - `部分完成`：只完成子集能力，仍需后续补齐。
 
-最后更新：2026-05-30（TUI 接入完成 — 差分渲染引擎 + 7 业务组件）
+最后更新：2026-05-30（TUI 重做完成 — Ink/React 框架 + 7 业务组件 + TUI 审计）
 
 ## Phase 0：脚手架搭建
 
@@ -241,12 +241,23 @@
 状态：完成（2026-05-30）
 
 - 复制 best-claude-code 的 Ink 框架（146 文件，~27K 行）到 `packages/ink/`
-- 新写 7 个 deepicode 专属业务组件（bridge.tsx、DeepiMessages.tsx、DeepiPromptInput.tsx、ToolCallBanner.tsx、Spinner.tsx、StatusBar.tsx、App.tsx）
-- 4 个 stub 文件（ModalContext.ts、promptOverlayContext.tsx、browser.ts、stringUtils.ts）
-- 精简版 FullscreenLayout.tsx（适配 deepicode imports）+ fullscreen.ts（~30 行）
-- CLI 入口更新为 Ink render（`wrappedRender` + React.createElement）
-- 清理旧 TUI 代码（tui.ts、terminal.ts、components/ 目录等 ~20 个文件）
-- `bun run typecheck` 零错误，`bun test` 66 pass
+- 3 处微改适配 deepicode：ThemeProvider（删 `feature('AUTO_THEME')`）、osc.ts（`USER_TYPE` → `false`）、ink.tsx（删 MACRO 注释）
+- 适配 FullscreenLayout.tsx（10 处 import 替换为 deepicode 等效模块）
+- 精简 fullscreen.ts（~30 行，移除 ant 专属逻辑和 tmux 探测）
+- 4 个 stub 文件：ModalContext.ts、promptOverlayContext.tsx、browser.ts、stringUtils.ts
+- 新写 7 个 React/JSX 业务组件（~1200 行）：
+  - `App.tsx` — 顶层组件，AlternateScreen + FullscreenLayout 包裹，scrollable（Messages + ToolCallBanner + Spinner）+ bottom（PromptInput + StatusBar）
+  - `bridge.tsx` — AsyncGenerator<LoopEvent> → React useState 桥接，switch-case 处理 8 种事件类型
+  - `DeepiMessages.tsx` — user/assistant/tool 三种角色消息渲染，流式文本增量追加
+  - `DeepiPromptInput.tsx` — useInput hook，多行输入 + 历史 + 基本编辑
+  - `ToolCallBanner.tsx` — 活跃工具状态行（spinner/✓/✗）
+  - `Spinner.tsx` — useAnimationFrame 循环旋转字符 + 计时
+  - `StatusBar.tsx` — 单行反转色，provider + model + tokens + 计时
+- CLI 入口 `tui.ts` 更新为 `wrappedRender(<App/>)`，不再使用 ProcessTerminal/TUI 类
+- 清理旧 TUI 代码（tui.ts、terminal.ts、stdin-buffer.ts、keys.ts、keybindings.ts 及旧 components/ 目录 ~20 个文件）
+- `bun run typecheck` 零错误，`bun test` 66 pass / 3 skip
+
+> **注意**：旧 TUI（oh-my-pi 移植版）的 22 项修复记录（ADVICE 第五轮）随旧代码删除而失效。新 TUI 的 23 项审计发现参见 `ADVICE.md` 当前待处理列表。旧修复保留在下文的 ADVICE修复汇总 § 第五轮 TUI 修复中作为历史参考。
 
 未完成：
 
@@ -442,7 +453,9 @@ bun test
 
 ## ADVICE.md 修复汇总
 
-2026-05-29 根据 `ADVICE.md` 全面审查后完成以下修复：
+以下 63 项修复已全部完成并记录于此（2026-05-29 ~ 2026-05-30）。修复内容原列于 ADVICE.md，TUI 重构后迁移至 DONE.md。
+
+### 核心引擎 + 工具层修复（前四轮）
 
 | 编号 | 问题 | 修复文件 | 修复方式 |
 |------|------|----------|----------|
@@ -512,6 +525,8 @@ bun test
   - CLI 入口更新为 Ink render（`wrappedRender` + React.createElement）
   - 清理旧 TUI 代码（tui.ts、terminal.ts、components/ 目录等 ~20 个文件）
   - 集成：bridge.tsx 事件桥接 + CLI 替换 readline
+
+> **旧 TUI 修复失效说明**: 第五轮 TUI 修复(22 项)针对 oh-my-pi 自研 TUI 的旧代码(bridge.ts/chat-view.ts/tool-call-view.ts 等类组件),这些文件已整体删除并替换为 Ink/React 架构。旧修复记录保留在下方 ADVICE修复汇总 E5 中作历史参考。新 TUI 代码质量由 2026-05-30 DecipecodeTUIReAudit 审计(23 项,见 ADVICE.md)。
 
 ## 已知限制
 

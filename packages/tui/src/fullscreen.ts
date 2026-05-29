@@ -1,11 +1,13 @@
 export function isFullscreenEnvEnabled(): boolean {
+  if (process.env.DEEPCODE_NO_FLICKER === '0') return false;
+  if (process.env.DEEPCODE_NO_FLICKER === '1') return true;
   if (process.env.CLAUDE_CODE_NO_FLICKER === '0') return false;
   if (process.env.CLAUDE_CODE_NO_FLICKER === '1') return true;
   return false;
 }
 
 export function isMouseTrackingEnabled(): boolean {
-  return !process.env.CLAUDE_CODE_DISABLE_MOUSE;
+  return !process.env.DEEPCODE_DISABLE_MOUSE && !process.env.CLAUDE_CODE_DISABLE_MOUSE;
 }
 
 export function isFullscreenActive(): boolean {

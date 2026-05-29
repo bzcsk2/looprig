@@ -47,6 +47,9 @@ export class ReasonixEngine implements CoreEngine {
   /** 可选：新引擎初始化时调用的清理钩子（如清除全局 stale-read tracker） */
   private onStart?: () => void
 
+  /** prefix.build 缓存：避免每次 submit 重复重建（P3-4-2） */
+  private prefixCacheKey = ""
+
   constructor(config: DeepicodeConfig, onStart?: () => void, sessionId?: string) {
     this.config = config
     this.ctx = new ContextManager(config.maxContextRounds, config.contextWindow)
@@ -139,7 +142,13 @@ export class ReasonixEngine implements CoreEngine {
         })
       }
 
-      this.ctx.prefix.build(this.ctx.prefix.messages[0]?.content ?? "", toolSpecs)
+      const systemPrompt = this.ctx.prefix.messages[0]?.content ?? ""
+      const toolSpecsKey = JSON.stringify(toolSpecs)
+      const cacheKey = `${systemPrompt}|${toolSpecsKey}`
+      if (cacheKey !== this.prefixCacheKey) {
+        this.ctx.prefix.build(systemPrompt, toolSpecs)
+        this.prefixCacheKey = cacheKey
+      }
 
       const loopOpts: LoopOptions = {
         ctx: this.ctx,
