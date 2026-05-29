@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto"
+import { createHash, randomUUID } from "node:crypto"
 import { createReadStream, createWriteStream } from "node:fs"
 import { stat, rename, unlink, chmod, mkdir } from "node:fs/promises"
 import { dirname } from "node:path"
@@ -22,7 +22,7 @@ export async function hashAnchoredReplaceOnce(filePath: string, oldString: strin
     // If file doesn't exist, we can't edit it anyway, but we'll let read stream fail
   }
 
-  const tmpPath = `${filePath}.deepicode_tmp_${Date.now()}`
+  const tmpPath = `${filePath}.deepicode_tmp_${randomUUID()}`
   await mkdir(dirname(tmpPath), { recursive: true })
 
   const needleHash = sha256(oldString)

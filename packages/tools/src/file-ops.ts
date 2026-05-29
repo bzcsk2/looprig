@@ -2,27 +2,9 @@ import { readFile, stat } from "node:fs/promises"
 import { resolve } from "node:path"
 import type { AgentTool } from "../../core/src/interface.js"
 import { recordRead } from "./stale-read.js"
-
-const SENSITIVE_FILE_PATTERNS = [
-  /(^|\/|\\)api-key$/,
-  /(^|\/|\\)\.env$/,
-  /(^|\/|\\)\.env\.local$/,
-  /(^|\/|\\)\.git\//,
-  /(^|\/|\\)id_rsa$/,
-  /(^|\/|\\)id_ed25519$/,
-  /(^|\/|\\)\.ssh\//,
-  /(^|\/|\\)known_hosts$/,
-]
+import { isSensitive } from "./sensitive.js"
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
-
-function isSensitive(path: string): boolean {
-  const normalized = path.replace(/\\/g, "/")
-  for (const p of SENSITIVE_FILE_PATTERNS) {
-    if (p.test(normalized)) return true
-  }
-  return false
-}
 
 export function createReadFileTool(): AgentTool {
   return {

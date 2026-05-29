@@ -8,31 +8,45 @@
 
 ### 目录结构约定
 
+> **注意**：以下为规划阶段的理想目录结构。实际开发中可能有所调整（如 `loop.ts` 当前合并入 `engine.ts`、`context.ts` 拆分为 `context/` 目录的多文件模块等）。以实际代码为准，此结构作为模块职责的参考蓝图。
+
 ```text
 deepicode/
 ├── packages/
 │   ├── core/                    # 核层：推理引擎
 │   │   ├── src/
+│   │   │   ├── types.ts         # 共享类型定义（ChatMessage, ToolSpec, Usage 等）
 │   │   │   ├── interface.ts     # CoreEngine / LoopEvent / AgentState 类型定义
-│   │   │   ├── engine.ts        # ReasonixEngine 包装实现
-│   │   │   ├── loop.ts          # CacheFirstLoop
-│   │   │   ├── client.ts        # DeepSeekClient
-│   │   │   ├── context.ts       # ContextManager (含增量旁路优化)
+│   │   │   ├── engine.ts        # ReasonixEngine 实现（当前含CacheFirstLoop主循环）
+│   │   │   ├── client.ts        # DeepSeekClient（SSE流式客户端）
+│   │   │   ├── config.ts        # 配置读取（API key, base URL, model）
 │   │   │   ├── session.ts       # SegmentedLog / AsyncSessionWriter
-│   │   │   ├── repair.ts        # Tool-call Repair Pipeline
-│   │   │   ├── tokenizer-pool.ts    # Tokenizer Worker Pool (含 Map 性能优化)
-│   │   │   ├── tokenizer-worker.ts  # Worker 线程入口
-│   │   │   ├── token-estimator.ts   # Token 用量预估 (CNY Native 计价)
-│   │   │   ├── streaming-executor.ts # StreamingToolExecutor (含 AST 防假闭合)
-│   │   │   ├── strategy/            # 智能推理强度调节
+│   │   │   ├── streaming-executor.ts # StreamingToolExecutor
+│   │   │   ├── context/         # 上下文管理模块
+│   │   │   │   ├── manager.ts       # ContextManager（三区域组装）
+│   │   │   │   ├── immutable.ts     # ImmutablePrefix（含prefix-cache指纹）
+│   │   │   │   ├── append-log.ts    # AppendOnlyLog（对话历史）
+│   │   │   │   ├── scratch.ts       # VolatileScratch（每轮清空）
+│   │   │   │   └── message.ts       # cloneChatMessage 等辅助函数
+│   │   │   ├── vendor/              # 第三方类型声明（仅类型，无运行时引用）
+│   │   │   │   └── pi.d.ts          # pi-ai 包装器的类型存根
+│   │   │   ├── repair.ts            # Tool-call Repair Pipeline（待实现）
+│   │   │   ├── loop.ts              # CacheFirstLoop 独立拆分（待从engine.ts析出）
+│   │   │   ├── tokenizer-pool.ts    # Tokenizer Worker Pool（待实现）
+│   │   │   ├── tokenizer-worker.ts  # Worker 线程入口（待实现）
+│   │   │   ├── token-estimator.ts   # Token 用量预估（待实现）
+│   │   │   ├── strategy/            # 智能推理强度调节（待实现）
 │   │   │   │   ├── task-classifier.ts
 │   │   │   │   ├── chain-estimator.ts
 │   │   │   │   ├── strategy-selector.ts
 │   │   │   │   └── tier-config.ts
 │   │   │   └── index.ts
 │   │   ├── __tests__/
+│   │   │   ├── context.test.ts
+│   │   │   ├── engine-tools.test.ts
+│   │   │   └── integration.test.ts（默认 skip，需真实API）
 │   │   └── package.json
-│   ├── shell/                   # 壳层：TUI + 状态 + 事件
+│   ├── shell/                   # 壳层：TUI + 状态 + 事件（大部分待实现）
 │   │   ├── src/
 │   │   │   ├── state.ts         # AgentState 集中管理
 │   │   │   ├── events.ts        # EventStream / Event Bus
@@ -42,7 +56,7 @@ deepicode/
 │   │   │   │   └── plan-agent.ts
 │   │   │   └── index.ts
 │   │   └── package.json
-│   ├── tui/                     # TUI 渲染层
+│   ├── tui/                     # TUI 渲染层（待接入 Ink/React）
 │   │   ├── src/
 │   │   │   ├── App.tsx
 │   │   │   ├── components/
@@ -56,43 +70,50 @@ deepicode/
 │   ├── tools/                   # 工具层
 │   │   ├── src/
 │   │   │   ├── registry.ts      # ToolRegistry
-│   │   │   ├── hash-edit.ts     # Hash-Anchored Edit (异步流式计算优化)
-│   │   │   ├── fuzzy-edit.ts    # 9-Pass Fuzzy Edit
-│   │   │   ├── file-ops.ts      # 文件读写工具
-│   │   │   ├── shell-exec.ts    # Shell 执行工具
-│   │   │   ├── search.ts        # Grep/Glob 搜索工具
-│   │   │   ├── lsp-client.ts    # LSP 客户端
-│   │   │   ├── mcp-client.ts    # MCP 客户端
-│   │   │   ├── web-fetch.ts     # Web 请求工具
-│   │   │   ├── python-kernel.ts # Python IPython Kernel
-│   │   │   ├── stale-read.ts    # Stale-read Validation (含 System-level bypass)
+│   │   │   ├── hash-edit.ts     # Hash-Anchored Edit（当前最小版：流式replace once）
+│   │   │   ├── fuzzy-edit.ts    # 9-Pass Fuzzy Edit（当前实现 4 pass）
+│   │   │   ├── edit.ts          # edit 工具（组合 hash-anchored + fuzzy fallback）
+│   │   │   ├── file-ops.ts      # read_file 工具（含敏感文件保护 + stale-read）
+│   │   │   ├── shell-exec.ts    # bash 工具（含危险命令拦截 + 超时控制）
+│   │   │   ├── stale-read.ts    # Stale-read Validation（ReadTracker）
+│   │   │   ├── write-file.ts    # write_file 工具（创建/覆盖文件，待实现）
+│   │   │   ├── search.ts        # Grep/Glob 搜索工具（待实现）
+│   │   │   ├── list-dir.ts      # 目录列表工具（待实现）
+│   │   │   ├── lsp-client.ts    # LSP 客户端（待实现）
+│   │   │   ├── mcp-client.ts    # MCP 客户端（待实现）
+│   │   │   ├── web-fetch.ts     # Web 请求工具（待实现）
+│   │   │   ├── python-kernel.ts # Python IPython Kernel（待实现）
 │   │   │   └── index.ts
 │   │   └── package.json
-│   ├── security/                # 安全层
+│   ├── security/                # 安全层（当前为 placeholder）
 │   │   ├── src/
-│   │   │   ├── permission.ts    # Deny-first 权限引擎
-│   │   │   ├── hooks.ts         # beforeToolCall / afterToolCall
-│   │   │   ├── git-snapshot.ts  # Git Shadow 变更快照
+│   │   │   ├── permission.ts    # Deny-first 权限引擎（待实现）
+│   │   │   ├── hooks.ts         # beforeToolCall / afterToolCall（待实现）
+│   │   │   ├── git-snapshot.ts  # Git Shadow 变更快照（待实现）
 │   │   │   └── index.ts
 │   │   └── package.json
 │   └── cli/                     # CLI 入口
 │       ├── src/
-│       │   └── main.ts
+│       │   ├── index.ts         # 入口文件
+│       │   └── tui.ts           # readline 交互循环 + 工具注册
 │       └── package.json
 ├── vitest.config.ts
 ├── tsconfig.json
 ├── package.json
+├── api-key（git-ignored）
 └── README.md
 ```
 
 ### 代码参考来源索引
 
-| 缩写 | 来源 | 仓库地址 | 关键路径 |
-|------|------|---------|---------|
-| **RNX** | Reasonix | /vol4/Agent/DeepSeek-Reasonix | 核心引擎：loop / client / context / repair |
-| **OMP** | oh-my-pi | /vol4/Agent/oh-my-pi | `packages/agent/src/agent-loop.ts`（核心 loop）、`packages/agent/src/agent.ts`（Agent 类）、`packages/tui/`（Ink TUI）、`packages/tool/`（工具注册表） |
-| **CC** | Claude Code | /vol4/Agent/best-claude-code | StreamingToolExecutor 思想、Deny-first 权限规则引擎、BashTool/FileEditTool 实现 |
-| **OC** | OpenCode | /vol4/Agent/opencode | 9-Pass Fuzzy Edit、Stale-read validation、LSP touch、多 Agent 系统（Build/Plan） |
+> **注意**：以下为设计理念和架构思想的参考来源。deepicode 的实际代码为全新编写（独立项目，非 fork），仅在概念层面借鉴以下项目的设计模式。
+
+| 缩写 | 来源 | 仓库地址 | 参考内容 | 实际关系 |
+|------|------|---------|---------|---------|
+| **RNX** | Reasonix | /vol4/Agent/DeepSeek-Reasonix | Cache-first 设计、repair pipeline、prefix-cache 优化思想 | 理念参考，代码全新 |
+| **OMP** | oh-my-pi | /vol4/Agent/oh-my-pi | Ink TUI 组件设计、Agent 状态管理模式 | 理念参考，`vendor/pi.d.ts` 仅保留类型存根 |
+| **CC** | Claude Code | /vol4/Agent/best-claude-code | StreamingToolExecutor 思路、Deny-first 权限规则、工具设计 | 理念参考 |
+| **OC** | OpenCode | /vol4/Agent/opencode | 9-Pass Fuzzy Edit、Stale-read validation、多 Agent 模式 | 理念参考 |
 
 ### 测试约定
 - 所有测试使用 **Vitest**
@@ -105,14 +126,13 @@ deepicode/
 
 ## Phase 0：脚手架搭建
 
-**目标**：让 Reasonix 的 loop 在 oh-my-pi 壳中跑起来，验证核壳分离可行性。
-**预计耗时**：3-4 天
+**目标**：搭建 monorepo 骨架，实现最小可运行的对话引擎，验证核壳分离可行性。
+**预计耗时**：2-3 天（已完成）
 
 ### Step 0.1：项目初始化
-1. Fork oh-my-pi 仓库到本地。
-2. 创建 `reasonix-engine` feature 分支。
-3. 阅读并理解 oh-my-pi 核心文件结构。
-4. 在项目根目录创建 monorepo 结构（如上方目录结构约定）。
+1. 初始化独立 Git 仓库（非 fork）。
+2. 创建 Bun + TypeScript monorepo 结构（workspaces: `packages/*`）。
+3. 配置 `tsconfig.json`、`vitest.config.ts`、`.gitignore`。
 
 ### Step 0.2：定义核心接口
 1. 创建 `packages/core/src/interface.ts`
@@ -128,8 +148,9 @@ deepicode/
 3. 将 Reasonix 内部事件格式转换为 `LoopEvent` 格式。
 
 ### Step 0.4：最小可运行集成
-1. 修改 oh-my-pi 的 TUI 入口，将原有 Agent 替换为 `ReasonixEngine`。
-2. 确保基本对话流程与工具调用流程可跑通。
+1. 创建 `packages/cli/src/index.ts` 和 `tui.ts`，实现 readline 交互式 CLI。
+2. 支持交互模式（`bun run dev`）和单轮管道输入（`echo "hi" | bun run dev`）。
+3. 注册基础工具（`read_file`、`bash`、`edit`）并验证基本对话与工具调用流程。
 
 **Phase 0 验收检查清单**：
 - [ ] 项目可正常启动
@@ -149,7 +170,7 @@ deepicode/
 ### Step 1.1：DeepSeekClient 实现
 1. 创建 `packages/core/src/client.ts`。
 2. **SSE 解析**：解析 `contentDelta`、`toolCallDelta`、`reasoningDelta`。
-3. **R1 thought harvesting**：提取 `reasoning_content`，仅传递给 TUI 渲染（可折叠显示），**严禁写入正式历史消息（防止污染前缀缓存）**。
+3. **R1 thought harvesting**：提取 `reasoning_content`，传递给 TUI 渲染（可折叠显示），同时写入 assistant 历史消息保留多轮连续性。但 `reasoning_content` **不计入 prefix-cache 的 cacheKey 计算**，因此不影响前缀稳定性。是否最终写入历史可留待性能测试后决定——若 reasoning 内容过长导致上下文膨胀，可改为仅保留最近 N 轮的 reasoning。
 4. **Usage 提取与重试**：实现指数退避重试（429/500/502/503重试，400/401不重试）。提取 cache hit/miss tokens 供统计。
 
 ### Step 1.2：SegmentedLog 与 Session 持久化
@@ -163,8 +184,9 @@ deepicode/
 ### Step 1.3：ContextManager (阈值旁路与阵痛处理)
 1. 创建 `packages/core/src/context.ts`。
 2. **(性能补丁) 增量计数旁路**：
-   - 当单次 append 的文本 $< 2000$ 字符时，**直接在主线程 O(1) 同步累加**。
-   - 仅当 $\ge 2000$ 字符时，才通过 postMessage 卸载给 Worker 线程计算。
+   - **短增量**（新消息文本长度 < 2000 字符）：直接在主线程用字符数近似估算（字符数 ÷ 2.5 ≈ token 数，此系数为混合中英文场景的经验值），耗时 < 1ms，不启动 Worker。
+   - **长增量**（≥ 2000 字符，如全量读文件）：offload 到 Tokenizer Worker 池做精确 BPE 计数。
+   - **注**：2000 字符为启发式阈值，具体数值待 tokenizer 接入后用基准测试校准。此旁路只用于「是否需要 offload」的快速判定，不替代实际 token 计数。
 3. **Fold 决策逻辑**：65% 提前启动预测性 Fold，75% 建议，80% 强制。
 4. **(架构修正) Cache Miss 阵痛管理**：当检测到本轮执行了 `compactInPlace`，抛出特定的 `status` 事件，通知 TokenEstimator 与 TUI 下一轮必将发生 Cache Miss，平抑用户延迟焦虑（显示 `"Context optimized, cold starting API..."`）。
 
@@ -175,7 +197,7 @@ deepicode/
 
 ### Step 1.5：StreamingToolExecutor (防假闭合)
 1. 创建 `packages/core/src/streaming-executor.ts`。
-2. **(架构修正) Eager Dispatch 安全化**：废弃朴素的大括号计数判断 JSON 闭合策略。引入轻量 AST Parser（或对流中局部 buffer 进行安全的 try-parse）。只有当 buffer 能够被完整解析为合法的参数树时，才触发执行。
+2. **(架构修正) Eager Dispatch 安全化**：废弃朴素的大括号计数判断 JSON 闭合策略。引入**增量式 JSON 验证**——仅当流式 buffer 被确认为完整的合法 JSON 参数时，才触发执行。具体实现待技术选型：状态机驱动的流式 JSON 部分解析器（更可靠），或对 buffer 进行安全 try-parse 配合括号深度追踪（更简单）。当前稳定优先策略：等模型 tool call 完整结束后执行工具。
 3. **并发安全检查**：读操作（`isConcurrencySafe`）并行，写操作独占串行。
 
 ### Step 1.6：Tool-call Repair 流水线
@@ -188,7 +210,7 @@ deepicode/
 2. 事件 yield 策略（实时推送增量、状态、工具回调等）。
 
 **Phase 1 验收检查清单**：
-- [ ] DeepSeekClient SSE 解析与 reasoning 分离正确
+- [ ] DeepSeekClient SSE 解析与 reasoning 分离正确（写入历史但不影响 cacheKey）
 - [ ] SegmentedLog 与异步批量 JSONL 写入正常
 - [ ] 阈值旁路机制下，短对话 TUI 零延迟
 - [ ] Tokenizer Map 回收无泄漏
@@ -264,7 +286,7 @@ deepicode/
 
 ### Step 4.2：流式 Hash-Anchored Edit
 1. 创建 `packages/tools/src/hash-edit.ts`。
-2. **(架构重构) 异步流式计算**：彻底废除 `fs.readFileSync`。使用 `fs.createReadStream` 结合 Node.js 的 `Transform Stream`，**异步逐块（Chunk）处理换行符分割和哈希计算**。
+2. **(架构重构) 异步流式处理**：彻底废除 `readFileSync`。使用流式 API（`fs.createReadStream` 或 `Bun.file().stream()`）异步逐块处理文件。对于超大文件（5MB+），若纯异步流式仍对主线程造成可感知延迟，可将 hash 计算 offload 到 Worker。当前最小版已实现基于 `createReadStream` 的流式替换。
 3. 执行时如果 any oldHash 匹配失败，直接抛错阻断（进入 Fallback）。
 4. 统一使用 UTF-8，hash 前标准化处理首尾符。
 
@@ -285,15 +307,19 @@ deepicode/
 2. **(架构修正) 死锁提权**：当检测到 Stale-read 并触发自动重读补救动作时，为该 read_file 操作隐式注入 **System-level Bypass 标志**。确保安全层遇到此标志时静默放行，避免产生无意义的 `Ask` 弹窗导致操作链断裂。
 
 ### Step 4.5：基础工具集实现
-1. 实现 `file-ops.ts` (read_file, write_file, ls)
-2. 实现 `shell-exec.ts` (bash - 带 10000 字符截断与超时控制)
-3. 实现 `search.ts` (grep, glob)
-4. 实现 `web-fetch.ts`
+1. 实现 `file-ops.ts`（`read_file` — 已完成，含敏感文件保护 + stale-read 追踪）
+2. 实现 `shell-exec.ts`（`bash` — 已完成，含危险命令拦截 + 超时控制）
+3. 实现 `edit.ts`（组合 hash-anchored + fuzzy fallback — 已完成最小版）
+4. 实现 `write-file.ts`（创建/覆盖文件 — 无 old_string 依赖，区别于 edit）
+5. 实现 `list-dir.ts`（结构化目录列表，替代 bash `ls`）
+6. 实现 `search.ts`（`grep` 正则搜索 + `glob` 文件匹配）
+7. 实现 `web-fetch.ts`
 
 **Phase 4 验收检查清单**：
-- [ ] 面对 10 万行的日志或 JSON，Hash 计算时 TUI 刷新不卡顿（帧率 > 30fps）。
-- [ ] 9-Pass 模糊降级组合成功率 > 99%。
-- [ ] Stale-read 自动补偿重读不会被权限弹窗阻断。
+- [ ] 基础工具集完整：`read_file`、`write_file`、`edit`、`bash`、`list_dir`、`grep` 全部可用
+- [ ] 面对 10 万行的日志或 JSON，Hash 计算时 TUI 刷新不卡顿
+- [ ] 9-Pass 模糊降级组合成功率 > 99%
+- [ ] Stale-read 自动补偿重读不会被权限弹窗阻断
 
 ---
 
@@ -362,38 +388,46 @@ deepicode/
 
 ## 附录 A：模块依赖关系矩阵
 
-| 模块 | 依赖模块 | 被依赖模块 |
-|------|---------|-----------|
-| interface.ts | 无 | engine, state, events, registry, permission |
-| client.ts | 无 | loop |
-| session.ts | 无 | loop, context |
-| context.ts | session, tokenizer-pool | loop |
-| tokenizer-pool.ts | 无 | context, token-estimator |
-| tokenizer-worker.ts | 无 | tokenizer-pool |
-| streaming-executor.ts | interface | loop |
-| repair.ts | 无 | loop |
-| loop.ts | client, session, context, streaming-executor, repair, strategy-selector | engine |
-| token-estimator.ts | tokenizer-pool | loop |
-| task-classifier.ts | tier-config | strategy-selector |
-| chain-estimator.ts | tier-config | strategy-selector |
-| strategy-selector.ts | task-classifier, chain-estimator | loop |
-| engine.ts | loop, interface | cli |
-| state.ts | interface | tui, events |
-| events.ts | interface | tui, agents |
-| agents/* | interface, events | shell |
-| registry.ts | interface | streaming-executor, tools/* |
-| hash-edit.ts | interface | registry |
-| fuzzy-edit.ts | interface | registry |
-| stale-read.ts | interface | hash-edit, fuzzy-edit |
-| file-ops.ts | interface | registry |
-| shell-exec.ts | interface | registry |
-| search.ts | interface | registry |
-| permission.ts | interface | hooks |
-| hooks.ts | permission, git-snapshot | streaming-executor |
-| git-snapshot.ts | 无 | hooks |
-| lsp-client.ts | interface | registry |
-| mcp-client.ts | interface | registry |
-| python-kernel.ts | interface | registry |
+> **注意**：以下为规划阶段的依赖关系。实际代码结构可能与此不同（如 `loop.ts` 当前合并入 `engine.ts`、`context.ts` 拆分为 `context/` 目录）。待实现模块标记「待实现」。
+
+| 模块 | 依赖模块 | 被依赖模块 | 状态 |
+|------|---------|-----------|------|
+| types.ts | 无 | 全局 | 已完成 |
+| interface.ts | types | engine, state, events, registry, permission | 已完成 |
+| config.ts | types | engine | 已完成 |
+| client.ts | types | engine | 已完成（最小版） |
+| session.ts | 无 | engine | 已完成（仅写入） |
+| context/manager.ts | context/* | engine | 已完成 |
+| context/immutable.ts | types | manager | 已完成 |
+| context/append-log.ts | types | manager | 已完成 |
+| context/scratch.ts | types | manager | 已完成 |
+| context/message.ts | types | immutable, append-log, scratch | 已完成 |
+| streaming-executor.ts | interface | engine | 已完成（最小版） |
+| engine.ts | client, context, streaming-executor, session | cli | 已完成（含loop主循环） |
+| loop.ts | client, session, context, streaming-executor, repair, strategy-selector | engine | 待从engine.ts析出 |
+| repair.ts | 无 | loop | 待实现 |
+| tokenizer-pool.ts | 无 | context, token-estimator | 待实现 |
+| tokenizer-worker.ts | 无 | tokenizer-pool | 待实现 |
+| token-estimator.ts | tokenizer-pool | loop | 待实现 |
+| task-classifier.ts | tier-config | strategy-selector | 待实现 |
+| chain-estimator.ts | tier-config | strategy-selector | 待实现 |
+| strategy-selector.ts | task-classifier, chain-estimator | loop | 待实现 |
+| registry.ts | interface | streaming-executor, tools/* | 已完成（最小版） |
+| hash-edit.ts | 无 | edit | 已完成（最小版） |
+| fuzzy-edit.ts | 无 | edit | 已完成（4/9 pass） |
+| edit.ts | hash-edit, fuzzy-edit, stale-read | registry | 已完成 |
+| file-ops.ts | stale-read | registry | 已完成 |
+| shell-exec.ts | 无 | registry | 已完成 |
+| stale-read.ts | 无 | file-ops, edit | 已完成 |
+| write-file.ts | stale-read | registry | 待实现 |
+| list-dir.ts | 无 | registry | 待实现 |
+| search.ts | 无 | registry | 待实现 |
+| permission.ts | interface | hooks | 待实现 |
+| hooks.ts | permission, git-snapshot | streaming-executor | 待实现 |
+| git-snapshot.ts | 无 | hooks | 待实现 |
+| lsp-client.ts | interface | registry | 待实现 |
+| mcp-client.ts | interface | registry | 待实现 |
+| python-kernel.ts | interface | registry | 待实现 |
 
 ---
 
@@ -511,17 +545,19 @@ deepicode/
 | 决策点 | 选择 | 理由 | 影响范围 |
 |--------|------|------|---------|
 | 语言 | TypeScript | 用户已决定，oh-my-pi 和 Reasonix 都是 TS | 全局 |
-| 壳 | oh-my-pi fork | 低耦合、工具丰富、27K LOC 可控 | shell/tui/tools |
-| 核 | Reasonix 保留 | Cache-first、repair、cost control 是核心竞争力 | core/* |
+| 壳 | 自研 readline CLI | 轻量起步，后续可选接入 Ink/React TUI | shell/tui/cli |
+| 核 | 自研引擎（借鉴 Reasonix 理念） | Cache-first、repair、cost control 是核心竞争力 | core/* |
+| 运行时 | Bun | 原生 TypeScript 支持，更好的开发体验 | 全局 |
 | 首要增强 | Streaming Tool Executor | 真正的速度提升，Claude Code 核心优点 | streaming-executor.ts |
 | 计价体系 | CNY Native | DeepSeek 结算以 CNY 计价，减少换算认知负担 | tier-config, token-estimator |
 | 编辑工具 | Hash 流式异步化 | 解决单线程下读取与切分 5MB 文件导致 TUI 卡死问题 | hash-edit.ts |
 | 权限绕过 | 系统级提权标志 | 解决 Stale-read 重试导致的 Ask 死锁 | hooks.ts, stale-read.ts |
 | 状态 | 集中式 AgentState | Pi 的设计，适合未来多前端 | state.ts |
-| 分类器 | 纯规则（无 ML） | 零额外成本，行为可预期 | task-classifier.ts |
-| Token 计数 | 增量旁路 + Map池 | <2k 同步 O(1)，防 IPC 拖慢，杜绝 O(n) Array 搜索 | context.ts, tokenizer-pool.ts |
+| 分类器 | 纯规则（无 ML） | 零额外成本，行为可预期；接受约 60-70% 准确率 | task-classifier.ts |
+| Token 计数 | 增量旁路 + Map池 | <2000字符 O(1) 估算，≥2000字符 offload Worker，杜绝 O(n) Array 搜索 | context.ts, tokenizer-pool.ts |
 | Session 持久化 | JSONL + 异步批量 | 崩溃可恢复，IO 不阻塞 | session.ts |
-| 不引入 Vercel SDK | 是 | 与 DeepSeek cache 优化冲突 | 全局 |
+| reasoning 策略 | 写入历史但不影响 cacheKey | 保留多轮连续性；reasoning 不参与 prefix-cache 指纹计算 | client.ts, engine.ts, immutable.ts |
+| 不引入 Vercel SDK | 是（MCP 除外） | Vercel SDK 破坏 DeepSeek cache 优化；MCP 是外部工具集成标准，不影响核心推理链路 | 全局 |
 
 ---
 
@@ -530,9 +566,9 @@ deepicode/
 | 风险 | 触发条件 | 应对策略 | 负责模块 |
 |------|---------|---------|---------|
 | DeepSeek API 字段变化 | API 升级 | 封装在 DeepSeekClient 内部，单点修改 | client.ts |
-| oh-my-pi 代码耦合度高 | 集成困难 | 保留 CoreEngine 接口层，逐步替换 | engine.ts |
-| Worker 线程兼容性 | 运行时不支持 | 主线程 fallback，自动降级 | tokenizer-pool.ts |
-| AST 假闭合防御失灵 | 畸形代码输出 | 结合正则底线判定，失败退回 Scavenge | streaming-executor.ts |
+| CLI 体验不足（readline 非 TUI） | 复杂交互场景 | 保留 CoreEngine 接口层，后续接入 Ink/React TUI | engine.ts → tui/ |
+| Worker 线程兼容性 | Bun Worker 与 Node.js worker_threads API 存在差异 | 优先使用 Bun 原生 Worker API，必要时提供主线程 fallback | tokenizer-pool.ts |
+| JSON 假闭合防御失灵 | 模型输出代码块中的花括号 | 当前稳定优先策略（完整 tool call 后执行）已规避；改 eager dispatch 时需重新评估 | streaming-executor.ts |
 | Hash-anchored 编辑失败率高 | 哈希不匹配 | 9-pass fallback 兜底 | hash-edit.ts → fuzzy-edit.ts |
 | TTSR 规则误触发 | 规则过于宽泛 | 规则可配置，默认休眠，maxActivations 限制 | TTSR |
 | 多 Agent 切换上下文丢失 | 切换逻辑错误 | 切换只修改配置不修改消息历史 | agents/ |
@@ -542,5 +578,5 @@ deepicode/
 | 用户频繁手动覆盖 | 分类器不准 | 记录覆盖频率，迭代规则权重 | task-classifier.ts |
 | JSONL 写入崩溃 | 进程中断 | 原子写入（临时文件 + rename） | session.ts |
 | Fold 期间新消息 | 并发冲突 | 队列确保 fold 完成后处理新消息 | context.ts |
-| SSE 最后 chunk 不完整 | 网络中断 | 缓冲区机制，等待完整 chunk | client.ts |
+| SSE 任意位置分片 | 网络传输不可控 | 双层缓冲区（外层拼接 chunk，内层按 `\n\n` 切分消息），任意切分均可解析 | client.ts |
 ```

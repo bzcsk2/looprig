@@ -61,10 +61,8 @@ function runSearch(pattern: string, searchPath: string, include?: string): strin
     return execSync(rgCmd.join(" "), { encoding: "utf-8", timeout: 15000 })
   } catch {
     // rg not found or failed, fallback to grep
-    const grepCmd = ["grep", "-rn", "--include"]
-    if (include) {
-      grepCmd.push(include)
-    }
+    const grepCmd = ["grep", "-rn"]
+    if (include) grepCmd.push(`--include=${include}`)
     grepCmd.push(pattern, searchPath)
     try {
       return execSync(grepCmd.join(" "), { encoding: "utf-8", timeout: 15000 })

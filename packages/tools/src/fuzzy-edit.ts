@@ -29,22 +29,22 @@ export function fuzzyReplaceOnce(haystack: string, needle: string, replacement: 
   }
 
   // Pass 3: Flexible whitespace match using regex
-  // This handles normalizeWhitespace and normalizeIndent properly by locating the exact bounds in original haystack
+  // Split needle on whitespace, escape each segment independently, then join with \s+
+  // This avoids backslash-whitespace interaction from escapeRegExp
   try {
-    const escaped = escapeRegExp(needle.trim())
-    // Replace any sequence of whitespace in the escaped string with \s+ 
-    // Note: escapeRegExp will escape spaces as '\ ' if we are not careful, but our escapeRegExp doesn't escape spaces.
-    const flexSpaceRegexStr = escaped.replace(/\s+/g, '\\s+')
-    
-    // Only proceed if it actually creates a meaningful pattern
-    if (flexSpaceRegexStr && flexSpaceRegexStr.length > 0) {
-      const flexRegex = new RegExp(flexSpaceRegexStr)
-      const match = haystack.match(flexRegex)
-      if (match && match.index !== undefined) {
-        return {
-          edited: haystack.slice(0, match.index) + replacement + haystack.slice(match.index + match[0].length),
-          replacedCount: 1,
-          method: "flexible_whitespace"
+    const trimmed = needle.trim()
+    if (trimmed) {
+      const parts = trimmed.split(/\s+/)
+      if (parts.length > 1) {
+        const escapedParts = parts.map(escapeRegExp)
+        const flexRegex = new RegExp(escapedParts.join('\\s+'))
+        const match = haystack.match(flexRegex)
+        if (match && match.index !== undefined) {
+          return {
+            edited: haystack.slice(0, match.index) + replacement + haystack.slice(match.index + match[0].length),
+            replacedCount: 1,
+            method: "flexible_whitespace"
+          }
         }
       }
     }

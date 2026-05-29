@@ -4,25 +4,7 @@ import type { AgentTool } from "../../core/src/interface.js"
 import { hashAnchoredReplaceOnce } from "./hash-edit.js"
 import { fuzzyReplaceOnce } from "./fuzzy-edit.js"
 import { checkStale } from "./stale-read.js"
-
-const SENSITIVE_FILE_PATTERNS = [
-  /(^|\/|\\)api-key$/,
-  /(^|\/|\\)\.env$/,
-  /(^|\/|\\)\.env\.local$/,
-  /(^|\/|\\)\.git\//,
-  /(^|\/|\\)id_rsa$/,
-  /(^|\/|\\)id_ed25519$/,
-  /(^|\/|\\)\.ssh\//,
-  /(^|\/|\\)known_hosts$/,
-]
-
-function isSensitive(path: string): boolean {
-  const normalized = path.replace(/\\/g, "/")
-  for (const p of SENSITIVE_FILE_PATTERNS) {
-    if (p.test(normalized)) return true
-  }
-  return false
-}
+import { isSensitive } from "./sensitive.js"
 
 export function createEditTool(): AgentTool {
   return {

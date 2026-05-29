@@ -58,13 +58,13 @@ export class ReasonixEngine implements CoreEngine {
   switchAgent(_agentName: string): void {}
   resolveTierDecision(_tier: string): void {}
 
-  getState(): AgentState {
+  getState(isStreaming = false, streamingMessage = "", pendingToolCalls: Array<{ name: string; args: string }> = []): AgentState {
     return {
       sessionId: this.sessionId,
       messages: [...this.ctx.buildMessages()],
-      isStreaming: false,
-      streamingMessage: "",
-      pendingToolCalls: [],
+      isStreaming,
+      streamingMessage,
+      pendingToolCalls,
       currentAgent: "build",
       stats: { ...this.stats },
     }

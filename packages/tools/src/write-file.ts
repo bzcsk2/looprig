@@ -1,25 +1,7 @@
 import { writeFile as fsWriteFile } from "node:fs/promises"
 import { resolve } from "node:path"
 import type { AgentTool } from "../../core/src/interface.js"
-
-const SENSITIVE_FILE_PATTERNS = [
-  /(^|\/|\\)api-key$/,
-  /(^|\/|\\)\.env$/,
-  /(^|\/|\\)\.env\.local$/,
-  /(^|\/|\\)\.git\//,
-  /(^|\/|\\)id_rsa$/,
-  /(^|\/|\\)id_ed25519$/,
-  /(^|\/|\\)\.ssh\//,
-  /(^|\/|\\)known_hosts$/,
-]
-
-function isSensitive(path: string): boolean {
-  const normalized = path.replace(/\\/g, "/")
-  for (const p of SENSITIVE_FILE_PATTERNS) {
-    if (p.test(normalized)) return true
-  }
-  return false
-}
+import { isSensitive } from "./sensitive.js"
 
 export function createWriteFileTool(): AgentTool {
   return {
