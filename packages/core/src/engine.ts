@@ -67,7 +67,9 @@ export class ReasonixEngine implements CoreEngine {
     const engine = new ReasonixEngine(config, undefined, sessionId)
     const messages = await SessionLoader.read(sessionId)
     if (messages.length > 0) {
-      engine.ctx.log.appendMany(messages)
+      // 过滤 system 消息——prefix.build() 会重新生成，避免重复
+      const nonSystem = messages.filter(m => m.role !== "system")
+      engine.ctx.log.appendMany(nonSystem)
     }
     return engine
   }

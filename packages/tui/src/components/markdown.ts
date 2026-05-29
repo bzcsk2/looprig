@@ -80,6 +80,7 @@ export class Markdown implements Component {
     }
     for (let i = 0; i < this.#paddingY; i++) result.push("");
 
+    if (this.#cache.size >= 50) { const first = this.#cache.keys().next().value; if (first !== undefined) this.#cache.delete(first); }
     this.#cache.set(key, result);
     return result;
   }
@@ -198,7 +199,7 @@ export class Markdown implements Component {
     const result: string[] = [];
     const colCount = table.header.length;
     if (colCount === 0) return result;
-    const colWidth = Math.max(1, Math.floor(width / colCount));
+    const colWidth = Math.max(3, Math.floor(width / colCount));
 
     const headerCells = table.header.map(h =>
       truncateToWidth(this.#renderInlineTokens(h.tokens), colWidth - 1),

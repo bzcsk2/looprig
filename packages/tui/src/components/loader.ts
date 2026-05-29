@@ -40,4 +40,8 @@ export class Loader extends Text {
     const msg = this.#messageColorFn(this.#message);
     this.setText(`${frame} ${msg}`);
   }
+
+  destroy(): void {
+    if (this.#intervalId) { clearInterval(this.#intervalId); this.#intervalId = undefined; }
+  }
 }

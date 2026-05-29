@@ -6,19 +6,14 @@ interface ChatMessage {
   content: string;
 }
 
-const ROLE_COLORS: Record<string, string> = {
-  user: "\x1b[32m", assistant: "\x1b[36m", tool: "\x1b[90m",
-};
-const RESET = "\x1b[0m";
+const ROLE_LABELS: Record<string, string> = { user: "You", assistant: "Deepicode", tool: "Tool" };
 
 export class ChatView implements Component {
   messages: ChatMessage[] = [];
-  #scrollOffset = 0;
   autoScroll = true;
 
   addMessage(role: ChatMessage["role"], content: string): void {
     this.messages.push({ role, content });
-    if (this.autoScroll) this.#scrollOffset = 0;
   }
 
   updateLastMessage(content: string): void {
@@ -27,22 +22,33 @@ export class ChatView implements Component {
   }
 
   invalidate(): void {}
-  handleInput(): void {}
 
   render(width: number): string[] {
     const lines: string[] = [];
-    const start = Math.max(0, this.messages.length - 50);
-    for (let i = start; i < this.messages.length; i++) {
+    // show last N messages that fit; each message = header + content lines + spacer
+    const w = Math.max(20, width);
+    for (let i = this.messages.length - 1; i >= 0; i--) {
       const msg = this.messages[i]!;
-      const color = ROLE_COLORS[msg.role] ?? "";
-      const header = `${color}[${msg.role}]${RESET}`;
-      lines.push(header);
+      const label = ROLE_LABELS[msg.role] ?? msg.role;
+      const header = `\x1b[1m${label}\x1b[0m`;
+      const msgLines: string[] = [header];
       const contentLines = msg.content.split("\n");
       for (const cl of contentLines) {
-        const trimmed = visibleWidth(cl) > width - 2 ? cl.slice(0, width - 5) + "..." : cl;
-        lines.push(` ${trimmed}`);
+        if (cl.length === 0) { msgLines.push(""); continue; }
+        if (visibleWidth(cl) > w - 2) {
+          // simple wrap at width
+          let remaining = cl;
+          while (remaining.length > 0) {
+            const chunk = remaining.slice(0, w - 2);
+            msgLines.push(` ${chunk}`);
+            remaining = remaining.slice(w - 2);
+          }
+        } else {
+          msgLines.push(` ${cl}`);
+        }
       }
-      lines.push("");
+      // prepend so newest messages are at bottom
+      lines.unshift(...msgLines);
     }
     return lines;
   }

@@ -4,7 +4,7 @@ import { ReasonixEngine } from "../../core/src/engine.js"
 import { buildSystemPrompt } from "../../core/src/system-prompt.js"
 import { createBashTool, createEditTool, createReadFileTool, createWriteFileTool, createListDirTool, createGrepTool, createTodoWriteTool } from "../../tools/src/index.js"
 import { clearReadTracker } from "../../tools/src/stale-read.js"
-import { TUI, ProcessTerminal, ChatView, ToolCallView, TokenEstimate, StatusLine, Input } from "../../tui/src/index.js"
+import { TUI, ProcessTerminal, ChatView, ToolCallView, StatusLine, Input, Spacer } from "../../tui/src/index.js"
 import { processEvents } from "../../tui/src/bridge.js"
 
 function printHelp(): void {
@@ -47,7 +47,7 @@ async function main(): Promise<void> {
     return
   }
 
-  await runTUIMode(engine)
+  await runTUIMode(engine, config)
 }
 
 async function runPipeMode(engine: ReasonixEngine): Promise<void> {
@@ -80,25 +80,31 @@ async function runPipeMode(engine: ReasonixEngine): Promise<void> {
   }
 }
 
-async function runTUIMode(engine: ReasonixEngine): Promise<void> {
+async function runTUIMode(engine: ReasonixEngine, config: ReturnType<typeof loadConfig>): Promise<void> {
   const terminal = new ProcessTerminal()
   const tui = new TUI(terminal)
 
   const chatView = new ChatView()
   const toolView = new ToolCallView()
-  const tokenEst = new TokenEstimate()
   const statusLine = new StatusLine()
-  const input = new Input()
+  const inputC = new Input()
 
+  // layout: spacer(top) → chat → tools → input → status(bottom)
+  // spacer pushes content down so input anchors to terminal bottom
+  const spacerH = Math.max(0, terminal.rows - 4)  // 4 = input+status+tools+safety
+  tui.addChild(new Spacer(spacerH))
   tui.addChild(chatView)
   tui.addChild(toolView)
-  tui.addChild(tokenEst)
+  tui.addChild(inputC)
   tui.addChild(statusLine)
-  tui.setFocus(input)
+  tui.setFocus(inputC)
+
+  // initial status
+  statusLine.setModel(`${config.model}`)
 
   tui.start()
 
-  input.onSubmit = (text: string) => {
+  inputC.onSubmit = (text: string) => {
     if (text === "__CANCEL__") { tui.stop(); process.exit(0); return }
     if (text === "/exit" || text === "/bye") { tui.stop(); process.exit(0); return }
     if (text === "/help") { printHelp(); return }
@@ -106,7 +112,7 @@ async function runTUIMode(engine: ReasonixEngine): Promise<void> {
 
     chatView.addMessage("user", text)
     const events = engine.submit(text)
-    processEvents(tui, chatView, toolView, tokenEst, statusLine, input, events)
+    processEvents(tui, chatView, toolView, null as any, statusLine, inputC, events)
   }
 }
 

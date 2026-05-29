@@ -75,7 +75,8 @@ export class StdinBuffer {
       return;
     }
     const r = extract(this.#buf); this.#buf = r.rem;
-    for (const s of this.#pasteSeqs) { this.#pasteSeqs = []; this.#emit("data", s); }
+    const pasteSeqs = this.#pasteSeqs; this.#pasteSeqs = [];
+    for (const s of pasteSeqs) this.#emit("data", s);
     for (const s of r.seqs) this.#emit("data", s);
     if (this.#buf.length > 0) this.#timer = setTimeout(() => { const f = this.flush(); for (const s of f) this.#emit("data", s); }, this.#tm);
   }

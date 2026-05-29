@@ -175,6 +175,32 @@ deepicode/
 3. **R1 thought harvesting**：提取 `reasoning_content`，传递给 TUI 渲染（可折叠显示），**不写入上下文（AppendOnlyLog），不进入 API 请求体**。理由：reasoning 内容可能极长（数千 token），写入历史会快速耗尽上下文窗口；且模型读取自己上一轮的思考过程存在自我强化偏差风险。用户仍可通过 TUI 查看 reasoning 内容。
 4. **Usage 提取与重试**：实现指数退避重试（429/500/502/503重试，400/401不重试）。提取 cache hit/miss tokens 供统计。
 
+### Step 1.1b：ChatClient 抽象层 + 多 Provider 配置
+
+1. 在 `interface.ts` 中定义 `ChatClient` 接口（仅 `chatCompletionsStream` 一个方法）。
+2. `DeepSeekClient` 实现该接口（现状不变，只加 `implements ChatClient`）。
+3. `config.ts` 扩展为多 provider 支持：
+
+```typescript
+type Provider = "zen" | "mimo" | "deepseek" | "custom"
+
+interface ProviderConfig {
+  baseUrl: string
+  defaultModel: string
+  requiresAuth: boolean
+}
+
+const PROVIDERS: Record<Provider, ProviderConfig> = {
+  zen:      { baseUrl: "https://opencode.ai/zen/v1",        defaultModel: "deepseek-v4-flash-free", requiresAuth: false },
+  mimo:     { baseUrl: "https://api.mimo.com/v1",            defaultModel: "mimo-v1",              requiresAuth: false },
+  deepseek: { baseUrl: "https://api.deepseek.com",           defaultModel: "deepseek-v4-flash",     requiresAuth: true  },
+  custom:   { baseUrl: "",                                   defaultModel: "",                       requiresAuth: true  },
+}
+```
+
+4. 配置来源：环境变量 > TUI `/model` 命令 > 默认预设（zen）。
+5. API key 管理：`DEEPICODE_PROVIDER` 环境变量选择 provider；各 provider 独立的 API key 环境变量（`DEEPSEEK_API_KEY`、`MIMO_API_KEY`、`ZEN_API_KEY`）。Zen/Mimo 免费 tier 不强制要求 key。
+
 ### Step 1.2：SegmentedLog 与 Session 持久化
 1. 创建 `packages/core/src/session.ts`。
 2. **(架构修正)** 实现 `SegmentedLog` 类（弃用 AppendOnlyLog 名称以消除语义冲突）：
@@ -197,9 +223,13 @@ deepicode/
 2. **(性能补丁) O(1) 任务回收**：放弃原实现中 `find` 查找。使用自增 `this.taskId` 配合 `Map<number, { resolve, reject }>` 结构精确追踪与回收。
 3. 实现主线程 fallback。
 
-### Step 1.5：StreamingToolExecutor (防假闭合)
+### Step 1.5：StreamingToolExecutor (分级 Eager Dispatch)
 1. 创建 `packages/core/src/streaming-executor.ts`。
-2. **(架构修正) Eager Dispatch 安全化**：废弃朴素的大括号计数判断 JSON 闭合策略。引入**增量式 JSON 验证**——仅当流式 buffer 被确认为完整的合法 JSON 参数时，才触发执行。具体实现待技术选型：状态机驱动的流式 JSON 部分解析器（更可靠），或对 buffer 进行安全 try-parse 配合括号深度追踪（更简单）。当前稳定优先策略：等模型 tool call 完整结束后执行工具。
+2. **(架构修正) 分级 Eager Dispatch**：
+   - 流式 buffer 检测到完整 JSON 参数时，**仅对读操作（`isConcurrencySafe=true`）立即执行**。
+   - 写操作（edit、write_file、bash）必须等模型 `finish_reason` 确认后再执行。
+   - 理由：读操作误触发最多多读一个文件（毫秒级，零成本）；写操作误触发不可逆。读操作占总工具调用 90%+，收益最大化而风险为零。
+   - 当前状态：稳定优先（完整 tool call 后执行），Eager Dispatch 待后续迭代实现。
 3. **并发安全检查**：读操作（`isConcurrencySafe`）并行，写操作独占串行。
 
 ### Step 1.6：Tool-call Repair 流水线
@@ -301,6 +331,16 @@ deepicode/
 5. `diff-preview.ts` — 代码变更的行级差异展示
 6. `status-line.ts` — 底部状态栏（模型、token 用量、会话时长）
 7. `input.ts` — 多行输入框（支持粘贴、历史、Ctrl+C 中断）
+8. `model-picker.ts` — `/model` 命令的 provider 选择 + 模型列表 + API key 输入界面
+
+### Step 3.3b：`/model` 命令实现
+1. 输入 `/model` 触发 provider 选择界面（zen / mimo / deepseek / custom）
+2. 选择 provider 后展示该 provider 可用模型列表（预设 + 自定义输入）
+3. 如果 provider 需要 API key（deepseek / custom），显示安全输入框（回显 `***`）
+4. API key 只在内存中（`config.apiKey`），不落盘
+5. Zen/Mimo 免费 tier 跳过 key 输入
+6. 切换即时生效——更新 `DeepicodeConfig`，后续 API 请求走新 provider
+7. 状态栏实时显示当前 provider + model
 
 ### Step 3.4：多 Agent 系统
 1. 创建 `packages/shell/src/agents/agent-config.ts`。
@@ -571,6 +611,21 @@ deepicode/
 | T-GIT-003 | diffFull 返回差异 | git-snapshot.ts |
 | T-GIT-004 | revert 恢复文件 | git-snapshot.ts |
 
+### 按风险等级的关键测试缺口
+
+以下测试覆盖容易在边界条件下出问题的关键路径，优先级高于常规单元测试：
+
+| 风险等级 | 测试场景 | 对应 Phase | 状态 |
+|---------|---------|-----------|------|
+| 🔴 高 | Eager Dispatch 并发安全：读操作并行 + 写操作串行交叉调度 | Phase 1 | ❌ 缺失 |
+| 🔴 高 | Fold 前后 cache hit/miss 行为验证 | Phase 1 | ❌ 缺失 |
+| 🔴 高 | Session 恢复后消息结构与 prefix-cache 一致性 | Phase 1 | ❌ 缺失 |
+| 🟡 中 | 9-Pass Fuzzy 降级触发条件（前 pass 失败 → 后 pass 接管） | Phase 4 | ✅ 已有 9 单测 |
+| 🟡 中 | SSE 分片边界（1 字节 / 半个 UTF-8 / 半个 JSON） | Phase 1 | ❌ 缺失 |
+| 🟡 中 | 多 provider 切换后 API 请求正常（zen → deepseek → custom） | Phase 1 | ❌ 缺失 |
+| 🟢 低 | `tool_progress` 事件在 shared/exclusive 两种路径下的时序正确性 | Phase 1 | ❌ 缺失 |
+| 🟢 低 | tokenizer Worker 与主线程 fallback 估算一致性 | Phase 1 | ❌ 缺失 |
+
 ---
 
 ## 附录 C：关键决策记录
@@ -591,6 +646,11 @@ deepicode/
 | Token 计数 | 增量旁路 + Map池 | <2000字符 O(1) 估算，≥2000字符 offload Worker，杜绝 O(n) Array 搜索 | context.ts, tokenizer-pool.ts |
 | Session 持久化 | JSONL + 异步批量 | 崩溃可恢复，IO 不阻塞 | session.ts |
 | reasoning 策略 | 不入上下文，仅 TUI 展示 | reasoning 不写入 AppendOnlyLog，不进入 API 请求，不占用 token 窗口 | client.ts, engine.ts |
+| Provider 抽象 | `ChatClient` 接口 | 只抽象流式对话一个方法；各 provider 内部处理消息格式差异和 cache 策略 | interface.ts, client.ts |
+| 默认 Provider | Zen（免费） | 开箱即用，零配置；支持 Mimo 免费和 DeepSeek 官方/custom | config.ts |
+| `/model` 命令 | TUI 内切换 provider + model + API key | 不落盘 key，切换即时生效不影响会话上下文 | tui/model-picker.ts |
+| Plugin/Hooks | 三类 Hook 点 | `beforeToolCall` / `afterToolCall` / `onLoopEvent`；异常降级为 warning | security/hooks.ts |
+| Bypass 约束 | 代码级硬约束 | 写操作带 bypass 标志时抛出硬错误，非文档约定 | security/permission.ts |
 | 不引入 Vercel SDK | 是（MCP 除外） | Vercel SDK 破坏 DeepSeek cache 优化；MCP 是外部工具集成标准，不影响核心推理链路 | 全局 |
 
 ---

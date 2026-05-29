@@ -36,7 +36,8 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
 
   // fold check before first turn (non-blocking: kicks off async but uses sync fallback immediately)
   const foldP = ctx.getFoldDecision()
-  // don't block loop startup on fold check — use a race
+  // race with 100ms timeout — if timeout wins, foldP becomes an orphan task;
+  // pool's internal 5s timeout will clean up the Worker message, so no permanent leak
   const fold = await Promise.race([
     foldP,
     new Promise<FoldDecision>(resolve => setTimeout(() => resolve({ action: "none" as const, ratio: 0, used: 0, total: 128000 }), 100)),
@@ -107,11 +108,11 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
           stats.completionTokens += event.usage.completionTokens
           stats.cacheHitTokens += event.usage.cacheHitTokens ?? 0
           stats.cacheMissTokens += event.usage.cacheMissTokens ?? 0
-          stats.apiCalls++
           sessionWriter?.enqueue({ ts: Date.now(), type: "stats", payload: { ...stats } })
           break
 
         case "done": {
+          stats.apiCalls++  // 每轮只计数一次，避免 usage 重复事件导致偏高
           const reason = event.finishReason ?? "stop"
           const isToolUse = isToolUseFinishReason(reason)
 

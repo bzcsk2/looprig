@@ -5,10 +5,12 @@ import { repairToolArguments } from "./context/repair.js"
 export class StreamingToolExecutor {
   private tools: Map<string, AgentTool>
   private sessionId: string
+  private cwd: string
 
-  constructor(tools: Map<string, AgentTool>, sessionId: string) {
+  constructor(tools: Map<string, AgentTool>, sessionId: string, cwd?: string) {
     this.tools = tools
     this.sessionId = sessionId
+    this.cwd = cwd ?? process.cwd()
   }
 
   async *run(toolCalls: ToolCall[], signal: AbortSignal, appendToolResult: (tc: ToolCall, result: ToolResult) => void): AsyncGenerator<LoopEvent> {
@@ -22,6 +24,7 @@ export class StreamingToolExecutor {
 
       for (const { tc, index } of batch) {
         yield { role: "tool_start", toolName: tc.function.name, toolCallIndex: index }
+        yield { role: "tool_progress", toolName: tc.function.name, toolCallIndex: index, content: "running" }
       }
 
       // Run all shared tools concurrently, collect results
@@ -34,7 +37,6 @@ export class StreamingToolExecutor {
       completed.sort((a, b) => a.index - b.index)
 
       for (const { index, event, result } of completed) {
-        yield { role: "tool_progress", toolName: event.toolName, toolCallIndex: index, content: "running" }
         const originalTc = batch.find((b) => b.index === index)!.tc
         appendToolResult(originalTc, result)
         yield event
@@ -64,7 +66,7 @@ export class StreamingToolExecutor {
   // Execute tool and return result without appending to context
   private async executeToolResult(tc: ToolCall, index: number, signal: AbortSignal): Promise<{ event: LoopEvent; result: ToolResult }> {
     const handler = this.tools.get(tc.function.name)
-    const toolCtx: ToolContext = { cwd: process.cwd(), sessionId: this.sessionId, signal }
+    const toolCtx: ToolContext = { cwd: this.cwd, sessionId: this.sessionId, signal }
 
     if (!handler) {
       const result = makeToolError(`Unknown tool: ${tc.function.name}`)

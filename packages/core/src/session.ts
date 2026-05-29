@@ -53,8 +53,12 @@ export class AsyncSessionWriter {
   }
 
   enqueue(record: SessionRecord): void {
-    this.queue.push(JSON.stringify(record) + "\n")
-    void this.flushSoon()
+    try {
+      this.queue.push(JSON.stringify(record) + "\n")
+      void this.flushSoon()
+    } catch {
+      // best-effort: drop unserializable records silently
+    }
   }
 
   private async flushSoon(): Promise<void> {

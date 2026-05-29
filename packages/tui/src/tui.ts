@@ -142,8 +142,7 @@ export class TUI extends Container {
       if (o !== n) { if (fc === -1) fc = i; lc = i; }
     }
     const appended = newLines.length > this.#prevLines.length;
-    if (appended && fc === -1) fc = this.#prevLines.length;
-    if (appended) lc = newLines.length - 1;
+    if (appended && fc === -1) { fc = this.#prevLines.length; lc = newLines.length - 1; }
     return { firstChanged: fc, lastChanged: lc, appendedLines: appended };
   }
 

@@ -1,12 +1,15 @@
 import { Component, Focusable, CURSOR_MARKER, isFocusable } from "../tui";
 import { visibleWidth } from "../utils";
 
+const MAX_HISTORY = 1000;
+
 export class Input implements Component, Focusable {
   focused = false;
   #text = "";
   #cursor = 0;
   #history: string[] = [];
   #histIdx = -1;
+  #scrollOff = 0;
   onSubmit?: (text: string) => void;
 
   getText(): string { return this.#text; }
@@ -21,6 +24,7 @@ export class Input implements Component, Focusable {
     if (data === "\r" || data === "\n") {
       if (this.#text.trim()) {
         this.#history.push(this.#text);
+        if (this.#history.length > MAX_HISTORY) this.#history.shift();
         this.#histIdx = this.#history.length;
         this.onSubmit?.(this.#text);
         this.#text = ""; this.#cursor = 0;
@@ -67,14 +71,36 @@ export class Input implements Component, Focusable {
       this.onSubmit?.("__CANCEL__");
       return;
     }
+    if (data === "\x04" || data === "ctrl+d") {
+      this.onSubmit?.("__CANCEL__");
+      return;
+    }
   }
 
   invalidate(): void {}
 
   render(width: number): string[] {
-    const prompt = `\x1b[32m>\x1b[0m `;
+    const prompt = "\x1b[32m>\x1b[0m ";
+    const promptW = 2; // "> " visible width
+    const avail = width - promptW;
     const marker = this.focused ? CURSOR_MARKER : "";
     const display = this.#text.slice(0, this.#cursor) + marker + this.#text.slice(this.#cursor);
-    return [`${prompt}${display}`];
+    const dispW = visibleWidth(display);
+
+    // horizontal scroll: keep cursor in view
+    if (dispW <= avail) {
+      this.#scrollOff = 0;
+    } else {
+      const curW = visibleWidth(this.#text.slice(0, this.#cursor)) + (this.focused ? 1 : 0);
+      if (curW < this.#scrollOff) {
+        this.#scrollOff = curW;
+      } else if (curW > this.#scrollOff + avail - 1) {
+        this.#scrollOff = curW - avail + 1;
+      }
+      if (this.#scrollOff < 0) this.#scrollOff = 0;
+    }
+
+    const visible = display.length > this.#scrollOff ? display.slice(this.#scrollOff, this.#scrollOff + avail + 1) : display;
+    return [`${prompt}${visible}`];
   }
 }

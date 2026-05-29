@@ -504,6 +504,19 @@ bun test
 - 纯 JS 替代 Rust FFI（utils.ts：visibleWidth/wrapTextWithAnsi/truncateToWidth；keys.ts：matchesKey/parseKey/extractPrintableText）
 - 基础组件：Box/Text/Spacer/TruncatedText/Loader/Markdown/SelectList
 - 业务组件：ChatView/ToolCallView/Input/StrategyNotify/TokenEstimate/DiffPreview/StatusLine
+- 第五轮 TUI 审查修复（P0×2 + P1×5 + P2×8 + P3×5 = 20 项）：
+  - bridge.ts 重写：assistantStarted 占位、reasoning_delta/error/warning/status 事件处理、try-catch
+  - tool-call-view.ts：toolCallIndex 唯一标识 + STATUS_ORDER 状态机不回退
+  - loader.ts：destroy() 方法清理 timer
+  - strategy-notify.ts：旧 timer 清理 + cardW 最小值保护
+  - input.ts：水平滚动 + 1000 历史上限 + ctrl+d 支持
+  - markdown.ts：colWidth min 3 + cache LRU 50 条淘汰
+  - diff-preview.ts：visibleWidth 替代 s.length
+  - streaming-executor.ts：cwd 从构造函数传入
+  - select-list.ts：filter 比较实际 item 而非 index
+  - stdin-buffer.ts：pasteSeqs 循环前拷贝
+  - tui.ts：diffLines lc 仅纯追加场景覆盖
+  - chat-view.ts：重写，移除死 scroll 代码
 - 集成：bridge.ts 事件桥接 + CLI 替换 readline
 
 ## 已知限制

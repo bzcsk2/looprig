@@ -38,6 +38,12 @@ export function createTodoWriteTool(): AgentTool {
         return { content: safeStringify({ error: "todos array is required" }), isError: true }
       }
 
+      for (const t of todos) {
+        if (!t || typeof t.content !== "string" || typeof t.status !== "string") {
+          return { content: safeStringify({ error: "each todo must have content (string) and status (string)" }), isError: true }
+        }
+      }
+
       const summary = todos.map((t: TodoItem) => `[${statusIcon(t.status)}] ${t.content}`).join("\n")
       return {
         content: safeStringify({ todos, summary }),

@@ -1,4 +1,5 @@
 import { Component } from "../tui";
+import { visibleWidth } from "../utils";
 
 export class DiffPreview implements Component {
   #oldLines: string[] = []; #newLines: string[] = [];
@@ -33,4 +34,4 @@ export class DiffPreview implements Component {
   }
 }
 
-function slice(s: string, w: number): string { return s.length > w ? s.slice(0, w - 3) + "..." : s; }
+function slice(s: string, w: number): string { return visibleWidth(s) > w ? s.slice(0, Math.max(0, w - 3)) + "..." : s; }

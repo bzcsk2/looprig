@@ -14,6 +14,7 @@ export class StrategyNotify implements Component {
   #timer?: ReturnType<typeof setInterval>;
 
   startCountdown(cb: (id: string) => void): void {
+    if (this.#timer) clearInterval(this.#timer);
     this.onSelect = cb;
     this.#countdown = 3;
     this.#timer = setInterval(() => {
@@ -34,7 +35,7 @@ export class StrategyNotify implements Component {
     const lines: string[] = [];
     lines.push("\x1b[1m  选择推理强度  \x1b[0m");
     lines.push("");
-    const cardW = Math.floor((width - 10) / 4);
+    const cardW = Math.max(3, Math.floor((width - 10) / 4));
     let row = "";
     for (let i = 0; i < TIERS.length; i++) {
       const t = TIERS[i]!;

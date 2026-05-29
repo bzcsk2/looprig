@@ -91,15 +91,17 @@ export class SelectList implements Component, Focusable {
 
   #updateFilter(): void {
     const q = this.#filter.toLowerCase();
+    const prevIdx = this.#filteredIndices[this.#selectedIndex];
+    const prevItem = prevIdx !== undefined ? this.#items[prevIdx] : undefined;
     this.#filteredIndices = this.#items
       .map((item, i) => ({ item, i }))
       .filter(({ item }) => item.label.toLowerCase().includes(q))
       .map(({ i }) => i);
-    const prevSelected = this.#selectedIndex;
     this.#selectedIndex = 0;
     this.#scrollOffset = 0;
     const idx = this.#filteredIndices[0];
-    if (this.#selectedIndex !== prevSelected && idx !== undefined) {
+    const newItem = idx !== undefined ? this.#items[idx] : undefined;
+    if (prevItem !== newItem && idx !== undefined) {
       this.onSelectionChange?.(this.#items[idx]!, idx);
     }
   }
