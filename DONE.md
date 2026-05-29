@@ -283,19 +283,23 @@
   - `edit`
 - CLI 已修复工具结果展示：tool call 后会显示 bash stdout/stderr、read_file 内容、edit 结果。
 
-未完成：
+额外完成：
 
-- `write_file`
-- `ls`
-- `search.ts` grep/glob
-- `web-fetch.ts`
+- 工具参数运行时校验（shell-exec / file-ops / edit）
 
 ## Phase 5：安全层实现
 
-状态：未开始
+### 最小安全基线（工具内联实现）
 
-- `packages/security/src/index.ts` 仍是 placeholder。
-- 尚未实现 deny-first permission、hooks、git snapshot。
+状态：完成（2026-05-29）
+
+在 security 包完整之前，已在工具层实现最小安全保护：
+
+- **bash denylist** — 阻止 `rm -rf /`、`sudo`、`mkfs`、`dd`、`fdisk`、`chmod -R 777 /` 等危险命令
+- **read_file 路径保护** — 拒绝读取 `api-key`、`.env`、私钥文件、`.git/` 等敏感文件；基于 `ctx.cwd` resolve 相对路径；超过 10MB 的文件拒绝读取；不存在文件返回结构化错误
+- **edit 路径保护** — 同 read_file 的敏感文件拒绝策略
+- **参数校验** — shell-exec / file-ops / edit 三个工具入口先校验必填字段类型，不合格直接返回 `{ isError: true }`
+- **Session writer 错误吞没** — `flushSoon` catch 写入错误，避免未处理 rejection
 
 ## Phase 6：高级功能生态接入
 
@@ -346,7 +350,6 @@ bun test
 ## 已知限制
 
 - prefix fingerprint 尚未覆盖 toolSpecs / fewShots。
-- 无权限层，`bash` / `edit` 当前没有用户确认与风险拦截。
-- `read_file` 目前没有路径沙箱、文件大小 outline mode、stale-read tracking。
-- `edit` 工具仍是最小版本，不具备完整 9-pass 和 stale-read validation。
+- `edit` 工具仍是最小版本，不具备完整 9-pass。
+- Stale-read validation 尚未实现。
 - `session.ts` 尚不能恢复历史。

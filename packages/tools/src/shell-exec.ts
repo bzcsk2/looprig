@@ -1,6 +1,24 @@
 import { spawn } from "node:child_process"
 import type { AgentTool } from "../../core/src/interface.js"
 
+const DENY_PATTERNS = [
+  /^rm\s+-rf\s+\/$/,
+  /^sudo\b/,
+  /^mkfs\b/,
+  /^dd\s+if=/,
+  /^chmod\s+-R\s+777\s+\/$/,
+  /^dd\b/,
+  /^fdisk\b/,
+  /^mkfs\.\w+\b/,
+]
+
+function isDenied(command: string): string | null {
+  for (const p of DENY_PATTERNS) {
+    if (p.test(command.trim())) return p.source
+  }
+  return null
+}
+
 export function createBashTool(): AgentTool {
   return {
     name: "bash",
@@ -18,7 +36,14 @@ export function createBashTool(): AgentTool {
     concurrency: "exclusive",
     approval: "exec",
     async execute(args, ctx) {
-      const command = String(args.command)
+      if (typeof args.command !== "string" || !args.command.trim()) {
+        return { content: JSON.stringify({ error: "command is required" }), isError: true }
+      }
+      const command = args.command
+      const denied = isDenied(command)
+      if (denied) {
+        return { content: JSON.stringify({ error: `Command denied: matches dangerous pattern /${denied}/` }), isError: true }
+      }
       const cwd = typeof args.cwd === "string" ? args.cwd : ctx.cwd
       const timeoutMs = typeof args.timeout_ms === "number" ? Math.max(0, Math.floor(args.timeout_ms)) : 30_000
       const maxChars = typeof args.max_chars === "number" ? Math.max(0, Math.floor(args.max_chars)) : 200_000

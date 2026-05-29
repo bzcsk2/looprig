@@ -47,6 +47,8 @@ export class AsyncSessionWriter {
         const chunk = this.queue.splice(0, 50).join("")
         await appendFile(this.path, chunk, "utf-8")
       }
+    } catch {
+      // best-effort: swallow write errors silently
     } finally {
       this.flushing = false
     }

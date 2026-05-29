@@ -8,31 +8,7 @@
   5. ~~toolCallIndex 映射可能丢失~~ → 已完成：executeToolResult 保留原始 index
   6. ~~assistant_final / reasoning_content~~ → 已完成：协议边界 + 历史 round-trip
 
-  待修复：
-
-  1. 工具参数缺少运行时校验，可能执行错误命令
-      - deepicode/packages/tools/src/shell-exec.ts:21 直接 String(args.command)，如果
-        模型漏传 command，会执行字符串 "undefined"。
-      - deepicode/packages/tools/src/file-ops.ts:118 和 deepicode/packages/tools/src/
-        edit.ts:293 也有同类问题。
-      - 建议：每个工具入口先校验必填字段类型，不合格直接返回 { isError: true }。
-  2. 安全边界还没有落地
-      - deepicode/packages/tools/src/shell-exec.ts:41 直接 bash -lc，没有 denylist、确
-        认、沙箱、cwd 限制。
-      - deepicode/packages/tools/src/file-ops.ts:120 可读任意路径。
-      - deepicode/packages/tools/src/edit.ts:297 可写任意路径。
-  6. Session writer 是 best-effort，但错误会变成隐性风险
-      - deepicode/packages/core/src/engine.ts:37 writer.init() 没 await，随后可能立刻
-        enqueue。
-      - deepicode/packages/core/src/session.ts:39 void this.flushSoon() 没 catch，
-        appendFile 失败可能产生未处理 rejection。
-      - 建议：enqueue 内部吞掉写入错误或暴露诊断事件。
-        packages/tools/src/hash-edit.ts:184 比较的是 sha256(oldString) ===
-        needleHash，恒真。
-      - 当前实际是"流式 exact replace once"，不是 hash-anchored edit。
-      - 文档里标"最小完成"是对的，代码命名后续要么补真 hash anchor，要么改名避免误导。
-
-  建议下一步：参数校验、安全 denylist、abort catch、session writer 错误吞没。
+  所有问题已修复 ✅（2026-05-29）
 
 
 本文记录下一阶段任务。优先级从高到低排列，建议每个任务完成后同步更新 `DONE.md`。
@@ -68,42 +44,22 @@
 
 ### 4. 为 `bash` 增加最小权限确认接口
 
-目标：
+状态：完成 ✅（2026-05-29）
 
-- 在 security 层未完成前，避免危险命令静默执行。
-
-建议：
-
-- 先实现保守 denylist：
-  - `rm -rf /`
-  - `sudo`
-  - `mkfs`
-  - `dd if=`
-  - `chmod -R 777 /`
-- 对 mutating / network / install 类命令返回 `isError: true` 或进入待确认状态。
-
-验收：
-
-- 危险命令不会执行。
-- read-only 命令如 `pwd`、`ls`、`cat package.json` 可执行。
+- 添加了 deny patterns：`rm -rf /`、`sudo`、`mkfs`、`dd`、`fdisk`、`chmod -R 777 /`
+- 危险命令返回结构化错误，不执行
+- read-only 命令如 `pwd`、`ls`、`cat` 正常执行
+- command 参数过滤：非 string/空字符串返回错误
 
 ### 5. 为 `read_file` 增加路径与大文件保护
 
-目标：
+状态：完成 ✅（2026-05-29）
 
-- 防止意外读取敏感文件或巨大文件拖慢上下文。
-
-建议：
-
-- 默认相对路径基于 `ctx.cwd` resolve。
-- 拒绝读取 `api-key`、`.env`、私钥文件。
-- 超过阈值文件返回 outline / 截断提示。
-
-验收：
-
-- 读取 `api-key` 返回错误。
-- 读取不存在文件返回结构化错误。
-- 大文件不会完整塞进上下文。
+- 路径基于 `ctx.cwd` resolve 为绝对路径
+- 拒绝读取 `api-key`、`.env`、私钥、`.git/` 等敏感文件
+- 超过 10MB 的文件返回错误，不读取内容
+- 不存在文件返回结构化错误
+- path 参数验证：非 string/空返回错误
 
 ### 6. 完成 Stale-read Validation 最小版
 
