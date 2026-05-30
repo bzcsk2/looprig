@@ -25,6 +25,7 @@ export interface ProviderInfo {
   requiresKey: boolean
   label: string
   models: ProviderModel[]
+  defaultKey?: string
 }
 
 export const PROVIDERS: Record<string, ProviderInfo> = {
@@ -37,6 +38,7 @@ export const PROVIDERS: Record<string, ProviderInfo> = {
       { label: "deepseek-v4-flash", model: "deepseek-v4-flash" },
       { label: "mimo-v2.5", model: "mimo-v2.5" },
     ],
+    defaultKey: "public",
   },
   deepseek: {
     baseUrl: "https://api.deepseek.com",
@@ -95,7 +97,7 @@ export function loadConfig(): DeepicodeConfig {
   const model = process.env.DEEPSEEK_MODEL ?? providerCfg?.model ?? DEEPSEEK_MODEL
   const apiKeyEnvVar = getApiKeyEnvVar(provider)
 
-  let apiKey = process.env[apiKeyEnvVar] ?? ""
+  let apiKey = process.env[apiKeyEnvVar] ?? providerCfg?.defaultKey ?? ""
   if (!apiKey && provider === "deepseek") {
     apiKey = loadApiKeyFromProjectFile() ?? ""
   }
