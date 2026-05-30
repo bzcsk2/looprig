@@ -1,4 +1,5 @@
 import type { ChatMessage, ToolSpec } from "./types.js"
+import type { ChatClient } from "./interface.js"
 
 export type DeepSeekStreamEvent =
   | { type: "text_delta"; delta: string }
@@ -61,7 +62,7 @@ type SSEChunk = {
   error?: { message?: string }
 }
 
-export class DeepSeekClient {
+export class DeepSeekClient implements ChatClient {
   async *chatCompletionsStream(messages: ChatMessage[], opts: DeepSeekClientOptions): AsyncGenerator<DeepSeekStreamEvent> {
     const url = new URL("/chat/completions", ensureBaseUrl(opts.baseUrl)).toString()
     const headers: Record<string, string> = {

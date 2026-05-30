@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback, useRef } from 'react';
 import { Box, Text, AlternateScreen } from '@deepicode/ink';
 import type { ReasonixEngine } from '@deepicode/core';
 import type { DeepicodeConfig } from '@deepicode/core';
+import { PROVIDERS } from '@deepicode/core';
 import { createBridge, type BridgeState } from './bridge.js';
 import { DeepiMessages } from './DeepiMessages.js';
 import { DeepiPromptInput } from './DeepiPromptInput.js';
@@ -10,6 +11,7 @@ import { Spinner } from './Spinner.js';
 import { StatusBar } from './StatusBar.js';
 import { FullscreenLayout } from './FullscreenLayout.js';
 import { isFullscreenEnvEnabled } from './fullscreen.js';
+import { ModelPicker } from './ModelPicker.js';
 
 const initialState: BridgeState = {
   messages: [],
@@ -22,13 +24,9 @@ const initialState: BridgeState = {
   error: null,
 };
 
-const PROVIDER_LABEL: Record<string, string> = {
-  'https://api.deepseek.com': 'DeepSeek',
-  'https://opencode.ai/zen/v1': 'Zen',
-};
-
-function getProviderLabel(config: DeepicodeConfig): string {
-  return PROVIDER_LABEL[config.baseUrl] ?? config.baseUrl;
+export function getProviderLabel(provider: string, model: string): string {
+  const info = PROVIDERS[provider];
+  return info ? `${info.label} / ${model}` : `${provider} / ${model}`;
 }
 
 interface AppProps {
@@ -44,6 +42,10 @@ export function App({ engine, config }: AppProps) {
   const shuttingDown = useRef(false);
   const engineRef = useRef(engine);
 
+  const [activeProvider, setActiveProvider] = useState(config.provider ?? 'zen');
+  const [activeModel, setActiveModel] = useState(config.model);
+  const [showModelPicker, setShowModelPicker] = useState(false);
+
   const handleSubmit = useCallback((text: string) => {
     if (text === '/exit' || text === '/bye') {
       shuttingDown.current = true;
@@ -58,14 +60,51 @@ export function App({ engine, config }: AppProps) {
     if (text === '/help') {
       setBridgeState(prev => ({
         ...prev,
-        messages: [...prev.messages, { role: 'assistant' as const, content: 'Commands: /exit, /bye, /help' }],
+        messages: [...prev.messages, { role: 'assistant' as const, content: 'Commands: /exit, /bye, /help, /model' }],
       }));
+      return;
+    }
+    if (text === '/model') {
+      setShowModelPicker(true);
       return;
     }
     bridge.submit(text);
   }, [bridge]);
 
-  const providerLabel = getProviderLabel(config);
+  const handleModelSelect = useCallback((sel: { provider: string; model: string; apiKey: string; baseUrl: string }) => {
+    engineRef.current.updateConfig({
+      provider: sel.provider,
+      model: sel.model,
+      apiKey: sel.apiKey,
+      baseUrl: sel.baseUrl,
+    });
+    setActiveProvider(sel.provider);
+    setActiveModel(sel.model);
+    setShowModelPicker(false);
+    setBridgeState(prev => ({
+      ...prev,
+      messages: [...prev.messages, { role: 'assistant' as const, content: `Switched to ${PROVIDERS[sel.provider]?.label ?? sel.provider} / ${sel.model}` }],
+    }));
+  }, []);
+
+  const handleModelCancel = useCallback(() => {
+    setShowModelPicker(false);
+  }, []);
+
+  const providerLabel = getProviderLabel(activeProvider, activeModel);
+
+  if (showModelPicker) {
+    return (
+      <Box flexDirection="column" width="100%" height="100%">
+        <ModelPicker
+          currentProvider={activeProvider}
+          currentModel={activeModel}
+          onSelect={handleModelSelect}
+          onCancel={handleModelCancel}
+        />
+      </Box>
+    );
+  }
 
   const scrollableContent = (
     <>
@@ -99,7 +138,7 @@ export function App({ engine, config }: AppProps) {
         isLoading={bridgeState.isLoading}
       />
       <StatusBar
-        model={config.model}
+        model={activeModel}
         provider={providerLabel}
         inputTokens={bridgeState.tokens.input}
         outputTokens={bridgeState.tokens.output}

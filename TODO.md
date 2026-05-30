@@ -13,55 +13,18 @@
 
 ---
 
-## 0️⃣.1 TUI 审计修复（最高优先 — 阻断日常使用）
+## 0️⃣.1 TUI 审计修复 ✅
 
-> 审计报告：`DeepicodeTUIReAudit-20260530.md`。23 项发现，按 P0→P1→P2→P3 排列。
-> 状态全部在 `ADVICE.md` 当前待处理列表，以下仅列优先级排序。
-
-### 第一轮：阻断性 Bug（P0 + P1，共 6 项）
-
-| # | 优先级 | 问题 | 文件 | 预估 |
-|---|--------|------|------|------|
-| TUI-P0-1 | 🔴 | `tool_progress` 硬编码 `running`，`done` 被回退 | `bridge.tsx:80-91` | 10min |
-| TUI-P1-1 | 🔴 | error/warning 不渲染，静默失败 | `bridge.tsx` + `App.tsx` | 15min |
-| TUI-P1-2 | 🟠 | Token 统计永远 `↑0 ↓0`，loop.ts 未 yield usage | `loop.ts:106` + `bridge.tsx` | 30min |
-| TUI-P1-3 | 🟠 | 同名工具 name 匹配歧义，应用 toolCallIndex | `bridge.tsx:80-103` | 20min |
-| TUI-P1-4 | 🟠 | reasoning_delta 丢弃，R1 推理内容丢失 | `bridge.tsx:66-67` + `DeepiMessages.tsx` | 30min |
-| TUI-P1-5 | 🟠 | 光标 closure 陈旧，快速编辑时光标错位 | `DeepiPromptInput.tsx:87-90` | 20min |
-
-### 第二轮：体验修复（P2，共 9 项）
-
-| # | 问题 | 文件 | 预估 |
-|---|------|------|------|
-| TUI-P2-1 | tool_call_delta 忽略 | `bridge.tsx` | 15min |
-| TUI-P2-2 | status 事件丢弃 | `bridge.tsx:120-121` | 15min |
-| TUI-P2-4 | warning 混入 error 字段 | `bridge.tsx:113-118` | 10min |
-| TUI-P2-7 | 输入框无光标指示器 | `DeepiPromptInput.tsx` | 20min |
-| TUI-P2-8 | 缺 Ctrl+D/Home/End/Ctrl+U/Ctrl+K | `DeepiPromptInput.tsx` | 30min |
-| TUI-P2-5 | Pipe 模式 error → stdout 应 stderr | `cli/src/tui.ts:78` | 5min |
-| TUI-P2-6 | Pipe 模式缺 5 种事件 | `cli/src/tui.ts:60-81` | 20min |
-| TUI-P2-3 | done 事件忽略 + P2-9 `/exit` 不优雅 | `bridge.tsx` + `App.tsx` | 10min |
-
-### 第三轮：清理（P3，共 8 项）
-
-| # | 问题 | 文件 | 预估 |
-|---|------|------|------|
-| TUI-P3-2 | env var `CLAUDE_CODE` → `DEEPCODE` 前缀 | `fullscreen.ts` | 5min |
-| TUI-P3-1 | Help 硬编码 | `App.tsx` | 5min |
-| TUI-P3-3 | 非全屏无滚动容器 | `FullscreenLayout.tsx` | 30min |
-| TUI-P3-4 | StatusBar 无 flex 分隔 | `StatusBar.tsx` | 10min |
-| TUI-P3-6 | Pipe 重复换行 | `cli/src/tui.ts` | 5min |
-| TUI-P3-7 | index 作 React key | `DeepiMessages.tsx` | 5min |
-| TUI-P3-8 | Tool 消息截断无提示 | `DeepiMessages.tsx` | 10min |
-| TUI-P3-5 | promptOverlayContext 占位 | `promptOverlayContext.tsx` | — (暂缓) |
+> **状态**：2026-05-30 已完成 22 项修复（P0×1 + P1×5 + P2×9 + P3×6 + 旧遗留×1）。详见 `ADVICE.md` § 已修复（2026-05-30 第七轮）。
+> 已降级为"持续关注"：P3-4-5（fold 竞态，pool 超时自动清理）、TUI-P3-1（Help 硬编码）、TUI-P3-5（promptOverlayContext 占位）
 
 ---
 
-## 第一优先：TUI 功能增量
+## 第一优先：TUI 功能增量 ✅
 
-> TUI 可用后可做的用户可见功能。
+> ✅ TM1 + TM2 已完成。ChatClient 接口、PROVIDERS 预设表、DEEPICODE_PROVIDER env、ModelPicker 组件（provider 选择 → 模型选择 → API key 安全输入）。`bun run typecheck` 零错误，`bun test` 66 pass。
 
-### TM1. Provider 抽象层 + 多 Provider 配置
+### TM1. Provider 抽象层 + 多 Provider 配置 ✅
 
 参考：**CC** `src/services/api/openai/`（OpenAI 兼容层架构）
 
@@ -73,7 +36,7 @@
 - 环境变量：`DEEPICODE_PROVIDER` 选择 provider，各 provider 独立 API key 变量
 - Zen/Mimo 免费 tier 不强制要求 key
 
-### TM2. `/model` 命令 + model-picker 组件
+### TM2. `/model` 命令 + model-picker 组件 ✅
 
 参考：**CC** `src/commands/model/` + `src/components/CustomSelect/`
 
@@ -215,11 +178,11 @@ CNY 预估 vs DeepSeek 账单误差 < 20%。TUI 帧率 > 30fps。
 |--------|------|------|------|
 | 0 | 脚手架 + 核心引擎 | — | ✅ |
 | 0 | TUI 重构（Ink 框架 + 7 组件） | 1 | ✅ |
-| **0.1** | **TUI 审计修复（P0+P1+P2+P3）** | **23** | ⬜ |
-| 1 | TUI 功能增量（/model + Provider） | 2 | ⬜ |
+| **0.1** | **TUI 审计修复（P0+P1+P2+P3）** | **22** | ✅ |
+| 1 | TUI 功能增量（/model + Provider） | 2 | ✅ |
 | 2 | 安全层 | 3 | ⬜ |
 | 3 | 壳层增强 + 多 Agent | 3 | ⬜ |
 | 4 | 智能推理调节 | 4 | ⬜ |
 | 5 | 工具层生态 | 3 | ⬜ |
 | 6 | 测试与调优 | 3 | ⬜ |
-| — | 旧引擎遗留 | 3 | ⬜ |
+| — | 旧引擎遗留 | 2 | ⬜ |

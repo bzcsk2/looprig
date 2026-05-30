@@ -1,4 +1,5 @@
 import type { ChatMessage, ToolSpec, Usage } from "./types.js"
+import type { DeepSeekStreamEvent, DeepSeekClientOptions } from "./client.js"
 
 /* ── LoopEvent — core yields these, shell consumes them ── */
 
@@ -99,4 +100,10 @@ export interface AgentConfig {
   maxTokens?: number
   systemPrompt?: string
   toolNames?: string[]
+}
+
+/* ── ChatClient — abstract provider interface ── */
+
+export interface ChatClient {
+  chatCompletionsStream(messages: ChatMessage[], opts: DeepSeekClientOptions): AsyncGenerator<DeepSeekStreamEvent>
 }

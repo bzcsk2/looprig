@@ -98,6 +98,11 @@ export class ReasonixEngine implements CoreEngine {
     this.activeAbortController?.abort()
   }
 
+  /** 运行时更新引擎配置（用于 /model 命令切换 Provider） */
+  updateConfig(partial: Partial<DeepicodeConfig>): void {
+    Object.assign(this.config, partial)
+  }
+
   /** 预留：切换 agent（当前为空实现） */
   switchAgent(_agentName: string): void {}
   /** 预留：处理 tier 决策（当前为空实现） */

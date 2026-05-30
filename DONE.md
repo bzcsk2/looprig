@@ -6,7 +6,7 @@
 - `最小完成`：具备可用闭环，但未达到实施计划中的完整版要求。
 - `部分完成`：只完成子集能力，仍需后续补齐。
 
-最后更新：2026-05-30（TUI 重做完成 — Ink/React 框架 + 7 业务组件 + TUI 审计）
+最后更新：2026-05-30（TUI 审计 22 项全部修复 — 第七轮）
 
 ## Phase 0：脚手架搭建
 
@@ -531,3 +531,17 @@ bun test
 ## 已知限制
 
 - `token_estimate` 事件尚未产出（#11 提供了 ContextManager 接口，未接入 loop event）。
+
+## 第七轮修复：TUI 审计修复（2026-05-30，共 22 项）
+
+审计报告：`DeepicodeTUIReAudit-20260530.md`。详见 `ADVICE.md` 已修复章节。
+
+| 级别 | 数量 | 关键修复 |
+|------|------|---------|
+| P0 | 1 | tool_progress 状态回退 — 检查 content 字段，done 时不回退为 running |
+| P1 | 5 | error 渲染到 scrollable 底部、token 统计（loop.ts yield usage 事件）、toolCallIndex 精确匹配、reasoning_delta 渲染为灰色推理行、cursorPos 改用 useRef |
+| P2 | 9 | tool_call_delta/status/done 事件消费、warning 独立 warnings[] 数组、输入框光标 ▊ 指示器、Home/End/Ctrl+A/E/U/K/D 八快捷键、Pipe stderr + 全事件覆盖、/exit 延迟退出 |
+| P3 | 6 | DEEPCODE 前缀兼容、非全屏路径也包 ScrollBox、StatusBar flexGrow 分隔、Pipe done 去重换行、React key 组合化、Tool 截断追加 "..." 提示 |
+| 旧遗留 | 1 | P3-4-2 prefix.build 短路（计算 cacheKey，未变化跳过 rebuild） |
+
+降级为持续关注（3 项）：P3-4-5（fold 竞态 pool 5s 超时自动清理）、TUI-P3-1（Help 硬编码，后续 /model 扩展时解决）、TUI-P3-5（promptOverlayContext 占位，MVP 不需要斜杠命令建议）
