@@ -9,29 +9,29 @@ interface ModelPickerProps {
   onCancel: () => void;
 }
 
-type Step = 'provider' | 'model' | 'key' | 'custom_url' | 'custom_model';
+type Step = 'provider' | 'key' | 'model';
+
+const PROVIDER_ORDER = ['zen', 'deepseek', 'mimo'];
 
 export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel }: ModelPickerProps) {
-  const providerKeys = Object.keys(PROVIDERS);
   const [step, setStep] = useState<Step>('provider');
-  const [selIdx, setSelIdx] = useState(Math.max(0, providerKeys.indexOf(currentProvider)));
+  const [selIdx, setSelIdx] = useState(Math.max(0, PROVIDER_ORDER.indexOf(currentProvider)));
   const [selProvider, setSelProvider] = useState(currentProvider);
   const [selModel, setSelModel] = useState(currentModel);
   const [apiKey, setApiKey] = useState('');
-  const [customUrl, setCustomUrl] = useState('');
-  const [customModel, setCustomModel] = useState('');
   const [inputBuf, setInputBuf] = useState('');
 
   const confirmSelection = useCallback(() => {
     const cfg = PROVIDERS[selProvider];
+    if (!cfg) return;
     const existingKey = process.env[getApiKeyEnvVar(selProvider)] ?? process.env.DEEPSEEK_API_KEY ?? '';
     onSelect({
       provider: selProvider,
       model: selModel || cfg.model,
       apiKey: apiKey || existingKey,
-      baseUrl: selProvider === 'custom' ? customUrl : cfg.baseUrl,
+      baseUrl: cfg.baseUrl,
     });
-  }, [selProvider, selModel, apiKey, customUrl, onSelect]);
+  }, [selProvider, selModel, apiKey, onSelect]);
 
   useInput((_input, key) => {
     if (key.ctrl && _input === 'c') {
@@ -45,22 +45,38 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
         return;
       }
       if (key.downArrow) {
-        setSelIdx(prev => Math.min(providerKeys.length - 1, prev + 1));
+        setSelIdx(prev => Math.min(PROVIDER_ORDER.length - 1, prev + 1));
         return;
       }
       if (key.return) {
-        const p = providerKeys[selIdx];
+        const p = PROVIDER_ORDER[selIdx];
         setSelProvider(p);
-        setSelModel(PROVIDERS[p].models[0] ?? '');
+        setSelModel(PROVIDERS[p].models[0]?.model ?? '');
         setInputBuf('');
-        if (p === 'custom') {
-          setStep('custom_url');
-        } else if (PROVIDERS[p].requiresKey && !process.env[getApiKeyEnvVar(p)] && !process.env.DEEPSEEK_API_KEY) {
+        if (PROVIDERS[p].requiresKey && !process.env[getApiKeyEnvVar(p)] && !process.env.DEEPSEEK_API_KEY) {
           setStep('key');
         } else {
           setStep('model');
         }
         return;
+      }
+      return;
+    }
+
+    if (step === 'key') {
+      if (key.return && inputBuf.length > 0) {
+        setApiKey(inputBuf);
+        setInputBuf('');
+        setSelIdx(0);
+        setStep('model');
+        return;
+      }
+      if (key.backspace || key.delete) {
+        setInputBuf(prev => prev.slice(0, -1));
+        return;
+      }
+      if (_input && _input.length === 1) {
+        setInputBuf(prev => prev + _input);
       }
       return;
     }
@@ -76,63 +92,12 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
         return;
       }
       if (key.return) {
-        const m = models[selIdx] ?? selModel;
-        setSelModel(m);
-        confirmSelection();
+        const m = models[selIdx];
+        if (m) {
+          setSelModel(m.model);
+          confirmSelection();
+        }
         return;
-      }
-      return;
-    }
-
-    if (step === 'key') {
-      if (key.return && inputBuf.length > 0) {
-        setApiKey(inputBuf);
-        setInputBuf('');
-        setStep(selProvider === 'custom' ? 'custom_url' : 'model');
-        return;
-      }
-      if (key.backspace || key.delete) {
-        setInputBuf(prev => prev.slice(0, -1));
-        return;
-      }
-      if (_input && _input.length === 1) {
-        setInputBuf(prev => prev + _input);
-      }
-      return;
-    }
-
-    if (step === 'custom_url') {
-      if (key.return && inputBuf.length > 0) {
-        setCustomUrl(inputBuf);
-        setInputBuf('');
-        setStep('custom_model');
-        return;
-      }
-      if (key.backspace || key.delete) {
-        setInputBuf(prev => prev.slice(0, -1));
-        return;
-      }
-      if (_input) {
-        setInputBuf(prev => prev + _input);
-      }
-      return;
-    }
-
-    if (step === 'custom_model') {
-      if (key.return && inputBuf.length > 0) {
-        setCustomModel(inputBuf);
-        setSelModel(inputBuf);
-        setInputBuf('');
-        setApiKey(apiKey || process.env[getApiKeyEnvVar('custom')] || '');
-        confirmSelection();
-        return;
-      }
-      if (key.backspace || key.delete) {
-        setInputBuf(prev => prev.slice(0, -1));
-        return;
-      }
-      if (_input) {
-        setInputBuf(prev => prev + _input);
       }
       return;
     }
@@ -150,26 +115,17 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
       {step === 'provider' && (
         <Box flexDirection="column">
           <Text dimColor>Select provider (↑↓ Enter, Ctrl+C to cancel):</Text>
-          {providerKeys.map((p, i) => (
-            <Box key={p}>
-              <Text>{i === selIdx ? '❯ ' : '  '}</Text>
-              <Text bold={i === selIdx}>{PROVIDERS[p].label}</Text>
-              {p === currentProvider && <Text dimColor> (current)</Text>}
-            </Box>
-          ))}
-        </Box>
-      )}
-
-      {step === 'model' && (
-        <Box flexDirection="column">
-          <Text dimColor>{providerName} — select model (↑↓ Enter):</Text>
-          {models.map((m, i) => (
-            <Box key={m}>
-              <Text>{i === selIdx ? '❯ ' : '  '}</Text>
-              <Text bold={i === selIdx}>{m}</Text>
-              {m === currentModel && <Text dimColor> (current)</Text>}
-            </Box>
-          ))}
+          {PROVIDER_ORDER.map((p, i) => {
+            const info = PROVIDERS[p];
+            if (!info) return null;
+            return (
+              <Box key={p}>
+                <Text>{i === selIdx ? '❯ ' : '  '}</Text>
+                <Text bold={i === selIdx}>{info.label}</Text>
+                {p === currentProvider && <Text dimColor> (current)</Text>}
+              </Box>
+            );
+          })}
         </Box>
       )}
 
@@ -180,17 +136,16 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
         </Box>
       )}
 
-      {step === 'custom_url' && (
+      {step === 'model' && (
         <Box flexDirection="column">
-          <Text dimColor>Enter base URL (e.g. https://api.example.com):</Text>
-          <Text>  {inputBuf}{'▊'}</Text>
-        </Box>
-      )}
-
-      {step === 'custom_model' && (
-        <Box flexDirection="column">
-          <Text dimColor>Enter model name:</Text>
-          <Text>  {inputBuf}{'▊'}</Text>
+          <Text dimColor>{providerName} — select model (↑↓ Enter):</Text>
+          {models.map((m, i) => (
+            <Box key={m.model}>
+              <Text>{i === selIdx ? '❯ ' : '  '}</Text>
+              <Text bold={i === selIdx}>{m.label}</Text>
+              {m.model === currentModel && <Text dimColor> (current)</Text>}
+            </Box>
+          ))}
         </Box>
       )}
     </Box>

@@ -14,42 +14,49 @@ export interface DeepicodeConfig {
   provider?: string
 }
 
+export interface ProviderModel {
+  label: string
+  model: string
+}
+
 export interface ProviderInfo {
   baseUrl: string
   model: string
   requiresKey: boolean
   label: string
-  models: string[]
+  models: ProviderModel[]
 }
 
 export const PROVIDERS: Record<string, ProviderInfo> = {
-  deepseek: {
-    baseUrl: "https://api.deepseek.com",
-    model: "deepseek-v4-flash",
-    requiresKey: true,
-    label: "DeepSeek",
-    models: ["deepseek-v4-flash", "deepseek-v4", "deepseek-r1", "deepseek-chat"],
-  },
   zen: {
     baseUrl: "https://opencode.ai/zen/v1",
     model: "deepseek-v4-flash-free",
     requiresKey: false,
     label: "Zen (Free)",
-    models: ["deepseek-v4-flash-free"],
+    models: [
+      { label: "deepseek-v4-flash-free", model: "deepseek-v4-flash-free" },
+      { label: "mimo-v2.5-free", model: "mimo-v2.5-free" },
+    ],
+  },
+  deepseek: {
+    baseUrl: "https://api.deepseek.com",
+    model: "deepseek-chat",
+    requiresKey: true,
+    label: "DeepSeek",
+    models: [
+      { label: "pro", model: "deepseek-chat" },
+      { label: "flash", model: "deepseek-v4-flash" },
+    ],
   },
   mimo: {
-    baseUrl: "https://mimo.p.rapidapi.com",
-    model: "mimo-v1",
-    requiresKey: false,
-    label: "Mimo (Free)",
-    models: ["mimo-v1"],
-  },
-  custom: {
-    baseUrl: "",
-    model: "",
+    baseUrl: "https://api.mimo.ai/v1",
+    model: "mimo-v2.5-pro",
     requiresKey: true,
-    label: "Custom",
-    models: [],
+    label: "Mimo",
+    models: [
+      { label: "mimo-v2.5-pro", model: "mimo-v2.5-pro" },
+      { label: "mimo-v2.5", model: "mimo-v2.5" },
+    ],
   },
 }
 
