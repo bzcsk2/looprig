@@ -129,21 +129,15 @@ describe("HookManager", () => {
     expect(spy2).toHaveBeenCalledWith("bash", { content: "ok", isError: false })
   })
 
-  it("should continue to next afterToolCall hook when one throws", async () => {
+  it("M14: should survive afterToolCall exception and continue to next hook", async () => {
     const hooks = new HookManager()
     const spy = vi.fn()
     hooks.addHooks({
       afterToolCall: async () => { throw new Error("hook failed") },
     })
     hooks.addHooks({ afterToolCall: spy })
-    // Currently: exception from first hook propagates and blocks the second
-    // Expected: second hook should still run
-    try {
-      await hooks.runAfterToolCall("bash", { content: "ok", isError: false })
-      // If we get here, fail-safe worked. Check spy was called.
-      // Source needs try-catch in runAfterToolCall to make this pass
-    } catch {
-      // Expected until source fix: exception propagates
-    }
+    // Source already has try-catch in runAfterToolCall — exception is swallowed
+    await hooks.runAfterToolCall("bash", { content: "ok", isError: false })
+    expect(spy).toHaveBeenCalledWith("bash", { content: "ok", isError: false })
   })
 })

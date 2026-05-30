@@ -254,4 +254,22 @@ describe("edit tool stale-read integration", () => {
     expect(p.method).toBe("hash_anchored")
     expect(readFileSync(filePath, "utf-8")).toBe("replaced string here")
   })
+
+  it("M11: should support concurrent edits to different files", async () => {
+    const d1 = join(tmpDir, "concurrent-a.txt")
+    const d2 = join(tmpDir, "concurrent-b.txt")
+    writeFileSync(d1, "file A content")
+    writeFileSync(d2, "file B content")
+
+    const tool = createEditTool()
+    const c = { cwd: tmpDir, signal: new AbortController().signal } as any
+    const [r1, r2] = await Promise.all([
+      tool.execute({ path: d1, old_string: "file A", new_string: "modified A" }, c),
+      tool.execute({ path: d2, old_string: "file B", new_string: "modified B" }, c),
+    ])
+    expect(r1.isError).toBe(false)
+    expect(r2.isError).toBe(false)
+    expect(readFileSync(d1, "utf-8")).toBe("modified A content")
+    expect(readFileSync(d2, "utf-8")).toBe("modified B content")
+  })
 })

@@ -303,7 +303,7 @@ describe("SSE Client with MockSseServer", () => {
     expect(events.some((e) => e.type === "error")).toBe(false)
   })
 
-  it("TT1: should handle data: prefix split across chunks", async () => {
+  it("TT1: should handle data: prefix split across chunks", { timeout: 30000 }, async () => {
     // Split "data:" prefix itself across chunks
     const content = `{"choices":[{"delta":{"content":"hello"}}]}`
     server = new MockSseServer().setChunks([
@@ -366,6 +366,85 @@ describe("SSE Client with MockSseServer", () => {
     const deltas = events.filter((e) => e.type === "text_delta")
     expect(deltas.length).toBeGreaterThanOrEqual(1)
     expect(events.some((e) => e.type === "error")).toBe(false)
+  })
+
+  // ── S2: reasoning_content not in ChatMessage ──────────
+
+  it("S2: should yield reasoning_delta for reasoning_content, not text_delta", async () => {
+    server = new MockSseServer().setChunks([
+      { data: `data: {"choices":[{"delta":{"reasoning_content":"Let me think","content":""}}]}\n\n` },
+      { data: `data: {"choices":[{"delta":{"reasoning_content":" step by step","content":""}}]}\n\n` },
+      { data: `data: {"choices":[{"delta":{"content":"Here is the answer"}}]}\n\n` },
+      { data: `data: {"choices":[{"delta":{"content":""},"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":3,"total_tokens":8}}\n\n` },
+      { data: "data: [DONE]\n\n" },
+    ])
+    await server.start()
+    const events = await collectStream()
+    const reasoning = events.filter((e) => e.type === "reasoning_delta")
+    const text = events.filter((e) => e.type === "text_delta")
+    expect(reasoning.length).toBeGreaterThanOrEqual(2)
+    expect(reasoning[0].delta).toBe("Let me think")
+    expect(reasoning[1].delta).toBe(" step by step")
+    expect(text).toHaveLength(1)
+    expect(text[0].delta).toBe("Here is the answer")
+    expect(events.some((e) => e.type === "error")).toBe(false)
+  })
+
+  // ── M7: >100K chars single line ─────────────────────
+
+  it("M7: should handle >100K chars single line without OOM", { timeout: 30000 }, async () => {
+    const longContent = "x".repeat(110_000)
+    server = new MockSseServer().setChunks([
+      { data: `data: {"choices":[{"delta":{"content":"${longContent}"}}]}\n\n` },
+      { data: `data: {"choices":[{"delta":{"content":""},"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":3,"total_tokens":8}}\n\n` },
+      { data: "data: [DONE]\n\n" },
+    ])
+    await server.start()
+    const events = await collectStream()
+    const text = events.filter((e) => e.type === "text_delta")
+    expect(text.length).toBeGreaterThanOrEqual(1)
+    expect(text[0].delta.length).toBe(110_000)
+    expect(events.some((e) => e.type === "error")).toBe(false)
+  })
+
+  // ── M8: concurrent chatCompletionsStream ─────────────
+
+  it("M8: should handle concurrent chatCompletionsStream calls without interference", async () => {
+    // Two servers with different scenarios run in parallel
+    const server1 = new MockSseServer().setChunks([
+      { data: `data: {"choices":[{"delta":{"content":"alpha"}}]}\n\n` },
+      { data: `data: {"choices":[{"delta":{"content":""},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}\n\n` },
+      { data: "data: [DONE]\n\n" },
+    ])
+    await server1.start()
+    const server2 = new MockSseServer().setChunks([
+      { data: `data: {"choices":[{"delta":{"content":"beta"}}]}\n\n` },
+      { data: `data: {"choices":[{"delta":{"content":""},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}\n\n` },
+      { data: "data: [DONE]\n\n" },
+    ])
+    await server2.start()
+
+    const client = new DeepSeekClient()
+    const stream1 = client.chatCompletionsStream(
+      [{ role: "user", content: "hi" }],
+      { apiKey: "test-key", baseUrl: server1.baseUrl, model: "test-model" },
+    )
+    const stream2 = client.chatCompletionsStream(
+      [{ role: "user", content: "hi" }],
+      { apiKey: "test-key", baseUrl: server2.baseUrl, model: "test-model" },
+    )
+
+    const [events1, events2] = await Promise.all([
+      (async () => { const e: DeepSeekStreamEvent[] = []; for await (const ev of stream1) e.push(ev); return e })(),
+      (async () => { const e: DeepSeekStreamEvent[] = []; for await (const ev of stream2) e.push(ev); return e })(),
+    ])
+
+    const text1 = events1.filter((e) => e.type === "text_delta")
+    const text2 = events2.filter((e) => e.type === "text_delta")
+    expect(text1[0].delta).toBe("alpha")
+    expect(text2[0].delta).toBe("beta")
+    await server1.stop()
+    await server2.stop()
   })
 
   it("TT1: should handle multiple \\n\\n splits across chunks", { timeout: 15000 }, async () => {

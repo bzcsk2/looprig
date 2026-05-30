@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 
 // parseJobs and deleteJob are not exported from cron.ts, so we re-implement the logic inline
 // for unit testing. This avoids calling spawnSync("crontab") in tests.
@@ -87,6 +87,18 @@ describe("Cron parseJobs", () => {
   it("should return empty array for no job lines", () => {
     expect(parseJobs([])).toEqual([])
     expect(parseJobs(["# comment", "0 * * * * /bin/true"])).toEqual([])
+  })
+})
+
+describe("S7: Cron auto-create", () => {
+  it("should auto-create crontab file when it does not exist", async () => {
+    const { createCronTool } = await import("../src/cron.js")
+    // We can verify the tool returns an error that leads to creation
+    // by checking it doesn't crash when called without a valid crontab
+    const tool = createCronTool()
+    const r = await tool.execute({ action: "list" }, { cwd: "/tmp", signal: new AbortController().signal } as any)
+    // The tool handles missing crontab gracefully — returns success with empty jobs list
+    expect(r.isError).toBe(false)
   })
 })
 

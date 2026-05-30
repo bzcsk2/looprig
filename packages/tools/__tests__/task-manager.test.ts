@@ -100,6 +100,39 @@ describe("TaskManager", () => {
     expect(tasks).toEqual([])
   })
 
+  it("S5: full flow — create → get → update → stop", () => {
+    const mgr = new TaskManager(tmpDir)
+    const t = mgr.create({ content: "full flow", status: "pending", priority: "high" })
+    expect(t.id).toBeTruthy()
+    expect(t.status).toBe("pending")
+
+    const got = mgr.get(t.id)
+    expect(got).toBeDefined()
+    expect(got!.content).toBe("full flow")
+
+    const updated = mgr.update(t.id, { status: "in_progress", priority: "medium" })
+    expect(updated).toBe(true)
+    expect(mgr.get(t.id)!.status).toBe("in_progress")
+
+    const stopped = mgr.stop(t.id)
+    expect(stopped).toBe(true)
+    expect(mgr.get(t.id)!.status).toBe("cancelled")
+  })
+
+  it("S5: full flow with persistence across mgr instances", () => {
+    const mgr1 = new TaskManager(tmpDir)
+    const t = mgr1.create({ content: "cross-instance", status: "pending", priority: "low" })
+
+    const mgr2 = new TaskManager(tmpDir)
+    const got = mgr2.get(t.id)
+    expect(got).toBeDefined()
+    expect(got!.content).toBe("cross-instance")
+
+    mgr2.update(t.id, { status: "completed" })
+    const mgr3 = new TaskManager(tmpDir)
+    expect(mgr3.get(t.id)!.status).toBe("completed")
+  })
+
   it("should support concurrent task creation without conflicts", async () => {
     const mgr = new TaskManager(tmpDir)
     const p1 = Promise.resolve(mgr.create({ content: "task1", status: "pending", priority: "high" }))

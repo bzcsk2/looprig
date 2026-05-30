@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest"
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -188,5 +188,45 @@ Content here`)
     const { loadSkillsDirs } = await import("../src/skill-loader.js")
     const skills = await loadSkillsDirs(["/nonexistent/path"])
     expect(skills).toEqual([])
+  })
+})
+
+describe("S9: skill sorting", () => {
+  function sortSkills(skills: Array<{ name: string; description: string }>, query: string): typeof skills {
+    const q = query.toLowerCase()
+    return skills
+      .filter(s => s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const aExact = a.name.toLowerCase() === q ? 1 : 0
+        const bExact = b.name.toLowerCase() === q ? 1 : 0
+        if (aExact !== bExact) return bExact - aExact
+        const aStarts = a.name.toLowerCase().startsWith(q) ? 1 : 0
+        const bStarts = b.name.toLowerCase().startsWith(q) ? 1 : 0
+        return bStarts - aStarts
+      })
+  }
+
+  const skills = [
+    { name: "git-branch", description: "Manage git branches" },
+    { name: "git-commit", description: "Create git commits" },
+    { name: "bash", description: "Execute bash commands" },
+    { name: "node-server", description: "Node.js server management" },
+  ]
+
+  it("should sort exact name match first", () => {
+    const result = sortSkills(skills, "bash")
+    expect(result[0].name).toBe("bash")
+  })
+
+  it("should sort prefix matches before substring matches", () => {
+    const result = sortSkills(skills, "git")
+    // git-branch and git-commit both start with "git" — alphabetical
+    expect(result[0].name).toBe("git-branch")
+    expect(result[1].name).toBe("git-commit")
+  })
+
+  it("should return empty for no match", () => {
+    const result = sortSkills(skills, "nonexistent")
+    expect(result).toHaveLength(0)
   })
 })

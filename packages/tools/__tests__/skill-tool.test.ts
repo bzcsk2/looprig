@@ -29,4 +29,12 @@ describe("SkillTool", () => {
     const r = await tool.execute({ command: "invalid" }, ctx)
     expect(r.isError).toBe(true)
   })
+
+  it("S8: should return error when load target does not exist", async () => {
+    const tool = createSkillTool()
+    const r = await tool.execute({ command: "load", query: "nonexistent-skill-that-will-never-exist" }, ctx)
+    expect(r.isError).toBe(true)
+    const p = JSON.parse(r.content as string)
+    expect(p.error).toContain("not found")
+  })
 })

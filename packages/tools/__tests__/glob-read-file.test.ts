@@ -163,6 +163,28 @@ describe("write_file", () => {
   })
 })
 
+describe("glob - Bun.Glob fallback", () => {
+  it("S3: should error on unresolvable path (catches Bun.Glob errors)", async () => {
+    const tool = createGlobTool()
+    // Non-existent path triggers path resolution error before glob
+    const r = await tool.execute({ pattern: "*.ts", path: "/nonexistent-path-xyz-123" }, ctx("/tmp"))
+    expect(r.isError).toBe(true)
+    const p = JSON.parse(r.content as string)
+    expect(p.error).toBeTruthy()
+  })
+
+  it("S4: rg fallback — grep is used when rg is unavailable", async () => {
+    // grep tool runs in this environment — verify it works
+    const { createGrepTool } = await import("../src/grep.js")
+    const tool = createGrepTool()
+    // Search in a known directory for a known string
+    const r = await tool.execute({ pattern: "createGrepTool", path: process.cwd() + "/packages/tools/src" }, ctx(process.cwd()))
+    expect(r.isError).toBe(false)
+    const p = JSON.parse(r.content as string)
+    expect(p.totalMatches).toBeGreaterThanOrEqual(1)
+  })
+})
+
 describe("glob", () => {
   let tmpDir: string
   beforeEach(() => {

@@ -87,4 +87,43 @@ describe("PermissionEngine", () => {
     engine.removeDenyRule("bash")
     expect(engine.decide("bash", {}, "exec").decision).toBe("ask")
   })
+
+  it("S10: isAllowed returns true when decision is allow", () => {
+    const engine = new PermissionEngine()
+    expect(engine.isAllowed("read_file", {}, "read")).toBe(true)
+    engine.addDenyRule({ toolName: "read_file" })
+    expect(engine.isAllowed("read_file", {}, "read")).toBe(false)
+  })
+
+  it("S10: isDenied returns true when decision is deny", () => {
+    const engine = new PermissionEngine()
+    expect(engine.isDenied("read_file", {}, "read")).toBe(false)
+    engine.addDenyRule({ toolName: "read_file" })
+    expect(engine.isDenied("read_file", {}, "read")).toBe(true)
+  })
+
+  it("S11: fromJSON restores allow and deny rules", () => {
+    const engine = PermissionEngine.fromJSON({
+      allowRules: [{ toolName: "bash" }],
+      denyRules: [{ toolName: "rm", reason: "no rm" }],
+    })
+    expect(engine.decide("bash", {}, "exec").decision).toBe("allow")
+    expect(engine.decide("rm", {}, "exec").decision).toBe("deny")
+  })
+
+  it("S11: toJSON exports rules for serialization", () => {
+    const engine = new PermissionEngine()
+    engine.addAllowRule({ toolName: "bash" })
+    engine.addDenyRule({ toolName: "rm", reason: "no rm" })
+    const json = engine.toJSON()
+    expect(json.allowRules).toHaveLength(1)
+    expect(json.allowRules[0].toolName).toBe("bash")
+    expect(json.denyRules).toHaveLength(1)
+    expect(json.denyRules[0].reason).toBe("no rm")
+  })
+
+  it("S11: fromJSON handles empty rules", () => {
+    const engine = PermissionEngine.fromJSON({})
+    expect(engine.decide("bash", {}, "exec").decision).toBe("ask")
+  })
 })

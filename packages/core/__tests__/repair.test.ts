@@ -128,6 +128,23 @@ describe("repairToolArguments - all failed", () => {
   })
 })
 
+describe("repairToolArguments - truncation semantic diff", () => {
+  it("should succeed when truncation changes semantic meaning (known limitation)", async () => {
+    const { repairToolArguments } = await import("../src/context/repair.js")
+    // Long input (>200 chars) that truncation can parse by cutting off end
+    const safe = "x".repeat(100)
+    const unsafe = "y".repeat(100)
+    // {"path":"xxx...xxx"} — scavenge will fail because value is unterminated
+    // truncation will cut it to {"path":"xxx...x"} which is valid but semantically different
+    const long = '{"path": "' + safe + unsafe
+    const result = repairToolArguments(long)
+    expect(result.success).toBe(true)
+    // Method may be scavenge (1g combined fix) or truncation
+    // Both are acceptable — the key insight is the semantic change is a known limitation
+    expect(result.args).toHaveProperty("path")
+  })
+})
+
 describe("repairToolArguments - method tracking", () => {
   it("should track which stage succeeded", () => {
     // Valid JSON goes through scavenge

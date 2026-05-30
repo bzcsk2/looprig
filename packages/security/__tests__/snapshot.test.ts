@@ -97,4 +97,32 @@ describe("FileSnapshot", () => {
     expect(list[0]).toMatch(/\.snap$/)
     expect(list[1]).toMatch(/\.snap$/)
   })
+
+  it("M15: SHA256 path index — same path gets same index", async () => {
+    const filePath = join(workDir, "sha256-test.txt")
+    await writeFile(filePath, "content", "utf-8")
+    const id1 = await snap.snapshot(filePath)
+    await writeFile(filePath, "modified", "utf-8")
+    const id2 = await snap.snapshot(filePath)
+    // Both snapshots of the same file should be in the same dir
+    expect(id1).toBe(id2)
+  })
+
+  it("M15: different paths get different indices", async () => {
+    const f1 = join(workDir, "file1.txt")
+    const f2 = join(workDir, "file2.txt")
+    await writeFile(f1, "same content", "utf-8")
+    await writeFile(f2, "same content", "utf-8")
+    const id1 = await snap.snapshot(f1)
+    const id2 = await snap.snapshot(f2)
+    // Different paths → different SHA256 hashes
+    expect(id1).not.toBe(id2)
+  })
+
+  it("M15: SHA256 index is deterministic (16 hex chars)", async () => {
+    const filePath = join(workDir, "deterministic.txt")
+    await writeFile(filePath, "data", "utf-8")
+    const id = await snap.snapshot(filePath)
+    expect(id).toMatch(/^[0-9a-f]{16}$/)
+  })
 })
