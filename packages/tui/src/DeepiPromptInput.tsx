@@ -1,19 +1,21 @@
-import React, { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Box, Text, useInput } from '@deepicode/ink';
 
 interface DeepiPromptInputProps {
   onSubmit: (text: string) => void;
   isLoading: boolean;
   disabled?: boolean;
+  onCancel: () => void;
 }
 
 const MAX_HISTORY = 100;
 
-export function DeepiPromptInput({ onSubmit, isLoading, disabled }: DeepiPromptInputProps) {
+export function DeepiPromptInput({ onSubmit, isLoading, disabled, onCancel }: DeepiPromptInputProps) {
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState(-1);
   const cursorRef = useRef(0);
+  const escRef = useRef(0);
 
   const submitLine = useCallback(() => {
     const text = input.trim();
@@ -26,8 +28,24 @@ export function DeepiPromptInput({ onSubmit, isLoading, disabled }: DeepiPromptI
   }, [input, onSubmit]);
 
   useInput((_input, key) => {
-    if (disabled || isLoading) return;
+    if (disabled) return;
 
+    // Esc × 2 to interrupt during loading (Esc IS a key event, unlike Ctrl+C)
+    if (key.escape && isLoading) {
+      const now = Date.now();
+      if (now - escRef.current < 800) {
+        onCancel();
+        escRef.current = 0;
+        return;
+      }
+      escRef.current = now;
+      return;
+    }
+
+    // Block normal input while loading
+    if (isLoading) return;
+
+    // --- Normal editing ---
     if (key.return) {
       submitLine();
       return;
@@ -99,12 +117,6 @@ export function DeepiPromptInput({ onSubmit, isLoading, disabled }: DeepiPromptI
       return;
     }
 
-    if (_input === 'c' && key.ctrl) {
-      setInput('');
-      cursorRef.current = 0;
-      return;
-    }
-
     if (_input === 'd' && key.ctrl) {
       const pos = cursorRef.current;
       if (pos < input.length) {
@@ -132,23 +144,12 @@ export function DeepiPromptInput({ onSubmit, isLoading, disabled }: DeepiPromptI
     }
   });
 
-  const displayText = input || (isLoading ? '' : '输入消息...');
   const isPlaceholder = !input && !isLoading;
-  const pos = cursorRef.current;
+  const displayText = isPlaceholder ? '输入消息...' : `${input.slice(0, cursorRef.current)}▊${input.slice(cursorRef.current)}`;
 
   return (
     <Box flexDirection="column" width="100%" borderStyle="round" paddingX={1}>
-      <Text wrap="truncate-end">
-        {isPlaceholder ? (
-          <Text dimColor>{displayText}</Text>
-        ) : (
-          <>
-            <Text>{input.slice(0, pos)}</Text>
-            <Text color="success">▊</Text>
-            <Text>{input.slice(pos)}</Text>
-          </>
-        )}
-      </Text>
+      <Text wrap="truncate-end" dimColor={isPlaceholder}>{displayText}</Text>
     </Box>
   );
 }

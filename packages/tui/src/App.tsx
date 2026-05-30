@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Box, Text, AlternateScreen } from '@deepicode/ink';
 import type { ReasonixEngine } from '@deepicode/core';
 import type { DeepicodeConfig } from '@deepicode/core';
-import { PROVIDERS } from '@deepicode/core';
+import { PROVIDERS, saveLastConfig } from '@deepicode/core';
 import { createBridge, type BridgeState } from './bridge.js';
 import { DeepiMessages } from './DeepiMessages.js';
 import { DeepiPromptInput } from './DeepiPromptInput.js';
@@ -19,14 +19,15 @@ const initialState: BridgeState = {
   streamingText: null,
   reasoningText: null,
   activeTools: new Map(),
-  tokens: { input: 0, output: 0 },
+  tokens: { input: 0, output: 0, cacheHit: 0, cacheMiss: 0 },
+  contextUsage: 0,
   warnings: [],
   error: null,
 };
 
-export function getProviderLabel(provider: string, model: string): string {
+export function getProviderLabel(provider: string): string {
   const info = PROVIDERS[provider];
-  return info ? `${info.label} / ${model}` : `${provider} / ${model}`;
+  return info ? info.label : provider;
 }
 
 interface AppProps {
@@ -37,10 +38,51 @@ interface AppProps {
 export function App({ engine, config }: AppProps) {
   const [bridgeState, setBridgeState] = useState<BridgeState>(initialState);
   const bridge = useMemo(() => createBridge(engine, setBridgeState), [engine]);
-  const scrollRef = useRef<any>(null);
-
+  const bridgeRef = useRef(bridge);
+  bridgeRef.current = bridge;
+  const contextTotal = config.contextWindow ?? 128_000;
   const shuttingDown = useRef(false);
   const engineRef = useRef(engine);
+
+  // Linux: Ctrl+C → SIGINT (not a character event), Ink can't capture it.
+  // Handle interrupt/exit entirely via the process signal.
+  const isLoadingRef = useRef(bridgeState.isLoading);
+  isLoadingRef.current = bridgeState.isLoading;
+
+  useEffect(() => {
+    let exitPending = false;
+    let exitTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const onSigint = () => {
+      if (isLoadingRef.current) {
+        bridgeRef.current.cancel();
+        return;
+      }
+      if (exitPending) {
+        shuttingDown.current = true;
+        engineRef.current.interrupt();
+        setTimeout(() => process.exit(0), 300);
+        return;
+      }
+      exitPending = true;
+      setBridgeState(prev => ({
+        ...prev,
+        messages: [...prev.messages, { role: 'assistant' as const, content: 'Press Ctrl+C again to exit' }],
+      }));
+      exitTimer = setTimeout(() => { exitPending = false; }, 2000);
+    };
+
+    process.on('SIGINT', onSigint);
+    return () => {
+      process.off('SIGINT', onSigint);
+      if (exitTimer) clearTimeout(exitTimer);
+    };
+  }, []); // register once, read latest via refs
+
+  const handleCancel = useCallback(() => {
+    bridgeRef.current.cancel();
+  }, []);
+  const scrollRef = useRef<any>(null);
 
   const [activeProvider, setActiveProvider] = useState(config.provider ?? 'zen');
   const [activeModel, setActiveModel] = useState(config.model);
@@ -80,6 +122,7 @@ export function App({ engine, config }: AppProps) {
     });
     setActiveProvider(sel.provider);
     setActiveModel(sel.model);
+    saveLastConfig({ provider: sel.provider, model: sel.model, baseUrl: sel.baseUrl });
     setShowModelPicker(false);
     setBridgeState(prev => ({
       ...prev,
@@ -91,7 +134,7 @@ export function App({ engine, config }: AppProps) {
     setShowModelPicker(false);
   }, []);
 
-  const providerLabel = getProviderLabel(activeProvider, activeModel);
+  const providerLabel = getProviderLabel(activeProvider);
 
   if (showModelPicker) {
     return (
@@ -136,12 +179,17 @@ export function App({ engine, config }: AppProps) {
       <DeepiPromptInput
         onSubmit={handleSubmit}
         isLoading={bridgeState.isLoading}
+        onCancel={handleCancel}
       />
       <StatusBar
         model={activeModel}
         provider={providerLabel}
         inputTokens={bridgeState.tokens.input}
         outputTokens={bridgeState.tokens.output}
+        cacheHitTokens={bridgeState.tokens.cacheHit}
+        cacheMissTokens={bridgeState.tokens.cacheMiss}
+        contextUsed={bridgeState.contextUsage}
+        contextTotal={contextTotal}
       />
     </Box>
   );

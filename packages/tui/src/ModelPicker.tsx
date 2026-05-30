@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Box, Text, useInput } from '@deepicode/ink';
 import { PROVIDERS, getApiKeyEnvVar } from '@deepicode/core';
+import { spawnSync } from 'child_process';
 
 interface ModelPickerProps {
   currentProvider: string;
@@ -13,6 +14,24 @@ type Step = 'provider' | 'key' | 'model';
 
 const PROVIDER_ORDER = ['zen', 'deepseek', 'mimo'];
 
+function tryReadClipboard(): string | null {
+  const platform = process.platform;
+  const cmds: Array<{ bin: string; args: string[] }> = [];
+  if (platform === 'darwin') {
+    cmds.push({ bin: 'pbpaste', args: [] });
+  } else if (platform === 'linux') {
+    // Try Wayland first, then X11
+    cmds.push({ bin: 'wl-paste', args: [] });
+    cmds.push({ bin: 'xclip', args: ['-o', '-selection', 'clipboard'] });
+    cmds.push({ bin: 'xsel', args: ['--clipboard', '--output'] });
+  }
+  for (const { bin, args } of cmds) {
+    const r = spawnSync(bin, args, { encoding: 'utf8', timeout: 500 });
+    if (r.status === 0 && r.stdout) return r.stdout.replace(/\n$/, '');
+  }
+  return null;
+}
+
 export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel }: ModelPickerProps) {
   const [step, setStep] = useState<Step>('provider');
   const [selIdx, setSelIdx] = useState(Math.max(0, PROVIDER_ORDER.indexOf(currentProvider)));
@@ -21,21 +40,43 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
   const [apiKey, setApiKey] = useState('');
   const [inputBuf, setInputBuf] = useState('');
 
-  const confirmSelection = useCallback(() => {
+  const confirmSelection = useCallback((modelOverride?: string) => {
     const cfg = PROVIDERS[selProvider];
     if (!cfg) return;
     const envKey = process.env[getApiKeyEnvVar(selProvider)] ?? '';
     onSelect({
       provider: selProvider,
-      model: selModel || cfg.model,
+      model: modelOverride ?? (selModel || cfg.model),
       apiKey: apiKey || envKey || (cfg.defaultKey ?? ''),
       baseUrl: cfg.baseUrl,
     });
   }, [selProvider, selModel, apiKey, onSelect]);
 
-  useInput((_input, key) => {
-    if (key.ctrl && _input === 'c') {
+  const goBack = useCallback(() => {
+    if (step === 'provider') {
       onCancel();
+    } else if (step === 'key') {
+      setInputBuf('');
+      setStep('provider');
+    } else {
+      const p = PROVIDERS[selProvider];
+      if (p && p.requiresKey && !p.defaultKey && !process.env[getApiKeyEnvVar(selProvider)]) {
+        setSelIdx(0);
+        setStep('key');
+      } else {
+        setSelIdx(Math.max(0, PROVIDER_ORDER.indexOf(selProvider)));
+        setStep('provider');
+      }
+    }
+  }, [step, selProvider, onCancel]);
+
+  useInput((_input, key) => {
+    if (key.escape || (key.ctrl && _input === 'c')) {
+      if (step === 'provider') {
+        onCancel();
+      } else {
+        goBack();
+      }
       return;
     }
 
@@ -75,7 +116,13 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
         setInputBuf(prev => prev.slice(0, -1));
         return;
       }
-      if (_input && _input.length === 1) {
+      if (key.ctrl && _input === 'v') {
+        const clip = tryReadClipboard();
+        if (clip) setInputBuf(prev => prev + clip);
+        return;
+      }
+      if (_input) {
+        // Multi-character input = bracketed paste from terminal
         setInputBuf(prev => prev + _input);
       }
       return;
@@ -95,7 +142,7 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
         const m = models[selIdx];
         if (m) {
           setSelModel(m.model);
-          confirmSelection();
+          confirmSelection(m.model);
         }
         return;
       }
@@ -132,7 +179,8 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
       {step === 'key' && (
         <Box flexDirection="column">
           <Text dimColor>Enter API key for {providerName}:</Text>
-          <Text>  {"*".repeat(inputBuf.length)}{inputBuf.length > 0 ? '▊' : ''}</Text>
+          <Text>  {inputBuf}{inputBuf.length > 0 ? '▊' : ''}</Text>
+          <Text dimColor>  Esc to go back</Text>
         </Box>
       )}
 
@@ -146,6 +194,7 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
               {m.model === currentModel && <Text dimColor> (current)</Text>}
             </Box>
           ))}
+          <Text dimColor>  Esc to go back</Text>
         </Box>
       )}
     </Box>

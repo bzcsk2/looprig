@@ -1,16 +1,21 @@
 import type { AgentTool, LoopEvent, ToolContext, ToolResult } from "./interface.js"
 import type { ToolCall } from "./types.js"
 import { repairToolArguments } from "./context/repair.js"
+import type { PermissionEngine, HookManager, BeforeToolCallContext } from "@deepicode/security"
 
 export class StreamingToolExecutor {
   private tools: Map<string, AgentTool>
   private sessionId: string
   private cwd: string
+  private permissionEngine?: PermissionEngine
+  private hookManager?: HookManager
 
-  constructor(tools: Map<string, AgentTool>, sessionId: string, cwd?: string) {
+  constructor(tools: Map<string, AgentTool>, sessionId: string, cwd?: string, permissionEngine?: PermissionEngine, hookManager?: HookManager) {
     this.tools = tools
     this.sessionId = sessionId
     this.cwd = cwd ?? process.cwd()
+    this.permissionEngine = permissionEngine
+    this.hookManager = hookManager
   }
 
   async *run(toolCalls: ToolCall[], signal: AbortSignal, appendToolResult: (tc: ToolCall, result: ToolResult) => void): AsyncGenerator<LoopEvent> {
@@ -86,7 +91,28 @@ export class StreamingToolExecutor {
     }
 
     try {
+      const check = this.permissionEngine?.decide(tc.function.name, args, handler.approval)
+      if (check?.decision === "deny") {
+        const result = makeToolError(check.reason ?? "Permission denied")
+        return { event: makeErrorEvent(result, tc.function.name, index), result }
+      }
+      if (check?.decision === "ask") {
+        const ctx: BeforeToolCallContext = {
+          toolName: tc.function.name,
+          args,
+          tier: handler.approval,
+          permissionDecision: "ask",
+          permissionReason: check.reason,
+        }
+        const hookDecision = await this.hookManager?.runBeforeToolCall(ctx) ?? "deny"
+        if (hookDecision === "deny") {
+          const result = makeToolError(`Tool call denied: ${tc.function.name} requires manual approval`)
+          return { event: makeErrorEvent(result, tc.function.name, index), result }
+        }
+      }
+
       const result = normalizeToolResult(await handler.execute(args, toolCtx))
+      this.hookManager?.runAfterToolCall(tc.function.name, { content: result.content, isError: result.isError, metadata: result.metadata })
       return {
         event: {
           role: result.isError ? "error" : "tool",
@@ -100,6 +126,7 @@ export class StreamingToolExecutor {
       }
     } catch (e) {
       const result = makeToolError(errorMessage(e))
+      this.hookManager?.runAfterToolCall(tc.function.name, { content: result.content, isError: true, metadata: result.metadata })
       return { event: makeErrorEvent(result, tc.function.name, index), result }
     }
   }

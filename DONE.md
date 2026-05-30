@@ -6,7 +6,49 @@
 - `最小完成`：具备可用闭环，但未达到实施计划中的完整版要求。
 - `部分完成`：只完成子集能力，仍需后续补齐。
 
-最后更新：2026-05-30（TUI 审计 22 项全部修复 — 第七轮）
+最后更新：2026-05-30（安全层 — PermissionEngine + HookManager + FileSnapshot）
+
+## 第八轮：TUI 交互打磨（2026-05-30）
+
+### TM1 + TM2: `/model` 命令 + Provider 切换
+
+- `packages/core/src/config.ts`：新增 `PROVIDERS` 预设表（zen/deepseek/mimo）、`getApiKeyEnvVar()`、`saveLastConfig()`、`loadLastConfig()`
+- `packages/tui/src/ModelPicker.tsx`：三步选择器（provider → API key → model），↑↓/Enter 操作，Zen 免费 tier 跳过 key 输入
+- `packages/cli/src/tui.ts`：pipe 模式补全 5 种事件类型 + error 改 stderr
+
+### 模型选择持久化
+
+- `.deepicode/last-config.json`：退出时自动保存 provider + model + baseUrl
+- `loadConfig()` 优先级：环境变量 > last-config.json > 代码默认值
+- Zen 404 修复：`ensureBaseUrl()` 改为字符串拼接，保留 `/zen/v1/` 路径段
+
+### 状态栏重新设计
+
+- 样式：`Zen (Free) deepseek-v4-flash-free  入13K 中95% 出65  58K/1000K`
+- `loop.ts`：usage 事件 metadata 增加 cacheHit/cacheMiss
+- `bridge.tsx`：BridgeState 增加 cacheHit/cacheMiss/contextUsage
+- `StatusBar.tsx`：中文标签（入/中/出）+ 缓存命中率 + 上下文用量/总量
+- `DeepiPromptInput.tsx`：光标改用字符串拼接（▊ 嵌入文本中），不再嵌套 Text 组件
+- 模型名重复修复：`getProviderLabel()` 不再包含 model 名
+
+### 粘贴功能
+
+- `ModelPicker.tsx`：`tryReadClipboard()` 支持 wl-paste → xclip → xsel 三种工具回退
+- 终端 bracketed paste 支持：多字符 `_input` 直接追加到输入
+
+### 中断/退出（Ctrl+C）
+
+- **根因**：Linux 终端 Ctrl+C = SIGINT 信号，不经过 Ink 的 `useInput`
+- `App.tsx`：`process.on('SIGINT')` 全局接管——加载中取消生成，空闲双击退出
+- `DeepiPromptInput.tsx`：保留 Esc × 2 中断（Esc 是真正的按键事件），删除死代码 Ctrl+C handler
+- ⚠ **未完全解决**：SIGINT 后 raw mode 恢复仍有问题
+
+### 配置更新
+
+- `PROVIDERS.zen.models`：标签改为全名（`deepseek-v4-flash-free`、`mimo-v2.5-free`）
+- `DeepSeekClient`：支持 `zen-free` 等自定义 model 名映射
+
+---
 
 ## Phase 0：脚手架搭建
 
@@ -264,6 +306,24 @@
 - `packages/shell/src/index.ts` 仍是 placeholder。
 - 尚未实现状态管理、EventStream/EventBus、多 Agent 系统。
 
+### Step 3.1 TUI 功能增量：Provider 抽象层 + `/model` 命令
+
+状态：完成（2026-05-30）
+
+- `ChatClient` 接口定义于 `interface.ts`，`DeepSeekClient implements ChatClient`（不改实现逻辑）
+- `PROVIDERS` 预设表（`config.ts`）：
+  - **Zen (Free)**：`baseUrl=https://opencode.ai/zen/v1`，key=`"public"`，模型 `deepseek-v4-flash` / `mimo-v2.5`
+  - **DeepSeek**：`baseUrl=https://api.deepseek.com`，需 key，模型 `pro(deepseek-chat)` / `flash(deepseek-v4-flash)`
+  - **Mimo**：`baseUrl=https://api.mimo.ai/v1`，需 key，模型 `mimo-v2.5-pro` / `mimo-v2.5`
+- `ProviderInfo` 新增 `defaultKey` 字段，Zen 利用此字段硬编码 `"public"` key
+- `ProviderModel` 区分 `label`（展示名）和 `model`（API 实际模型 ID）
+- 环境变量：`DEEPICODE_PROVIDER` 默认 provider，各 provider 独立 key env（`ZEN_API_KEY` / `DEEPSEEK_API_KEY` / `MIMO_API_KEY`）
+- `ModelPicker` 组件（`packages/tui/src/ModelPicker.tsx`）：三步向导（provider 选择 → 可选 key 输入 → 模型选择），`defaultKey` 自动跳过 key 步骤
+- `App.tsx` 接入 `/model` 命令，通过 `engine.updateConfig({ provider, model, apiKey, baseUrl })` 即时切换
+- `StatusBar.tsx` 实时显示 `provider label / model`
+- 输出 `PROVIDERS`、`getApiKeyEnvVar`、`ProviderInfo`、`ProviderModel` 等导出
+- `bun run typecheck` 零错误，`bun test` 66 pass
+
 ## Phase 4：工具层实现
 
 ### Step 4.1 ToolRegistry
@@ -347,6 +407,14 @@
 - D2: edit.ts 补上 `known_hosts` 敏感文件保护
 - D3: `getState()` 改为参数化接口，可传入实际 streaming 状态
 
+## 第九轮：安全层实现（PermissionEngine + HookManager + FileSnapshot，2026-05-30）
+
+- `packages/security/src/permission.ts`：Deny-first 三级权限判定引擎
+- `packages/security/src/hooks.ts`：beforeToolCall / afterToolCall / onLoopEvent 三个 Hook 点
+- `packages/security/src/snapshot.ts`：`.deepicode_patches/` Git 风格文件快照与毫秒级恢复
+- 集成到 streaming-executor.ts（执行前权限检查）和 engine.ts（构造时创建实例，submit 中 onLoopEvent）
+- `bun run typecheck` 零错误，`bun test` 66 pass / 3 skip
+
 ## Phase 5：安全层实现
 
 ### 最小安全基线（工具内联实现）
@@ -360,6 +428,20 @@
 - **edit 路径保护** — 同 read_file 的敏感文件拒绝策略
 - **参数校验** — shell-exec / file-ops / edit 三个工具入口先校验必填字段类型，不合格直接返回 `{ isError: true }`
 - **Session writer 错误吞没** — `flushSoon` catch 写入错误，避免未处理 rejection
+
+### Step 5.1 正式权限引擎 + Hooks + Git Snapshot
+
+状态：完成（2026-05-30）
+
+- `@deepicode/security` 包实现，`packages/security/src/` 三个模块：
+  - **`permission.ts`** — `PermissionEngine` 类，三级判定：Deny 规则优先 → Allow 规则 → 默认 Ask（exec tier）/ Allow（read/write tier）。规则支持按 tool name（string/RegExp）和 args 模式匹配。
+  - **`hooks.ts`** — `HookManager` 类，`beforeToolCall`（可返回 deny/allow 拦截）、`afterToolCall`（执行后回调）、`onLoopEvent`（事件观察）三个 Hook 点。
+  - **`snapshot.ts`** — `FileSnapshot` 类，`.deepicode_patches/` 目录，`snapshot(filepath)` 保存原始内容，`revert(filepath)` 毫秒级恢复，SHA256 路径索引。
+- 集成：
+  - `streaming-executor.ts`：`PermissionEngine.decide()` 在 `handler.execute()` 前调用；"deny" 返回错误事件；"ask" 触发 `beforeToolCall` 钩子，无钩子自动 deny。
+  - `engine.ts`：构造时创建 `permissionEngine` 和 `hookManager` 实例；`submit()` 中每个 loop event 触发 `onLoopEvent` 钩子。
+  - tsconfig.json 添加 `@deepicode/security` 路径映射。
+- `bun run typecheck` 零错误，`bun test` 66 pass / 3 skip
 
 ## Phase 6：高级功能生态接入
 
@@ -534,14 +616,72 @@ bun test
 
 ## 第七轮修复：TUI 审计修复（2026-05-30，共 22 项）
 
-审计报告：`DeepicodeTUIReAudit-20260530.md`。详见 `ADVICE.md` 已修复章节。
+---
 
-| 级别 | 数量 | 关键修复 |
-|------|------|---------|
-| P0 | 1 | tool_progress 状态回退 — 检查 content 字段，done 时不回退为 running |
-| P1 | 5 | error 渲染到 scrollable 底部、token 统计（loop.ts yield usage 事件）、toolCallIndex 精确匹配、reasoning_delta 渲染为灰色推理行、cursorPos 改用 useRef |
-| P2 | 9 | tool_call_delta/status/done 事件消费、warning 独立 warnings[] 数组、输入框光标 ▊ 指示器、Home/End/Ctrl+A/E/U/K/D 八快捷键、Pipe stderr + 全事件覆盖、/exit 延迟退出 |
-| P3 | 6 | DEEPCODE 前缀兼容、非全屏路径也包 ScrollBox、StatusBar flexGrow 分隔、Pipe done 去重换行、React key 组合化、Tool 截断追加 "..." 提示 |
-| 旧遗留 | 1 | P3-4-2 prefix.build 短路（计算 cacheKey，未变化跳过 rebuild） |
+## ✅ 已修复（2026-05-30 第七轮）
 
-降级为持续关注（3 项）：P3-4-5（fold 竞态 pool 5s 超时自动清理）、TUI-P3-1（Help 硬编码，后续 /model 扩展时解决）、TUI-P3-5（promptOverlayContext 占位，MVP 不需要斜杠命令建议）
+| # | 问题 | 修复方式 |
+|---|------|----------|
+| TUI-P0-1 | tool_progress 硬编码 `status: 'running'` | `bridge.tsx`：tool_progress 检查 content，`done` 时不回退 |
+| TUI-P1-1 | error/warning 状态不渲染 | `App.tsx`：scrollable 区域底部添加 error/warning 显示 |
+| TUI-P1-2 | Token 统计永远 ↑0 ↓0 | `loop.ts`：yield usage 事件 → `bridge.tsx` 累加到 tokens state |
+| TUI-P1-3 | 同名工具状态更新歧义 | `bridge.tsx`：改为 `toolCallIndex` 精确匹配 |
+| TUI-P1-4 | reasoning_delta 完全忽略 | `bridge.tsx`：追踪 reasoningText → `DeepiMessages.tsx` 显示 reasoning 行 |
+| TUI-P1-5 | cursorPos closure 陈旧 | `DeepiPromptInput.tsx`：改用 `useRef` 存储光标位置 |
+| TUI-P2-1 | tool_call_delta 事件忽略 | `bridge.tsx`：添加 case |
+| TUI-P2-2 | status 事件忽略 | `bridge.tsx`：非 interrupt/tools_completed 的状态作为 warning 显示 |
+| TUI-P2-3 | done 事件未被明确处理 | `bridge.tsx`：添加 case（空处理，finally 已负责清理） |
+| TUI-P2-4 | warning 与 error 状态混淆 | `bridge.tsx`：warning 改为独立 `warnings[]` 数组 |
+| TUI-P2-5 | Pipe 模式 error 输出到 stdout | `cli/src/tui.ts`：error/warning 改用 `errorOutput` (stderr) |
+| TUI-P2-6 | Pipe 模式缺事件处理 | `cli/src/tui.ts`：添加 reasoning_delta / tool_call_delta / tool_progress / status / warning |
+| TUI-P2-7 | 输入框无光标 | `DeepiPromptInput.tsx`：在输入位置渲染 `▊` 光标 |
+| TUI-P2-8 | 快捷键缺失 | `DeepiPromptInput.tsx`：添加 Ctrl+D / Ctrl+U / Ctrl+K / Home / End / Ctrl+A / Ctrl+E |
+| TUI-P2-9 | /exit 不优雅 | `App.tsx`：interrupt() + 延迟 300ms 退出 |
+| TUI-P3-2 | CLAUDE_CODE 环境变量前缀 | `fullscreen.ts`：兼容 `DEEPCODE_NO_FLICKER` / `DEEPCODE_DISABLE_MOUSE` |
+| TUI-P3-4 | StatusBar 无 flex 分隔 | `StatusBar.tsx`：添加 `<Box flexGrow={1} />` 分隔 |
+| TUI-P3-6 | Pipe 模式 done 重复换行 | `cli/src/tui.ts`：移除 done case 的 `output.write("\n")` |
+| TUI-P3-7 | messages 用 index 作 React key | `DeepiMessages.tsx`：改为 `role + index + content 前缀` 组合 key |
+| TUI-P3-8 | Tool 消息截断无提示 | `DeepiMessages.tsx`：`slice(0, 200) + '...'` |
+| TUI-P3-3 | 非全屏无滚动容器 | `FullscreenLayout.tsx`：非全屏路径也包 ScrollBox |
+| P3-4-2 | prefix.build 每次 submit 无短路 | `engine.ts`：计算 cacheKey，未变化时跳过 rebuild |
+
+---
+
+## 持续关注（低风险，不建议立即改动）
+
+| # | 问题 | 理由 |
+|---|------|------|
+| 1 | Stale-read TOCTOU 窗口 | 毫秒级窗口，atomic rename + exclusive 并发 |
+| 2 | Session JSONL 崩溃一致性 | best-effort 设计 |
+| 3 | Bash 命令绕过 | 黑名单永远有绕过 |
+| 4 | Fuzzy Edit flexible_whitespace 误匹配 | 前 7 pass 约束 |
+| 5 | Prompt 注入 | system prompt 声明即可 |
+| 6 | 设计文档功能缺口 | Phase 2 未实现 |
+| 7 | P3-4-5 fold 竞态孤儿 tokenizer | pool 5s 超时自动清理 |
+| 8 | TUI-P3-1 Help 消息硬编码 | 不影响功能，后续扩展 `/model` 时自然解决 |
+| 9 | TUI-P3-5 promptOverlayContext 空占位 | MVP 不需要斜杠命令建议 |
+
+---
+
+## 驳回
+
+| 来源 | 原描述 | 驳回理由 |
+|------|--------|---------|
+| v2 | P0-1 reasoning_content | 已改为不入上下文 |
+| v2 | P1-4 hash-edit sha256 重复 | indexOf 已保证精确匹配 |
+| v2 | P1-5 computeFingerprint 工具顺序 | 不跨 session 持久化 |
+| v2 | P1-6 fuzzy fallback 未 re-check stale | fuzzy 路径重新 readFile |
+| Audit | NEW-P2-1 flushSoon 竞态 | 自身降级为低风险 |
+| Audit | NEW-P2-4~7 | 不适用/不影响 |
+| 第四轮 | NEW-3/4 | 不触发/已等价完成 |
+
+---
+
+## 总览
+
+| 级别 | 数量 |
+|------|------|
+| ✅ 已修复 | 22（本轮） |
+| ⬜ 关注 | 9 |
+| ✅ 已修复（移入 DONE.md） | 63 |
+| ❌ 驳回 | 11 |

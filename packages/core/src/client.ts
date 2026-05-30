@@ -64,7 +64,7 @@ type SSEChunk = {
 
 export class DeepSeekClient implements ChatClient {
   async *chatCompletionsStream(messages: ChatMessage[], opts: DeepSeekClientOptions): AsyncGenerator<DeepSeekStreamEvent> {
-    const url = new URL("/chat/completions", ensureBaseUrl(opts.baseUrl)).toString()
+    const url = `${ensureBaseUrl(opts.baseUrl)}chat/completions`
     const headers: Record<string, string> = {
       Authorization: `Bearer ${opts.apiKey}`,
       "Content-Type": "application/json",
@@ -255,13 +255,10 @@ export function isToolUseFinishReason(reason: string | null): boolean {
 }
 
 function ensureBaseUrl(baseUrl: string): string {
-  // accept https://api.deepseek.com or https://api.deepseek.com/v1
-  const u = new URL(baseUrl)
-  if (!u.pathname || u.pathname === "/") u.pathname = "/"
-  if (u.pathname.endsWith("/")) u.pathname = u.pathname.slice(0, -1)
-  // DeepSeek official is base host without /v1 in our python test; but also accept /v1.
-  // We'll normalize to include /v1 if not present? Official works without /v1 in examples.
-  return u.toString()
+  // Normalize to exactly one trailing slash, preserving path segments like /zen/v1/
+  let url = baseUrl
+  if (!url.endsWith("/")) url += "/"
+  return url
 }
 
 async function safeReadText(resp: Response): Promise<string> {

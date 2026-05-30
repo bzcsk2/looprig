@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs"
-import { resolve } from "node:path"
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs"
+import { resolve, join } from "node:path"
 import { DEEPSEEK_BASE_URL, DEEPSEEK_MODEL } from "./types.js"
 import type { Model } from "./vendor/pi.js"
 
@@ -31,28 +31,28 @@ export interface ProviderInfo {
 export const PROVIDERS: Record<string, ProviderInfo> = {
   zen: {
     baseUrl: "https://opencode.ai/zen/v1",
-    model: "deepseek-v4-flash",
+    model: "zen-free",
     requiresKey: false,
     label: "Zen (Free)",
     models: [
-      { label: "deepseek-v4-flash", model: "deepseek-v4-flash" },
-      { label: "mimo-v2.5", model: "mimo-v2.5" },
+      { label: "deepseek-v4-flash-free", model: "deepseek-v4-flash-free" },
+      { label: "mimo-v2.5-free", model: "mimo-v2.5-free" },
     ],
     defaultKey: "public",
   },
   deepseek: {
     baseUrl: "https://api.deepseek.com",
-    model: "deepseek-chat",
+    model: "deepseek-v4",
     requiresKey: true,
     label: "DeepSeek",
     models: [
-      { label: "pro", model: "deepseek-chat" },
+      { label: "pro", model: "deepseek-v4-pro" },
       { label: "flash", model: "deepseek-v4-flash" },
     ],
   },
   mimo: {
     baseUrl: "https://api.mimo.ai/v1",
-    model: "mimo-v2.5-pro",
+    model: "mimo-v2.5",
     requiresKey: true,
     label: "Mimo",
     models: [
@@ -64,6 +64,25 @@ export const PROVIDERS: Record<string, ProviderInfo> = {
 
 export function getApiKeyEnvVar(provider: string): string {
   return `${provider.toUpperCase()}_API_KEY`
+}
+
+const LAST_CONFIG_FILE = ".deepicode/last-config.json"
+
+export function saveLastConfig(cfg: { provider: string; model: string; baseUrl: string }): void {
+  try {
+    const dir = join(process.cwd(), ".deepicode")
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, "last-config.json"), JSON.stringify(cfg, null, 2), "utf8")
+  } catch {}
+}
+
+function loadLastConfig(): { provider?: string; model?: string; baseUrl?: string } | null {
+  try {
+    const raw = readFileSync(resolve(process.cwd(), LAST_CONFIG_FILE), "utf8")
+    return JSON.parse(raw) as { provider?: string; model?: string; baseUrl?: string }
+  } catch {
+    return null
+  }
 }
 
 function loadApiKeyFromProjectFile(): string | undefined {
@@ -91,12 +110,17 @@ function loadApiKeyFromProjectFile(): string | undefined {
 }
 
 export function loadConfig(): DeepicodeConfig {
-  const provider = process.env.DEEPICODE_PROVIDER ?? "deepseek"
-  const providerCfg = PROVIDERS[provider]
-  const baseUrl = process.env.DEEPSEEK_BASE_URL ?? providerCfg?.baseUrl ?? DEEPSEEK_BASE_URL
-  const model = process.env.DEEPSEEK_MODEL ?? providerCfg?.model ?? DEEPSEEK_MODEL
-  const apiKeyEnvVar = getApiKeyEnvVar(provider)
+  // Priority: env vars > persisted last-config > defaults
+  const last = loadLastConfig()
 
+  const provider = process.env.DEEPICODE_PROVIDER ?? last?.provider ?? "deepseek"
+  const providerCfg = PROVIDERS[provider]
+
+  const baseUrl = process.env.DEEPSEEK_BASE_URL ?? last?.baseUrl ?? providerCfg?.baseUrl ?? DEEPSEEK_BASE_URL
+
+  const model = process.env.DEEPSEEK_MODEL ?? last?.model ?? providerCfg?.model ?? DEEPSEEK_MODEL
+
+  const apiKeyEnvVar = getApiKeyEnvVar(provider)
   let apiKey = process.env[apiKeyEnvVar] ?? providerCfg?.defaultKey ?? ""
   if (!apiKey && provider === "deepseek") {
     apiKey = loadApiKeyFromProjectFile() ?? ""

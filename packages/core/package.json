@@ -19,5 +19,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@deepicode/security": "workspace:*"
+  }
 }

@@ -8,6 +8,7 @@ import { StreamingToolExecutor } from "./streaming-executor.js"
 import { AsyncSessionWriter, SessionLoader } from "./session.js"
 import { runLoop } from "./loop.js"
 import type { LoopOptions } from "./loop.js"
+import { PermissionEngine, HookManager } from "@deepicode/security"
 
 /**
  * ReasonixEngine 是 Deepicode 的核心引擎，负责：
@@ -47,6 +48,11 @@ export class ReasonixEngine implements CoreEngine {
   /** 可选：新引擎初始化时调用的清理钩子（如清除全局 stale-read tracker） */
   private onStart?: () => void
 
+  /** 权限引擎：三级判定（Deny → Allow → Ask） */
+  permissionEngine: PermissionEngine
+  /** Hook 管理器：tool call 前后 + loop 事件 */
+  hookManager: HookManager
+
   /** prefix.build 缓存：避免每次 submit 重复重建（P3-4-2） */
   private prefixCacheKey = ""
 
@@ -55,7 +61,9 @@ export class ReasonixEngine implements CoreEngine {
     this.ctx = new ContextManager(config.maxContextRounds, config.contextWindow)
     this.client = new DeepSeekClient()
     this.sessionId = sessionId ?? randomUUID()
-    this.toolExecutor = new StreamingToolExecutor(this.tools, this.sessionId)
+    this.permissionEngine = new PermissionEngine()
+    this.hookManager = new HookManager()
+    this.toolExecutor = new StreamingToolExecutor(this.tools, this.sessionId, undefined, this.permissionEngine, this.hookManager)
     this.onStart = onStart
     this.onStart?.()
 
@@ -174,7 +182,10 @@ export class ReasonixEngine implements CoreEngine {
         appendToolResult: (tc, result) => this.appendToolResult(tc, result),
       }
 
-      yield* runLoop(loopOpts)
+      for await (const event of runLoop(loopOpts)) {
+        yield event
+        this.hookManager.runOnLoopEvent(event as unknown as Record<string, unknown>)
+      }
     } finally {
       if (this.activeAbortController === abortController) {
         this.activeAbortController = undefined

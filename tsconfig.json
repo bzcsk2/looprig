@@ -20,7 +20,9 @@
       "@anthropic/ink": ["./packages/ink/src/index.ts"],
       "@anthropic/ink/*": ["./packages/ink/src/*"],
       "@deepicode/ink": ["./packages/ink/src/index.ts"],
-      "@deepicode/ink/*": ["./packages/ink/src/*"]
+      "@deepicode/ink/*": ["./packages/ink/src/*"],
+      "@deepicode/security": ["./packages/security/src/index.ts"],
+      "@deepicode/security/*": ["./packages/security/src/*"]
     }
   },
   "include": ["packages/*/src/**/*.ts", "packages/*/src/**/*.tsx"],

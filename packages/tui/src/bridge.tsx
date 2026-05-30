@@ -14,7 +14,8 @@ export interface BridgeState {
   streamingText: string | null;
   reasoningText: string | null;
   activeTools: Map<string, ToolStatus>;
-  tokens: { input: number; output: number };
+  tokens: { input: number; output: number; cacheHit: number; cacheMiss: number };
+  contextUsage: number;
   warnings: string[];
   error: string | null;
 }
@@ -114,15 +115,24 @@ export function createBridge(
             });
             break;
 
-          case "usage":
+          case "usage": {
+            const addInput = typeof event.metadata?.input === 'number' ? event.metadata.input : 0;
+            const addOutput = typeof event.metadata?.output === 'number' ? event.metadata.output : 0;
+            const addCacheHit = typeof event.metadata?.cacheHit === 'number' ? event.metadata.cacheHit : 0;
+            const addCacheMiss = typeof event.metadata?.cacheMiss === 'number' ? event.metadata.cacheMiss : 0;
             setState(prev => ({
               ...prev,
               tokens: {
-                input: prev.tokens.input + (typeof event.metadata?.input === 'number' ? event.metadata.input : 0),
-                output: prev.tokens.output + (typeof event.metadata?.output === 'number' ? event.metadata.output : 0),
+                input: prev.tokens.input + addInput,
+                output: prev.tokens.output + addOutput,
+                cacheHit: prev.tokens.cacheHit + addCacheHit,
+                cacheMiss: prev.tokens.cacheMiss + addCacheMiss,
               },
+              // Last turn's prompt tokens ≈ current context usage
+              contextUsage: addInput,
             }));
             break;
+          }
 
           case "error":
             setState(prev => ({
@@ -167,6 +177,14 @@ export function createBridge(
 
   const cancel = () => {
     engine.interrupt();
+    // Immediately reset loading state so the UI is responsive even if
+    // the AsyncGenerator takes a moment to drain interrupted events
+    setState(prev => ({
+      ...prev,
+      isLoading: false,
+      streamingText: null,
+      reasoningText: null,
+    }));
   };
 
   return { submit, cancel };
