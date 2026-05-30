@@ -179,8 +179,10 @@ export class DeepSeekClient implements ChatClient {
             continue
           }
 
-          if (json.error?.message) {
-            yield { type: "error", message: json.error.message }
+          if (json.error) {
+            const err = json.error as { message?: string; code?: number | string }
+            const msg = err.message ?? `API error ${err.code ?? 'unknown'}`
+            yield { type: "error", message: msg }
             return
           }
 

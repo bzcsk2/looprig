@@ -70,8 +70,19 @@ export function createWebFetchTool(): AgentTool {
         const signal = ctx.signal ? anySignal(ctx.signal, controller.signal) : controller.signal
 
         const t0 = Date.now()
-        const resp = await fetch(url, { signal, redirect: "manual" })
+        // redirect: "follow" is used with post-fetch SSRF re-check on resp.redirected.
+        // The internal server receives the request (suboptimal), but content is blocked
+        // if it resolves to private IP. A full manual-redirect loop would avoid the
+        // request entirely but adds complexity (redirect chain depth, cookie carry).
+        const resp = await fetch(url, { signal, redirect: "follow" })
         clearTimeout(timer)
+
+        // SSRF: validate final URL after any redirects
+        const finalUrl = resp.redirected ? new URL(resp.url) : new URL(url)
+        if (hasPrivateIP(finalUrl.hostname) ||
+            (!isIP(finalUrl.hostname) && await isPrivateHostname(finalUrl.hostname))) {
+          return { content: safeStringify({ error: `URL resolves to internal network: ${finalUrl.hostname}` }), isError: true }
+        }
 
         if (!resp.ok) {
           return {

@@ -1,11 +1,13 @@
-import { describe, it, expect } from "vitest"
-import { mkdtempSync, writeFileSync, readFileSync } from "node:fs"
+import { describe, it, expect, beforeEach, afterEach } from "vitest"
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync } from "node:fs"
 import { rm } from "node:fs/promises"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { createHash } from "node:crypto"
 import { hashAnchoredReplaceOnce } from "../src/hash-edit.js"
 import { fuzzyReplaceOnce } from "../src/fuzzy-edit.js"
+import { createEditTool } from "../src/edit.js"
+import { recordRead, clearReadTracker } from "../src/stale-read.js"
 
 function sha256(s: string): string {
   return createHash("sha256").update(s).digest("hex")
@@ -166,5 +168,90 @@ describe("fuzzyReplaceOnce", () => {
     const result = fuzzyReplaceOnce(haystack, "a() { return 1", "a() { return 42")
     expect(result).not.toBeNull()
     expect(result!.edited).toContain("return 42")
+  })
+
+  it("hashAnchoredReplaceOnce should replace first occurrence when old_string appears multiple times", async () => {
+    const dir = tempDir()
+    const file = join(dir, "mult.txt")
+    writeFileSync(file, "keep A\ncommon\nkeep B\ncommon\nkeep C")
+
+    const res = await hashAnchoredReplaceOnce(file, "common", "REPLACED")
+    expect(res).not.toBeNull()
+    expect(res!.replacedCount).toBe(1)
+    const content = readFileSync(file, "utf-8")
+    expect(content).toBe("keep A\nREPLACED\nkeep B\ncommon\nkeep C")
+    await rm(dir, { recursive: true })
+  })
+
+  it("hashAnchoredReplaceOnce should delete old_string when newString is empty", async () => {
+    const dir = tempDir()
+    const file = join(dir, "del.txt")
+    writeFileSync(file, "before\ndelete this\nafter")
+
+    const res = await hashAnchoredReplaceOnce(file, "delete this\n", "")
+    expect(res).not.toBeNull()
+    const content = readFileSync(file, "utf-8")
+    expect(content).toBe("before\nafter")
+    await rm(dir, { recursive: true })
+  })
+})
+
+describe("edit tool stale-read integration", () => {
+  let tmpDir: string
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), "deepicode-stale-edit-"))
+    clearReadTracker()
+  })
+  afterEach(() => {
+    try { rmSync(tmpDir, { recursive: true, force: true }) } catch {}
+  })
+
+  it("should return stale error when file modified since last read", async () => {
+    const filePath = join(tmpDir, "stale.txt")
+    writeFileSync(filePath, "short", "utf-8")
+    const { stat } = await import("node:fs/promises")
+    const st = await stat(filePath)
+    recordRead(filePath, st.mtimeMs, st.size)
+    writeFileSync(filePath, "much longer content to ensure size changes", "utf-8")
+
+    const tool = createEditTool()
+    const r = await tool.execute({ path: filePath, old_string: "longer", new_string: "modified" }, { cwd: tmpDir, signal: new AbortController().signal } as any)
+    expect(r.isError).toBe(true)
+    const p = JSON.parse(r.content as string)
+    expect(p.error).toContain("modified since last read")
+  })
+
+  it("should succeed when file is not stale", async () => {
+    const filePath = join(tmpDir, "fresh.txt")
+    writeFileSync(filePath, "hello world", "utf-8")
+
+    const tool = createEditTool()
+    const r = await tool.execute({ path: filePath, old_string: "hello", new_string: "hi" }, { cwd: tmpDir, signal: new AbortController().signal } as any)
+    expect(r.isError).toBe(false)
+    expect(readFileSync(filePath, "utf-8")).toBe("hi world")
+  })
+
+  it("should fall back to fuzzy when hash-anchored fails (whitespace mismatch)", async () => {
+    const filePath = join(tmpDir, "fuzzy-fallback.txt")
+    writeFileSync(filePath, "hello   world", "utf-8")
+
+    const tool = createEditTool()
+    const r = await tool.execute({ path: filePath, old_string: "hello world", new_string: "hi world" }, { cwd: tmpDir, signal: new AbortController().signal } as any)
+    expect(r.isError).toBe(false)
+    const p = JSON.parse(r.content as string)
+    expect(p.method).toBe("flexible_whitespace")
+    expect(readFileSync(filePath, "utf-8")).toBe("hi world")
+  })
+
+  it("should use hash-anchored when exact match with no oldHash", async () => {
+    const filePath = join(tmpDir, "exact-match.txt")
+    writeFileSync(filePath, "exact string here", "utf-8")
+
+    const tool = createEditTool()
+    const r = await tool.execute({ path: filePath, old_string: "exact string", new_string: "replaced string" }, { cwd: tmpDir, signal: new AbortController().signal } as any)
+    expect(r.isError).toBe(false)
+    const p = JSON.parse(r.content as string)
+    expect(p.method).toBe("hash_anchored")
+    expect(readFileSync(filePath, "utf-8")).toBe("replaced string here")
   })
 })

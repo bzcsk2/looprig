@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { resolve } from "node:path"
 import type { DeepicodeConfig } from "./config.js"
 import { ContextManager } from "./context/manager.js"
 import type { ToolCall, ToolSpec, ChatMessage } from "./types.js"
@@ -72,7 +73,7 @@ export class ReasonixEngine implements CoreEngine {
     this.onStart?.()
 
     // 尝试初始化会话持久化（best-effort，失败则不记录）
-    const sessionPath = `${process.cwd()}/.deepicode/sessions/${this.sessionId}.jsonl`
+    const sessionPath = resolve(process.cwd(), ".deepicode", "sessions", `${this.sessionId}.jsonl`)
     const writer = new AsyncSessionWriter(sessionPath)
     writer.init().catch(() => {})
     this.sessionWriter = writer
@@ -97,7 +98,12 @@ export class ReasonixEngine implements CoreEngine {
       const nonSystem = messages.filter(m => m.role !== "system")
       this.ctx.log.appendMany(nonSystem)
     }
+    this.resetStats()
     return messages
+  }
+
+  resetStats(): void {
+    this.stats = { promptTokens: 0, completionTokens: 0, cacheHitTokens: 0, cacheMissTokens: 0, apiCalls: 0, toolCalls: 0, totalCost: 0 }
   }
 
   /** 设置系统级 system prompt */
@@ -124,6 +130,9 @@ export class ReasonixEngine implements CoreEngine {
   /** 运行时更新引擎配置（用于 /model 命令切换 Provider） */
   updateConfig(partial: Partial<DeepicodeConfig>): void {
     Object.assign(this.config, partial)
+    if (partial.contextWindow !== undefined) {
+      this.ctx.updateContextWindow(partial.contextWindow)
+    }
   }
 
   /** 切换 agent，返回 agent label */
@@ -189,7 +198,7 @@ export class ReasonixEngine implements CoreEngine {
         })
       }
 
-      const toolSpecsKey = JSON.stringify(toolSpecs)
+      const toolSpecsKey = JSON.stringify([...toolSpecs].sort((a, b) => a.function.name.localeCompare(b.function.name)))
       const cacheKey = `${systemPrompt}|${toolSpecsKey}`
       if (cacheKey !== this.prefixCacheKey) {
         this.ctx.prefix.build(systemPrompt, toolSpecs)

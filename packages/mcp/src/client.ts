@@ -104,7 +104,13 @@ export class McpClient {
 
   async disconnect(): Promise<void> {
     if (!this._connected || !this.proc) return
-    try { this.proc.kill("SIGTERM") } catch {}
+    try {
+      this.proc.kill("SIGTERM")
+      await new Promise<void>(resolve => {
+        const t = setTimeout(() => { try { this.proc?.kill("SIGKILL") } catch {} resolve() }, 5000)
+        this.proc?.once("exit", () => { clearTimeout(t); resolve() })
+      })
+    } catch {}
     this._connected = false
   }
 
@@ -162,7 +168,8 @@ export class McpClient {
           }
         }
       } catch {
-        // malformed JSON line, ignore
+        // malformed JSON line — drop silently; valid responses without matching
+        // id also land here (server-originated notifications)
       }
     }
   }

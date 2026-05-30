@@ -56,6 +56,12 @@ function scavenge(raw: string): { success: boolean; args: Record<string, unknown
     candidates.push(raw + '"')
   }
 
+  // 1g: combined brace+quote fix — when braces are unbalanced AND the
+  // raw string may have an unclosed string value (e.g. {"key": "value)
+  if (open > closed) {
+    candidates.push(raw + '"' + "}".repeat(open - closed))
+  }
+
   for (const c of candidates) {
     try {
       const parsed = JSON.parse(c) as unknown
@@ -96,8 +102,8 @@ function storm(raw: string): { success: boolean; args: Record<string, unknown> }
     return { success: true, args: { [kvMatch[1]]: kvMatch[2] } }
   }
 
-  // 3b: empty args
-  if (!raw || raw.trim() === "{}") {
+  // 3b: empty object literal
+  if (raw.trim() === "{}") {
     return { success: true, args: {} }
   }
 

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Box, Text, useInput } from '@deepicode/ink';
 import { PROVIDERS, getApiKeyEnvVar } from '@deepicode/core';
-import { spawnSync } from 'child_process';
+import { execFile } from 'child_process';
 
 interface ModelPickerProps {
   currentProvider: string;
@@ -14,20 +14,25 @@ type Step = 'provider' | 'key' | 'model';
 
 const PROVIDER_ORDER = ['zen', 'deepseek', 'mimo'];
 
-function tryReadClipboard(): string | null {
+async function tryReadClipboard(): Promise<string | null> {
   const platform = process.platform;
   const cmds: Array<{ bin: string; args: string[] }> = [];
   if (platform === 'darwin') {
     cmds.push({ bin: 'pbpaste', args: [] });
   } else if (platform === 'linux') {
-    // Try Wayland first, then X11
     cmds.push({ bin: 'wl-paste', args: [] });
     cmds.push({ bin: 'xclip', args: ['-o', '-selection', 'clipboard'] });
     cmds.push({ bin: 'xsel', args: ['--clipboard', '--output'] });
   }
   for (const { bin, args } of cmds) {
-    const r = spawnSync(bin, args, { encoding: 'utf8', timeout: 500 });
-    if (r.status === 0 && r.stdout) return r.stdout.replace(/\n$/, '');
+    try {
+      const out = await new Promise<string>((resolve, reject) => {
+        execFile(bin, args, { encoding: 'utf8', timeout: 500 }, (err, stdout) => {
+          if (err) reject(err); else resolve(stdout);
+        });
+      });
+      if (out) return out.replace(/\n$/, '');
+    } catch { continue }
   }
   return null;
 }
@@ -117,8 +122,9 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
         return;
       }
       if (key.ctrl && _input === 'v') {
-        const clip = tryReadClipboard();
-        if (clip) setInputBuf(prev => prev + clip);
+        void tryReadClipboard().then(clip => {
+          if (clip) setInputBuf(prev => prev + clip);
+        });
         return;
       }
       if (_input) {

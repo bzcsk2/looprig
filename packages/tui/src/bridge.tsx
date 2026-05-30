@@ -80,7 +80,7 @@ export function createBridge(
           case "tool_start":
             setState(prev => {
               const newTools = new Map(prev.activeTools);
-              const key = `tool_${event.toolCallIndex ?? Date.now()}`;
+              const key = `tool_${event.toolCallIndex ?? crypto.randomUUID()}`;
               newTools.set(key, {
                 name: event.toolName ?? 'unknown',
                 status: 'running',
@@ -161,6 +161,17 @@ export function createBridge(
 
           case "done":
             break;
+
+          case "strategy_notify":
+          case "strategy_estimate_refined":
+            // Phase 2 events — not yet implemented, ignore
+            break;
+
+          default: {
+            const _exhaustiveCheck: never = event.role;
+            void _exhaustiveCheck;
+            break;
+          }
         }
       }
     } catch (e: unknown) {
@@ -188,6 +199,7 @@ export function createBridge(
       isLoading: false,
       streamingText: null,
       reasoningText: null,
+      activeTools: new Map(),
     }));
   };
 

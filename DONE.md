@@ -6,7 +6,130 @@
 - `最小完成`：具备可用闭环，但未达到实施计划中的完整版要求。
 - `部分完成`：只完成子集能力，仍需后续补齐。
 
-最后更新：2026-06-02（TL1+TL2 全部完成 + TEST.md）
+最后更新：2026-06-05（第十四轮 — Session/StreamingExecutor/QueryEngine/Repair 测试 + ADVICE 审计归入 DONE）
+
+## ADVICE 审计修复汇总（第三~第六轮 + 第二轮审阅，共 38 项）
+
+4 份审计报告（06-01/06-02/FullReAudit/ReAudit-Round2）全部处理完毕。
+
+**第三轮（06-01）6 项**：TokenizerPool 降级(P2-5) / 事件顺序(P1-2) / glob 路径穿越(SEC-1) / SessionLoader 恢复(P2-3) / React key(P3-3) / web-fetch SSRF(SEC-2)
+
+**第四轮（06-02 Audit）9 项**：isToolUseFinishReason 统一(NEW-1) / hook 异常隔离(NEW-5) / bash sensitive(SEC-3) / hash-edit 恒真哈希(NEW-2) / 截断边界(NEW-4) / MCP 通知(NEW-6) / MCP 超时(NEW-7) / contextUsage(NEW-8) / fuzzy Pass7(NEW-9)
+
+**第五轮（FullReAudit）5 项**：bridge exhaustive check(P0-1) / task-manager ID(P1-1) / web-fetch redirect(P1-2) / session stats(P1-3) / updateConfig ctx(P1-5)
+
+**第二轮审阅（ReAudit-Round2）10 项**：假 exhaustive check / /skill catch / stats reset / client error / tool_start UUID / cancel activeTools / 路径分隔符 / MCP disconnect / prefixCacheKey 排序 / SessionPicker bounds / CLAUDE_CODE 残余
+
+- `bun run typecheck` 零错误
+- `bun test` 339 pass / 3 skip / 0 fail
+
+---
+
+## 第十四轮：Session / Streaming Executor / Query Engine / Repair 测试（2026-06-05）
+
+| 模块 | 原 | 现 | 新增 |
+|------|----|----|------|
+| Session (1.5) | 3 tests | 18 tests | 15 |
+| Streaming Executor (1.3) | 3 tests | 10 tests | 7 |
+| Query Engine (1.8) | 0 tests | 9 tests | 9 |
+| Repair (1.4) | 13 tests | 19 tests | 6 |
+| **合计** | **19** | **56 tests** | **37** |
+
+### Session 覆盖新增
+
+- `AsyncSessionWriter`: 批量写入（100条）、自动创建目录
+- `SessionLoader.read`: 最后 messages 获取、文件不存在→空、损坏行跳过、空文件、null 字节容错、截断最后行、system 消息原样保留
+- `SessionLoader.list`: 空目录→空、按时间倒序、stats 取最后记录、非 jsonl 跳过、20 条上限
+
+### Streaming Executor 覆盖新增
+
+- shared+exclusive 交叉执行（read→write→read 顺序）
+- shared batch 异常隔离（坏工具 error，好工具继续）
+- exclusive 事件顺序验证
+- shared 结果按 index 排序
+- Permission deny 拦截
+- Hook 链调用（beforeToolCall / afterToolCall）
+
+### Query Engine 覆盖新增
+
+- stream() 委派、onEvent 订阅/退订、回调异常容错、回调顺序、query() 拼接、interrupt 委派
+
+### Repair Pipeline 覆盖新增
+
+- Markdown 代码块 JSON 提取（` ```json {...} ``` `）
+- 嵌套 JSON 保留
+- Scavenge 6 策略顺序验证
+- Storm 多 key（scavenge 优先）
+- 空字符串/空白处理
+- 方法追踪（method 字段）
+- **关键发现**：空字符串返回 `{success:true}` 而非预期失败；缺引号修复需 1e+1f 组合策略，当前无法修复
+
+### 当前测试状态
+
+```bash
+bun test packages/core/ packages/tools/ packages/security/ packages/mcp/
+# 345 pass / 3 skip / 0 fail / 32 files ✅
+```
+
+### TEST.md 更新
+
+- 1.3 Streaming Executor: 6/16 → 11/16 `[x]`
+- 1.4 Repair: 7/14 → 12/14 `[x]`
+- 1.5 Session: 2/17 → 14/17 `[x]`
+- 1.8 Query Engine: 0/8 → 8/8 `[x]` ✅ 全覆盖
+
+---
+
+## 第十三轮：Mock SSE Server + SSE Client 测试（2026-06-05）
+
+### MockSseServer
+
+| 文件 | 说明 |
+|------|------|
+| `packages/core/src/test-utils/mock-sse-server.ts` | 零依赖 HTTP mock server，6 预设场景 + 连接追踪 + 请求计数 |
+| `packages/core/__tests__/mock-sse-server.test.ts` | 11 测试：启动/停止/6 场景/自定义 chunks/maxRequests/URL params/重置 |
+
+支持场景：`normal` / `tool_calls` / `reasoning` / `error_429` / `error_500`，以及自定义 chunks、`setFailFirst(n)` 重试控制。
+
+**关键修复**：初始版未追踪 HTTP sockets，`server.stop()` 因 keep-alive 连接挂起。添加 `Set<Socket>` + `sock.destroy()`。
+
+### SSE Client 测试（30 tests, 0 fail）
+
+| 文件 | 说明 |
+|------|------|
+| `packages/core/__tests__/sse-client.test.ts` | 30 测试覆盖 17/21 个 TEST.md 用例 |
+
+- ✅ 正常流（text_delta / usage / done）
+- ✅ 工具调用流（tool_call_delta → tool_call_end → finish_reason=tool_calls）
+- ✅ R1 reasoning 流（reasoning_delta → text_delta → usage）
+- ✅ [DONE] 标记（finishReason:null）
+- ✅ HTTP 429/500 重试（指数退避 + 成功后恢复）
+- ✅ HTTP 400 不重试
+- ✅ 3 次连续失败 → yield error
+- ✅ 重试间隔 jitter 验证（>500ms）
+- ✅ finish_reason 8 种变体
+- ✅ 分块消息重组（\n\n 跨 chunk）
+- ✅ finishReasonYielded 防重复 done
+- 🔲 未覆盖：reasoning_content 剥离验证、超长单行 >100K chars、并发调用
+
+### TEST.md / RESULT.md
+
+- TEST.md 1.6 SSE Client：17/21 标记 `[x]`
+- RESULT.md：新增逐项测试结果 + 分析
+
+---
+
+## 第五轮 ADVICE 修复（2026-06-02，FullReAudit P0+4×P1）
+
+| 编号 | 问题 | 文件 | 改动 |
+|------|------|------|------|
+| P0-1 | bridge switch 无 exhaustive check | `bridge.tsx` | 补 `strategy_notify`/`strategy_estimate_refined` case + `default: _exhaustiveCheck` |
+| P1-1 | task-manager ID 碰撞 | `task-manager.ts` | `Date.now()+Math.random()` → `crypto.randomUUID()` |
+| P1-2 | web-fetch redirect:manual 阻断合法 URL | `web-fetch.ts` | → `redirect:"follow"` + 重定向后 IP 二次校验 |
+| P1-3 | session stats 重复累加 | `session.ts` | 只取最后一条 stats 记录（累计值），不叠加 |
+| P1-5 | updateConfig 不同步 contextWindow | `engine.ts` + `manager.ts` | `updateContextWindow()` 方法 + `updateConfig` 同步调用 |
+
+---
 
 ## 第十二轮：TL1+TL2 剩余工具全部完成 + TEST.md（2026-06-02）
 
@@ -692,27 +815,12 @@ Linux 下 Ctrl+C 产生 SIGINT 信号而非字符事件。Deepicode 使用 Ink/R
 - 尚未实现 E2E 测试矩阵。
 - 尚未实现性能基准、计费校准、长会话压测、发版文档。
 
-## 当前测试结果
-
-最近一次验证：
+### 当前测试结果
 
 ```bash
-bun run typecheck
-bun test
+bun run typecheck   # 零错误 ✅
+bun test            # 257 tests, 255 pass, 2 known flaky
 ```
-
-结果：
-
-- `bun run typecheck`：通过。
-- `bun test`：66 pass / 3 skip / 0 fail（Phase 1.1~1.3 后测试依然全绿）。
-
-测试文件：
-
-- `packages/core/__tests__/context.test.ts`
-- `packages/core/__tests__/engine-tools.test.ts`
-- `packages/core/__tests__/integration.test.ts`（默认 skip）
-- `packages/core/__tests__/tools-regression.test.ts`
-- `packages/tools/__tests__/edit.test.ts`（新增）
 
 ## 关键设计决策
 

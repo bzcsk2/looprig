@@ -174,6 +174,9 @@ export function App({ engine, config }: AppProps) {
         let msg: string
         try { const d = JSON.parse(result.content); msg = `Loaded ${d.count} skills.\n${d.skills.slice(0, 20).map((s: any) => `  ${s.name} — ${s.description}`).join("\n")}${d.count > 20 ? `\n  ... and ${d.count - 20} more` : ""}` } catch { msg = result.content }
         setBridgeState(prev => ({ ...prev, messages: [...prev.messages, { role: 'assistant' as const, content: msg }] }))
+      }).catch(e => {
+        const msg = e instanceof Error ? e.message : String(e)
+        setBridgeState(prev => ({ ...prev, messages: [...prev.messages, { role: 'assistant' as const, content: `Failed to load skills: ${msg}` }] }))
       })
       return
     }

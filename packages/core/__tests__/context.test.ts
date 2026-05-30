@@ -308,4 +308,120 @@ describe("ContextManager - 截断逻辑", () => {
     const ctx = new ContextManager()
     expect(ctx["maxRounds"]).toBe(20)
   })
+
+  it("should return defensive copy from buildMessages (modifying result must not affect internal state)", () => {
+    const ctx = new ContextManager()
+    ctx.prefix.build("System")
+    ctx.log.append({ role: "user", content: "hello" })
+    ctx.log.append({ role: "assistant", content: "hi" })
+
+    const msgs = ctx.buildMessages()
+    const origLen = msgs.length
+
+    msgs.push({ role: "user", content: "tampered" } as any)
+    expect(ctx.buildMessages()).toHaveLength(origLen)
+
+    expect(ctx["log"].messages.find(m => m.content === "tampered")).toBeUndefined()
+  })
+
+  it("should treat negative maxRounds as 0 (no truncation)", () => {
+    const ctx = new ContextManager(-1)
+    ctx.prefix.build("System")
+
+    for (let i = 0; i < 5; i++) {
+      ctx.log.append({ role: "user", content: `q${i}` })
+      ctx.log.append({ role: "assistant", content: `a${i}` })
+    }
+    expect(ctx.buildMessages()).toHaveLength(11)
+  })
+})
+
+describe("ContextManager - 截断边界", () => {
+  it("should keep complete tool groups after truncation — cutFrom at user boundary preserves all tools in remaining rounds", () => {
+    // user0 → a0 → user1 → a1(tc:call_1) → tool(call_1) → a1_summary → user2 → a2
+    // userIdx = [0,2,6] → len 3 > maxRounds=2 → cutFrom=userIdx[1]=2
+    // slice(2) preserves [user1, a1(tc), tool(call_1), a1_summary, user2, a2]
+    // cutFrom always lands on a user, so the first kept msg is never an orphaned assistant(tc)
+    const ctx = new ContextManager(2)
+    ctx.prefix.build("System")
+    ctx.log.append({ role: "user", content: "q0" })
+    ctx.log.append({ role: "assistant", content: "a0" })
+    ctx.log.append({ role: "user", content: "q1" })
+    ctx.log.append({ role: "assistant", content: null, tool_calls: [{ id: "call_1", type: "function", function: { name: "bash", arguments: "{}" } }] })
+    ctx.log.append({ role: "tool", content: "out1", tool_call_id: "call_1" })
+    ctx.log.append({ role: "assistant", content: "done1" })
+    ctx.log.append({ role: "user", content: "q2" })
+    ctx.log.append({ role: "assistant", content: "a2" })
+
+    const msgs = ctx.buildMessages()
+    // system + q1 + a1(tc) + tool + done1 + q2 + a2 = 7
+    expect(msgs).toHaveLength(7)
+    expect(msgs[1].content).toBe("q1")
+    expect(msgs[1].role).toBe("user")
+    expect(msgs[2].role).toBe("assistant")
+    expect(msgs[3].content).toBe("out1")
+    expect(msgs[4].content).toBe("done1")
+    expect(msgs[5].content).toBe("q2")
+  })
+
+  it("should keep complete multi-tool groups after truncation (3+ tool_calls per round)", () => {
+    const ctx = new ContextManager(2)
+    ctx.prefix.build("System")
+    ctx.log.append({ role: "user", content: "q0" })
+    ctx.log.append({ role: "assistant", content: null, tool_calls: [
+      { id: "c1", type: "function", function: { name: "bash", arguments: "{}" } },
+      { id: "c2", type: "function", function: { name: "bash", arguments: "{}" } },
+      { id: "c3", type: "function", function: { name: "bash", arguments: "{}" } },
+    ]})
+    ctx.log.append({ role: "tool", content: "o1", tool_call_id: "c1" })
+    ctx.log.append({ role: "tool", content: "o2", tool_call_id: "c2" })
+    ctx.log.append({ role: "tool", content: "o3", tool_call_id: "c3" })
+    ctx.log.append({ role: "assistant", content: "sum0" })
+    ctx.log.append({ role: "user", content: "q1" })
+    ctx.log.append({ role: "assistant", content: null, tool_calls: [
+      { id: "c4", type: "function", function: { name: "bash", arguments: "{}" } },
+    ]})
+    ctx.log.append({ role: "tool", content: "o4", tool_call_id: "c4" })
+    ctx.log.append({ role: "assistant", content: "sum1" })
+    ctx.log.append({ role: "user", content: "q2" })
+    ctx.log.append({ role: "assistant", content: "a2" })
+
+    // userIdx = [0, 6, 10] → len 3 > maxRounds=2 → cutFrom=userIdx[1]=6
+    const msgs = ctx.buildMessages()
+    // Keep: q1 + a1(tc) + tool_c4 + sum1 + q2 + a2 = 6 + system = 7
+    expect(msgs).toHaveLength(7)
+    expect(msgs[1].content).toBe("q1")
+    expect(msgs[5].content).toBe("q2")
+  })
+
+  it("should not produce orphaned tool/assistant when conversation is all tool interactions", () => {
+    const ctx = new ContextManager(2)
+    ctx.prefix.build("System")
+    // round 0
+    ctx.log.append({ role: "user", content: "q0" })
+    ctx.log.append({ role: "assistant", content: null, tool_calls: [{ id: "c0", type: "function", function: { name: "bash", arguments: "{}" } }] })
+    ctx.log.append({ role: "tool", content: "o0", tool_call_id: "c0" })
+    ctx.log.append({ role: "assistant", content: "sum0" })
+    // round 1
+    ctx.log.append({ role: "user", content: "q1" })
+    ctx.log.append({ role: "assistant", content: null, tool_calls: [{ id: "c1", type: "function", function: { name: "bash", arguments: "{}" } }] })
+    ctx.log.append({ role: "tool", content: "o1", tool_call_id: "c1" })
+    ctx.log.append({ role: "assistant", content: "sum1" })
+    // round 2
+    ctx.log.append({ role: "user", content: "q2" })
+    ctx.log.append({ role: "assistant", content: null, tool_calls: [{ id: "c2", type: "function", function: { name: "bash", arguments: "{}" } }] })
+    ctx.log.append({ role: "tool", content: "o2", tool_call_id: "c2" })
+    ctx.log.append({ role: "assistant", content: "sum2" })
+    // round 3 (exceeds maxRounds=2)
+    ctx.log.append({ role: "user", content: "q3" })
+    ctx.log.append({ role: "assistant", content: "a3" })
+
+    // userIdx = [0, 4, 8, 12] → len 4 > maxRounds=2 → cutFrom=userIdx[2]=8
+    // Keep last 2 user rounds: q2 + a2(tc) + tool_c2 + sum2 + q3 + a3 = 6 + system = 7
+    const msgs = ctx.buildMessages()
+    expect(msgs).toHaveLength(7)
+    // No orphaned tool or bare assistant(tc) at start of log
+    expect(msgs[1].role).toBe("user")
+    expect(msgs[1].content).toBe("q2")
+  })
 })

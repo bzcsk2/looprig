@@ -37,7 +37,8 @@ export function SessionPicker({ onSelect, onCancel }: SessionPickerProps) {
 
   const confirm = useCallback(() => {
     const s = sessions[selIdx];
-    if (s) onSelect(s.id);
+    if (!s) return; // session list empty or selIdx out of bounds
+    onSelect(s.id);
   }, [sessions, selIdx, onSelect]);
 
   useInput((_input, key) => {

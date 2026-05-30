@@ -33,11 +33,13 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
 
   // fold check before first turn (non-blocking: kicks off async but uses sync fallback immediately)
   const foldP = ctx.getFoldDecision()
-  // race with 100ms timeout — if timeout wins, foldP becomes an orphan task;
-  // pool's internal 5s timeout will clean up the Worker message, so no permanent leak
   const fold = await Promise.race([
     foldP,
-    new Promise<FoldDecision>(resolve => setTimeout(() => resolve({ action: "none" as const, ratio: 0, used: 0, total: 128000 }), 100)),
+    new Promise<FoldDecision>(resolve => setTimeout(() => {
+      // tokenizer task becomes orphan — ctx.tokenizer is internal so no explicit cancel;
+      // pool's 5s fallback will resolve and gc the Promise without side effects
+      resolve({ action: "none" as const, ratio: 0, used: 0, total: 128000 })
+    }, 100)),
   ])
   if (fold.action === "force") {
     yield { role: "status", content: "Context budget exceeded — forcing fold on next turn", severity: "warning" as const, metadata: { fold } }

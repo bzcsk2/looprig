@@ -8,7 +8,7 @@ export interface FoldDecision {
 const CHARS_PER_TOKEN = 4
 const MSG_OVERHEAD = 10
 const CJK_RE = /[一-鿿㐀-䶿豈-﫿]/g
-const PUNCT_RE = /[^\w\s]/g
+const PUNCT_RE = /[^\w\s一-鿿㐀-䶿豈-﫿]/g
 
 /** 精细估算（CJK 1.5 token/字, 标点 2 token/字, ASCII CHARS_PER_TOKEN 字/token） */
 export function refinedEstimate(text: string): number {

@@ -18,7 +18,7 @@ export interface SessionSummary {
 }
 
 export class SessionLoader {
-  static sessionDir = `${process.cwd()}/.deepicode/sessions`
+  static sessionDir = resolve(process.cwd(), ".deepicode", "sessions")
 
   static async read(sessionId: string): Promise<ChatMessage[]> {
     const path = resolve(this.sessionDir, `${sessionId}.jsonl`)
@@ -64,13 +64,14 @@ export class SessionLoader {
         let userMessages = 0
         let inputTokens = 0
         let outputTokens = 0
-        // scan lines once for stats
+        // scan lines for stats — only take the LAST stats record (cumulative)
+        let lastInputTokens = 0
+        let lastOutputTokens = 0
         for (const line of lines) {
           try {
             const rec = JSON.parse(line) as SessionRecord
             if (rec.type === "messages" && Array.isArray(rec.payload)) {
               messageCount++
-              // keep overwriting — last one wins (snapshot format)
               userMessages = 0
               for (const m of rec.payload as ChatMessage[]) {
                 if (m.role === "user") userMessages++
@@ -78,11 +79,13 @@ export class SessionLoader {
             }
             if (rec.type === "stats" && typeof rec.payload === "object" && rec.payload) {
               const s = rec.payload as Record<string, unknown>
-              if (typeof s.inputTokens === "number") inputTokens += s.inputTokens
-              if (typeof s.outputTokens === "number") outputTokens += s.outputTokens
+              if (typeof s.inputTokens === "number") lastInputTokens = s.inputTokens
+              if (typeof s.outputTokens === "number") lastOutputTokens = s.outputTokens
             }
           } catch { continue }
         }
+        inputTokens = lastInputTokens
+        outputTokens = lastOutputTokens
         entries.push({ id, ts: firstRec.ts, messageCount, userMessages, inputTokens, outputTokens })
       } catch { continue }
     }
