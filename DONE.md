@@ -6,7 +6,7 @@
 - `最小完成`：具备可用闭环，但未达到实施计划中的完整版要求。
 - `部分完成`：只完成子集能力，仍需后续补齐。
 
-最后更新：2026-05-30（壳层增强 + 多 Agent — AppState + QueryEngine + Build/Plan Agent）
+最后更新：2026-05-30（SIGINT / Raw Mode 修复 — 第三轮终版）
 
 ## 第八轮：TUI 交互打磨（2026-05-30）
 
@@ -36,22 +36,54 @@
 - `ModelPicker.tsx`：`tryReadClipboard()` 支持 wl-paste → xclip → xsel 三种工具回退
 - 终端 bracketed paste 支持：多字符 `_input` 直接追加到输入
 
-## SIGINT / Raw Mode 修复（2026-05-30）✅ 已解决
+## SIGINT / Raw Mode 修复（2026-05-30，三轮迭代）✅ 已解决
 
-### 根因
+### 问题背景
 
-`exitOnCtrlC` 默认为 `true`。Ink 渲染 `<App>` 时把此选项传入。当 Linux 上 Ctrl+C 触发 `\x03` 字符到达 stdin 时，Ink 内部的 `App.handleInput('\x03')` 直接调用 `handleExit()` → `setRawMode(false)` + `unmount()`，不等 SIGINT handler 处理就把 raw mode 关了、React 树卸了。终端进入损坏状态：光标跳屏幕顶部、输入失效。
+Linux 下 Ctrl+C 产生 SIGINT 信号而非字符事件。Deepicode 使用 Ink/React 终端框架（复制自 best-claude-code），alternate screen + raw mode 环境下 Ctrl+C 导致终端损坏：光标跳屏幕顶部、输入失效、退出后看不到之前的屏幕记录。
 
-### 修复内容
+### 踩坑历程
+
+**第一轮（失败）：表面修复。** 在 `App.tsx` 的 `useEffect` 中注册 `process.on('SIGINT')` handler，处理加载中取消和空闲双击退出。错误地认为问题是"没有 SIGINT handler"，实际上 handler 早在第八轮就已存在，问题不在此。
+
+**第二轮（部分成功）：发现 `exitOnCtrlC` 根因。** 经深入调查 best-claude-code 对比分析，发现三个互相关联的问题：
+
+| 坑 | 现象 | 根因 |
+|----|------|------|
+| 坑 1：raw mode 丢失 | Ctrl+C 后输入失效、光标跳顶 | `exitOnCtrlC` 默认为 `true`，Ink 内部的 `App.handleInput('\x03')` 抢先调 `handleExit()` → `setRawMode(false)` + `unmount()`，raw mode 被 Ink 关掉了 |
+| 坑 2：连续 Ctrl+C 无法退出 | 双击退出不生效 | `setTimeout(() => process.exit(0), 100)` 在 Bun 信号处理上下文中不可靠——信号交付后事件循环可能异常，定时器回调永远不会触发 |
+| 坑 3：`\x03` 字符路径无退出逻辑 | 仅 SIGINT 路径可退出 | 设置 `exitOnCtrlC: false` 后 `\x03` 走 `useInput` 字符路径，但 DeepiPromptInput 只在 loading 时调 `onCancel()`，idle 时直接忽略 |
+
+第二轮修复：
+- `cli/src/tui.ts`：`render()` 传 `{ exitOnCtrlC: false }` — 禁止 Ink 内部拦截 `\x03`
+- `App.tsx`：创建模块级 `doInterrupt()` 统一入口，同时被 SIGINT handler 和 `useInput` 字符 handler 调用；`process.exit(0)` 改为同步调用
+- `bridge.tsx`：`setTUIState('loading'/'idle')` 同步引擎状态到模块变量
+- `DeepiPromptInput.tsx`：新增 `\x03` / Ctrl+C 字符检测
+- `StatusBar.tsx`：新增 `statusMessage` prop 显示退出确认
+
+**第三轮（成功）：终端恢复顺序错误。** 第二轮修复后，Ctrl+C 双击退出功能正常，但退出后看不到之前的屏幕记录。原因是 `cleanupTerminal()` 的调用顺序不对。
+
+关键教训：Ink 的 `unmount()` 必须在替代屏幕**仍然激活时**调用（它在 alt buffer 上渲染最后一帧），然后 `detachForShutdown()` 必须在 `unmount()` **之后**调用（阻止 signal-exit 二次执行 unmount）。先恢复 raw mode 再调 unmount 是错误的——会导致 unmount 在 cooked mode 下渲染，破坏终端状态。
+
+对照 best-claude-code `gracefulShutdown.ts` 的 `cleanupTerminalModes()` 后，确认正确顺序：
+
+```
+1. DISABLE_MOUSE_TRACKING     — 先关鼠标，给终端时间处理
+2. inst.unmount()             — alt screen 还在时渲染最后一帧 + 退出 + 取消 signal-exit
+3. inst.drainStdin()          — 清掉 tree-walk 期间到达的事件
+4. inst.detachForShutdown()   — 标记已卸载 + 恢复 raw mode
+5. SHOW_CURSOR                — 显示光标
+```
+
+### 最终修复内容
 
 | 文件 | 改动 |
 |------|------|
-| `packages/cli/src/tui.ts` | `render()` 传 `{ exitOnCtrlC: false }` — **核心修复**，禁止 Ink 内部拦截 `\x03` |
-| `packages/tui/src/App.tsx` | 新增 `cleanupTerminal()`（`detachForShutdown` + writeSync 安全网）、模块级 `tuiState`/`setTUIState`、`lastInterruptTime` 去抖 |
+| `packages/cli/src/tui.ts` | `render()` 传 `{ exitOnCtrlC: false }` — 禁止 Ink 内部拦截 `\x03`；`runTUIMode()` 加 try/finally + writeSync 安全网 |
+| `packages/tui/src/App.tsx` | 模块级 `tuiState`/`exitTimer`/`exitPending`；`doInterrupt()` 统一入口（SIGINT + useInput `\x03` 双路径）；`cleanupTerminal()` 严格按 CC 顺序：mouse↓ → unmount → drainStdin → detachForShutdown → SHOW_CURSOR |
 | `packages/tui/src/bridge.tsx` | `submit()` 开始调 `setTUIState('loading')`，finally/cancel 调 `setTUIState('idle')` |
-| `packages/tui/src/DeepiPromptInput.tsx` | 新增 `\x03` / `Ctrl+C` 字符检测，raw mode 正常时字符路径直通 |
-| `packages/tui/src/StatusBar.tsx` | 新增 `statusMessage` prop，显示退出确认提示 |
-| `packages/cli/src/tui.ts` | `runTUIMode()` 加 try/finally + writeSync 安全网 |
+| `packages/tui/src/DeepiPromptInput.tsx` | 新增 `\x03` / Ctrl+C 字符检测 |
+| `packages/tui/src/StatusBar.tsx` | 新增 `statusMessage` prop |
 
 ### 中断行为
 
@@ -66,11 +98,9 @@
 
 ### 参考来源
 
-借鉴 best-claude-code（`/vol4/Agent/best-claude-code`）的 gracefulShutdown 设计理念，利用 Deepicode Ink 框架已有的 `detachForShutdown()`、`instances`、signal-exit 基础设施。
+核心清理顺序借鉴 best-claude-code `/vol4/Agent/best-claude-code/src/utils/gracefulShutdown.ts` 的 `cleanupTerminalModes()`。Deepicode Ink 框架已有的 `detachForShutdown()`、`unmount()`、`drainStdin()`、`instances`、signal-exit 基础设施全部复用。
 
 ---
-
-### 中断/退出（Ctrl+C）
 
 ### 配置更新
 

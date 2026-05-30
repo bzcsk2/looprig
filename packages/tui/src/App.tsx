@@ -28,11 +28,29 @@ let _interrupt: (() => void) | null = null;
 let _setStatusMsg: ((m: string | null) => void) | null = null;
 
 function cleanupTerminal(): void {
-  try {
-    const inst = instances.get(process.stdout);
-    if (inst) inst.detachForShutdown();
-  } catch {}
-  try { writeSync(1, EXIT_ALT_SCREEN); } catch {}
+  const inst = instances.get(process.stdout);
+
+  // 1. Disable mouse tracking FIRST — gives terminal time to process
+  //    while we're busy unmounting the React tree
+  try { writeSync(1, '\x1b[?1006l\x1b[?1003l\x1b[?1002l\x1b[?1000l'); } catch {}
+
+  // 2. Full Ink unmount — renders last frame on alt buffer, exits alt screen,
+  //    unsubscribes from signal-exit so it won't double-fire on process.exit
+  if (inst?.isAltScreenActive) {
+    try {
+      inst.unmount();
+    } catch {
+      try { writeSync(1, EXIT_ALT_SCREEN); } catch {}
+    }
+  }
+
+  // 3. Drain stdin — catches mouse/input events that arrived during tree-walk
+  try { inst?.drainStdin(); } catch {}
+
+  // 4. Mark unmounted + restore raw mode so signal-exit won't re-run unmount()
+  try { inst?.detachForShutdown(); } catch {}
+
+  // 5. Show cursor
   try { writeSync(1, SHOW_CURSOR); } catch {}
 }
 
@@ -51,8 +69,7 @@ function doInterrupt(): void {
     exitPending = true;
     _interrupt?.();
     cleanupTerminal();
-    process.exit(0); // synchronous — setTimeout is unreliable inside signal handlers
-    return;
+    process.exit(0);
   }
 
   exitTimer = setTimeout(() => { exitTimer = null; _setStatusMsg?.(null); }, 2000);
@@ -87,7 +104,6 @@ export function App({ engine, config }: AppProps) {
   const bridgeRef = useRef(bridge);
   bridgeRef.current = bridge;
   const contextTotal = config.contextWindow ?? 128_000;
-  const shuttingDown = useRef(false);
   const engineRef = useRef(engine);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -121,15 +137,14 @@ export function App({ engine, config }: AppProps) {
 
   const handleSubmit = useCallback((text: string) => {
     if (text === '/exit' || text === '/bye') {
-      shuttingDown.current = true;
+      exitPending = true;
       engineRef.current.interrupt();
       setBridgeState(prev => ({
         ...prev,
         messages: [...prev.messages, { role: 'assistant' as const, content: 'Shutting down...' }],
       }));
       cleanupTerminal();
-      setTimeout(() => process.exit(0), 100);
-      return;
+      process.exit(0);
     }
     if (text === '/help') {
       const agentList = Object.values(AGENTS).map(a => `${a.name} — ${a.label}`).join('\n');

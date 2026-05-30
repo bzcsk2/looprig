@@ -77,17 +77,8 @@
 
 ---
 
-## 第三优先：智能推理强度调节
 
-参考：**RNX** `src/loop.ts`（strategy select 内嵌逻辑）
-
-### ST1-4: Tier 配置 → TaskClassifier → ChainEstimator → StrategySelector
-
-CNY 原生计价四档位，`packages/core/src/strategy/` 目录不存在，LoopEvent 已预留 `strategy_notify` / `strategy_estimate_refined`。
-
----
-
-## 第四优先：工具层生态
+## 第三优先：工具层生态
 
 > 当前状态：8 个核心工具已实现 + registry + 安全基线。
 
@@ -104,6 +95,17 @@ CNY 原生计价四档位，`packages/core/src/strategy/` 目录不存在，Loop
 参考：**OC** `packages/opencode/src/tool/webfetch.ts`
 
 ---
+
+## 第四优先：智能推理强度调节
+
+参考：**RNX** `src/loop.ts`（strategy select 内嵌逻辑）
+
+### ST1-4: Tier 配置 → TaskClassifier → ChainEstimator → StrategySelector
+
+CNY 原生计价四档位，`packages/core/src/strategy/` 目录不存在，LoopEvent 已预留 `strategy_notify` / `strategy_estimate_refined`。
+
+---
+
 
 ## 第五优先：测试与调优
 
@@ -147,7 +149,7 @@ CNY 预估 vs DeepSeek 账单误差 < 20%。TUI 帧率 > 30fps。
 | 0 | TUI 重构（Ink框架+7组件+审计+功能增量） | 4 | ✅ |
 | 1 | 安全层（PermissionEngine + HookManager + FileSnapshot） | 3 | ✅ |
 | 2 | 壳层增强 + 多 Agent（AppState + QueryEngine + Build/Plan Agent） | 3 | ✅ |
-| 3 | 智能推理调节 | 4 | ⬜ |
-| 4 | 工具层生态（核心8工具已✅） | 3 | ⬜ |
+| 3 | 工具层生态（核心8工具已✅） | 3 | ⬜ |
+| 4 | 智能推理调节 | 4 | ⬜ |
 | 5 | 测试与调优 | 3 | ⬜ |
 | — | 旧代码清理 | 2 | ⬜ |
