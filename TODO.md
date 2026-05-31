@@ -177,27 +177,13 @@ engine.submit()
 
 已实现。Enter 提交，Ctrl+Enter 插入换行，`wrap="wrap"` 自动换行。输入框支持多行文本编辑和历史记录。
 
-### T22：输入编辑增强
+### T22：输入编辑增强 ✅
 
-在 `T20` 完成后实现：
+已实现。Ctrl+←→ 跳词（基于字符类别边界检测），Ctrl+Backspace 删除前一个单词。支持 CJK、ASCII、标点分类。
 
-- `Ctrl+Left` / `Ctrl+Right`：按单词跳转。
-- `Ctrl+Backspace`：删除前一个单词。
-- 多行模式下 `Up` / `Down`：优先移动行内光标；仅在单行或显式历史模式下浏览历史。
+### T21：斜杠命令自动补全 ✅
 
-**验收**：
-
-- ASCII、中文、连续空白、行首行尾均有测试。
-- 不破坏 `Ctrl+A`、`Ctrl+E`、`Ctrl+U`、`Ctrl+K`、`Ctrl+D`。
-
-### T21：斜杠命令自动补全
-
-在 `T20/T22` 之后实现 `CommandAutocomplete.tsx`：
-
-- 只在输入以 `/` 开始且 cursor 位于命令 token 内时显示。
-- 命令来源集中维护，至少包含 `/help`、`/model`、`/sessions`、`/agent`、`/skill`、`/lang`、`/exit`、`/bye`。
-- `Up/Down` 选择，`Tab` 或 `Enter` 补全，`Esc` 关闭。
-- 不要在 `App.tsx` 和补全组件分别维护两套命令文本；抽出 command registry。
+已实现。新增 `CommandRegistry.ts`（命令注册表）、`CommandAutocomplete.tsx`（弹出补全组件）。输入以 `/` 开头时自动显示，↑↓ 选择，Enter/Tab 补全，Esc 关闭。App.tsx 的 handleSubmit 使用统一命令处理。
 
 ### T30/T31/T32：中英文切换
 

@@ -13,6 +13,7 @@ import { isFullscreenEnvEnabled } from './fullscreen.js';
 import { ModelPicker } from './ModelPicker.js';
 import { SessionPicker } from './SessionPicker.js';
 import { PermissionPrompt } from './PermissionPrompt.js';
+import { CommandAutocomplete } from './CommandAutocomplete.js';
 
 // ---- Module-level interrupt state (shared by SIGINT handler + useInput \x03 handler) ----
 
@@ -148,11 +149,14 @@ export function App({ engine, config }: AppProps) {
 
   const [activeProvider, setActiveProvider] = useState(config.provider ?? 'zen');
   const [activeModel, setActiveModel] = useState(config.model);
+  const [inputText, setInputText] = useState('');
+  const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showSessionPicker, setShowSessionPicker] = useState(false);
   const [activeAgent, setActiveAgent] = useState(engine.getAgentName?.() ?? 'build');
 
   const handleSubmit = useCallback((text: string) => {
+    setShowAutocomplete(false);
     if (text === '/exit' || text === '/bye') {
       exitPending = true;
       engineRef.current.interrupt();
@@ -294,8 +298,19 @@ export function App({ engine, config }: AppProps) {
 
   const bottomContent = (
     <Box flexDirection="column" width="100%">
+      {showAutocomplete && (
+        <CommandAutocomplete
+          query={inputText}
+          onSelect={(cmd) => { setInputText(cmd + ' '); setShowAutocomplete(false); }}
+          onClose={() => setShowAutocomplete(false)}
+        />
+      )}
       <DeepiPromptInput
         onSubmit={handleSubmit}
+        onChange={(text) => {
+          setInputText(text);
+          setShowAutocomplete(text.startsWith('/') && !text.includes(' '));
+        }}
         isLoading={bridgeState.isLoading}
         disabled={!!bridgeState.permissionPrompt}
         queueCount={bridgeState.messageQueue.length}

@@ -1,8 +1,9 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Box, Text, useInput } from '@deepicode/ink';
 
 interface DeepiPromptInputProps {
   onSubmit: (text: string) => void;
+  onChange?: (text: string) => void;
   isLoading: boolean;
   disabled?: boolean;
   queueCount?: number;
@@ -11,12 +12,49 @@ interface DeepiPromptInputProps {
 
 const MAX_HISTORY = 100;
 
-export function DeepiPromptInput({ onSubmit, isLoading, disabled, queueCount = 0, onCancel }: DeepiPromptInputProps) {
+/** Classify a character into a word class for boundary detection. */
+function charClass(ch: string): number {
+  if (!ch) return 0;
+  const code = ch.codePointAt(0)!;
+  if (code <= 32) return 1; // space/control
+  if (code >= 0x4E00 && code <= 0x9FFF) return 2; // CJK
+  if (code >= 0x3000 && code <= 0x303F) return 3; // CJK punctuation
+  if (/[a-zA-Z0-9_]/.test(ch)) return 4; // word chars
+  return 5; // other punctuation
+}
+
+/** Find the position of the previous word boundary (for Ctrl+Left / Ctrl+Backspace). */
+function findWordLeft(text: string, pos: number): number {
+  if (pos <= 0) return 0;
+  // Skip spaces
+  let i = pos - 1;
+  while (i > 0 && charClass(text[i]) === 1) i--;
+  // Skip word chars of the same class
+  const cls = charClass(text[i]);
+  while (i > 0 && charClass(text[i - 1]) === cls) i--;
+  return i;
+}
+
+/** Find the position of the next word boundary (for Ctrl+Right). */
+function findWordRight(text: string, pos: number): number {
+  if (pos >= text.length) return text.length;
+  // Skip word chars of the same class
+  let i = pos;
+  const cls = charClass(text[i]);
+  while (i < text.length && charClass(text[i]) === cls) i++;
+  // Skip spaces
+  while (i < text.length && charClass(text[i]) === 1) i++;
+  return i;
+}
+
+export function DeepiPromptInput({ onSubmit, onChange, isLoading, disabled, queueCount = 0, onCancel }: DeepiPromptInputProps) {
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState(-1);
   const [cursor, setCursor] = useState(0);
   const escRef = useRef(0);
+
+  useEffect(() => { onChange?.(input); }, [input, onChange]);
 
   const submitLine = useCallback(() => {
     const text = input.trim();
@@ -104,6 +142,29 @@ export function DeepiPromptInput({ onSubmit, isLoading, disabled, queueCount = 0
 
     if (key.rightArrow) {
       setCursor(prev => Math.min(input.length, prev + 1));
+      return;
+    }
+
+    // Ctrl+Left: jump to previous word boundary
+    if (key.leftArrow && key.ctrl) {
+      setCursor(prev => findWordLeft(input, prev));
+      return;
+    }
+
+    // Ctrl+Right: jump to next word boundary
+    if (key.rightArrow && key.ctrl) {
+      setCursor(prev => findWordRight(input, prev));
+      return;
+    }
+
+    // Ctrl+Backspace: delete previous word
+    if (key.backspace && key.ctrl) {
+      const pos = cursor;
+      const newCursor = findWordLeft(input, pos);
+      if (newCursor < pos) {
+        setInput(prev => prev.slice(0, newCursor) + prev.slice(pos));
+        setCursor(newCursor);
+      }
       return;
     }
 
