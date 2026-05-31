@@ -2,11 +2,13 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Box, Text, AlternateScreen, instances, SHOW_CURSOR, EXIT_ALT_SCREEN, useInput } from '@deepicode/ink';
 import { writeSync } from 'node:fs';
 import type { ReasonixEngine } from '@deepicode/core';
-import type { ChatMessage, DeepicodeConfig } from '@deepicode/core';
+import type { DeepicodeConfig } from '@deepicode/core';
 import { PROVIDERS, AGENTS, saveLastConfig } from '@deepicode/core';
-import { createBridge, timelineFromMessages, type BridgeState } from './bridge.js';
+import { createBridge, type BridgeState } from './bridge.js';
 import { DeepiMessages } from './DeepiMessages.js';
 import { DeepiPromptInput } from './DeepiPromptInput.js';
+import { ToolCallBanner } from './ToolCallBanner.js';
+import { Spinner } from './Spinner.js';
 import { StatusBar } from './StatusBar.js';
 import { FullscreenLayout } from './FullscreenLayout.js';
 import { isFullscreenEnvEnabled } from './fullscreen.js';
@@ -77,8 +79,12 @@ function doInterrupt(): void {
 }
 
 const initialState: BridgeState = {
-  timeline: [],
+  messages: [],
   isLoading: false,
+  streamingText: null,
+  reasoningText: null,
+  activeTools: new Map(),
+  toolHistory: [],
   messageQueue: [],
   tokens: { input: 0, output: 0, cacheHit: 0, cacheMiss: 0 },
   contextUsage: 0,
@@ -105,16 +111,6 @@ export function App({ engine, config }: AppProps) {
   const contextTotal = config.contextWindow ?? 128_000;
   const engineRef = useRef(engine);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const appendMessage = useCallback((message: ChatMessage) => {
-    setBridgeState(prev => ({
-      ...prev,
-      timeline: [...prev.timeline, {
-        id: `message-${crypto.randomUUID()}`,
-        kind: 'message',
-        message,
-      }],
-    }));
-  }, []);
 
   // Wire module-level callbacks for doInterrupt()
   _cancel = () => bridgeRef.current.cancel();
@@ -149,16 +145,22 @@ export function App({ engine, config }: AppProps) {
     if (text === '/exit' || text === '/bye') {
       exitPending = true;
       engineRef.current.interrupt();
-      appendMessage({ role: 'assistant' as const, content: 'Shutting down...' });
+      setBridgeState(prev => ({
+        ...prev,
+        messages: [...prev.messages, { role: 'assistant' as const, content: 'Shutting down...' }],
+      }));
       cleanupTerminal();
       process.exit(0);
     }
     if (text === '/help') {
       const agentList = Object.values(AGENTS).map(a => `${a.name} — ${a.label}`).join('\n');
-      appendMessage({
-        role: 'assistant' as const,
-        content: `Commands:\n  /exit, /bye  — exit\n  /help        — show this\n  /model       — switch provider/model\n  /sessions    — browse & resume past sessions\n  /agent       — switch agent\n  /skill       — list loaded skills\n\nAgents:\n${agentList}\n\nCurrent: ${AGENTS[activeAgent]?.label ?? activeAgent}`,
-      });
+      setBridgeState(prev => ({
+        ...prev,
+        messages: [...prev.messages, {
+          role: 'assistant' as const,
+          content: `Commands:\n  /exit, /bye  — exit\n  /help        — show this\n  /model       — switch provider/model\n  /sessions    — browse & resume past sessions\n  /agent       — switch agent\n  /skill       — list loaded skills\n\nAgents:\n${agentList}\n\nCurrent: ${AGENTS[activeAgent]?.label ?? activeAgent}`,
+        }],
+      }));
       return;
     }
     if (text === '/model') {
@@ -175,10 +177,10 @@ export function App({ engine, config }: AppProps) {
         const result = await tool.execute({ command: "list" }, { cwd: process.cwd(), sessionId: "" })
         let msg: string
         try { const d = JSON.parse(result.content); msg = `Loaded ${d.count} skills.\n${d.skills.slice(0, 20).map((s: any) => `  ${s.name} — ${s.description}`).join("\n")}${d.count > 20 ? `\n  ... and ${d.count - 20} more` : ""}` } catch { msg = result.content }
-        appendMessage({ role: 'assistant' as const, content: msg })
+        setBridgeState(prev => ({ ...prev, messages: [...prev.messages, { role: 'assistant' as const, content: msg }] }))
       }).catch(e => {
         const msg = e instanceof Error ? e.message : String(e)
-        appendMessage({ role: 'assistant' as const, content: `Failed to load skills: ${msg}` })
+        setBridgeState(prev => ({ ...prev, messages: [...prev.messages, { role: 'assistant' as const, content: `Failed to load skills: ${msg}` }] }))
       })
       return
     }
@@ -186,11 +188,14 @@ export function App({ engine, config }: AppProps) {
       const next = activeAgent === 'build' ? 'plan' : 'build';
       const label = engineRef.current.switchAgent(next);
       setActiveAgent(next);
-      appendMessage({ role: 'assistant' as const, content: `Switched to ${label}` });
+      setBridgeState(prev => ({
+        ...prev,
+        messages: [...prev.messages, { role: 'assistant' as const, content: `Switched to ${label}` }],
+      }));
       return;
     }
     bridge.submit(text);
-  }, [activeAgent, appendMessage, bridge]);
+  }, [bridge]);
 
   const handleModelSelect = useCallback((sel: { provider: string; model: string; apiKey: string; baseUrl: string }) => {
     engineRef.current.updateConfig({
@@ -203,8 +208,11 @@ export function App({ engine, config }: AppProps) {
     setActiveModel(sel.model);
     saveLastConfig({ provider: sel.provider, model: sel.model, baseUrl: sel.baseUrl });
     setShowModelPicker(false);
-    appendMessage({ role: 'assistant' as const, content: `Switched to ${PROVIDERS[sel.provider]?.label ?? sel.provider} / ${sel.model}` });
-  }, [appendMessage]);
+    setBridgeState(prev => ({
+      ...prev,
+      messages: [...prev.messages, { role: 'assistant' as const, content: `Switched to ${PROVIDERS[sel.provider]?.label ?? sel.provider} / ${sel.model}` }],
+    }));
+  }, []);
 
   const handleModelCancel = useCallback(() => {
     setShowModelPicker(false);
@@ -217,10 +225,13 @@ export function App({ engine, config }: AppProps) {
     // Reset bridge state with recovered messages
     setBridgeState({
       ...initialState,
-      timeline: timelineFromMessages(msgs),
+      messages: msgs,
     });
-    appendMessage({ role: 'assistant' as const, content: `Resumed session ${sessionId.slice(0, 8)}... (${msgs.length} messages)` });
-  }, [appendMessage]);
+    setBridgeState(prev => ({
+      ...prev,
+      messages: [...prev.messages, { role: 'assistant' as const, content: `Resumed session ${sessionId.slice(0, 8)}... (${msgs.length} messages)` }],
+    }));
+  }, []);
 
   const handleSessionCancel = useCallback(() => {
     setShowSessionPicker(false);
@@ -260,9 +271,16 @@ export function App({ engine, config }: AppProps) {
   const scrollableContent = (
     <>
       <DeepiMessages
-        timeline={bridgeState.timeline}
+        messages={bridgeState.messages}
+        activeTools={bridgeState.activeTools}
+        toolHistory={bridgeState.toolHistory}
+        isLoading={bridgeState.isLoading}
+        streamingText={bridgeState.streamingText}
+        reasoningText={bridgeState.reasoningText}
         scrollRef={scrollRef}
       />
+      <ToolCallBanner activeTools={bridgeState.activeTools} />
+      <Spinner loading={bridgeState.isLoading} message={bridgeState.isLoading ? 'thinking...' : undefined} />
       {bridgeState.warnings.map((w, i) => (
         <Box key={i} paddingX={1}>
           <Text color="warning">⚠ {w}</Text>

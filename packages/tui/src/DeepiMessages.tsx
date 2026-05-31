@@ -1,205 +1,171 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from '@deepicode/ink';
 import type { ChatMessage } from '@deepicode/core';
-import type { ToolStatus, ToolCallRecord } from './bridge.js';
+import type { TimelineItem, ToolStatus, TurnView } from './bridge.js';
 import { Markdown } from './MarkdownRenderer.js';
+import { Card } from './reasonix/Card.js';
+import { CardHeader } from './reasonix/CardHeader.js';
+import { Spinner } from './reasonix/Spinner.js';
+import { ToolCard, type ToolCardData } from './reasonix/ToolCard.js';
+import { FG, SURFACE, TONE } from './reasonix/tokens.js';
 
 interface DeepiMessagesProps {
-  messages: ChatMessage[];
-  activeTools: Map<string, ToolStatus>;
-  toolHistory: ToolCallRecord[];
-  isLoading: boolean;
-  streamingText: string | null;
-  reasoningText?: string | null;
+  timeline: TimelineItem[];
   scrollRef?: React.RefObject<any>;
 }
 
-const MAX_LINES = 3;
-
-function formatToolOutput(tc: ToolCallRecord): { header: string; body: string } {
+function formatToolOutput(tool: ToolStatus): string {
   let parsed: Record<string, unknown> | null = null;
-  try { parsed = JSON.parse(tc.output); } catch {}
+  try { parsed = JSON.parse(tool.output); } catch {}
 
-  if (tc.name === 'bash' || tc.name === 'shell' || tc.name === 'shell_exec') {
+  if (tool.name === 'bash' || tool.name === 'shell' || tool.name === 'shell_exec') {
     if (parsed) {
       const stdout = String(parsed.stdout ?? '');
       const stderr = String(parsed.stderr ?? '');
-      return { header: tc.command ? `$ ${tc.command}` : tc.name, body: stdout + (stderr.trim() ? '\n' + stderr : '') };
+      return stdout + (stderr.trim() ? `\n${stderr}` : '');
     }
-    return { header: tc.name, body: tc.output };
+    return tool.output;
   }
 
-  if (tc.name === 'list_dir' && parsed) {
+  if (tool.name === 'list_dir' && parsed) {
     const items = parsed.items as Array<Record<string, unknown>> | undefined;
     if (Array.isArray(items)) {
-      const list = items.map(item => {
-        const name = String(item.name ?? '');
-        return item.type === 'dir' ? `${name}/` : name;
-      }).join('\n');
-      return { header: `ls ${parsed.path ?? '.'}`, body: list };
+      return items.map(item => item.type === 'dir' ? `${String(item.name ?? '')}/` : String(item.name ?? '')).join('\n');
     }
   }
 
   if (parsed) {
     const msg = parsed.message ?? parsed.error ?? parsed.content;
-    if (typeof msg === 'string') return { header: tc.name, body: msg };
-    return { header: tc.name, body: JSON.stringify(parsed, null, 2) };
+    if (typeof msg === 'string') return msg;
+    return JSON.stringify(parsed, null, 2);
   }
 
-  return { header: tc.name, body: tc.output };
+  return tool.output;
 }
 
-function formatActiveTool(tool: ToolStatus): string {
-  const isBash = tool.name === 'bash' || tool.name === 'shell' || tool.name === 'shell_exec';
-  if (isBash && tool.args?.command) return `$ ${tool.args.command}`;
-  if (tool.args) {
-    const keys = Object.keys(tool.args);
-    if (keys.length <= 2) return `${tool.name} ${keys.map(k => `${k}=${JSON.stringify(tool.args![k])}`).join(' ')}`;
-  }
-  return tool.name;
-}
-
-function ThinkingBubble({ text, isOpen }: { text: string; isOpen: boolean }) {
-  return (
-    <Box backgroundColor="reasoningBackground" paddingX={1} paddingY={1} marginBottom={1} flexDirection="column">
-      <Box flexDirection="row">
-        <Text color="warning">{isOpen ? '\u25BC' : '\u25B6'}</Text>
-        <Box marginLeft={1}>
-          <Text bold color="warning">Thinking</Text>
-        </Box>
-      </Box>
-      {isOpen ? (
-        <Box marginTop={1} paddingLeft={2}>
-          <Text dimColor color="warning" wrap="wrap">{text}</Text>
-        </Box>
-      ) : (
-        <Box paddingLeft={2} marginTop={1}>
-          <Text dimColor>ctrl+o open</Text>
-        </Box>
-      )}
-    </Box>
-  );
-}
-
-function ToolUseBubble({ activeTools, toolHistory, isOpen }: {
-  activeTools: Map<string, ToolStatus>;
-  toolHistory: ToolCallRecord[];
-  isOpen: boolean;
-}) {
-  const hasContent = activeTools.size > 0 || toolHistory.length > 0;
-  if (!hasContent) return null;
-
-  // Collect all commands (running + completed)
-  const commands: { text: string; isError?: boolean }[] = [];
-
-  // Running tools
-  Array.from(activeTools.values()).forEach(tool => {
-    commands.push({ text: formatActiveTool(tool) });
-  });
-
-  // Completed tools: show command only (skip successful results, show errors)
-  toolHistory.forEach(tc => {
-    if (tc.isError) {
-      // Show error output
-      const { header, body } = formatToolOutput(tc);
-      commands.push({ text: header, isError: true });
-      if (body) commands.push({ text: body, isError: true });
-    } else {
-      // Show command only
-      const { header } = formatToolOutput(tc);
-      commands.push({ text: header });
-    }
-  });
-
-  return (
-    <Box backgroundColor="reasoningBackground" paddingX={1} paddingY={1} marginBottom={1} flexDirection="column">
-      <Box flexDirection="row">
-        <Text color="warning">{isOpen ? '\u25BC' : '\u25B6'}</Text>
-        <Box marginLeft={1}>
-          <Text bold color="warning">Tool use</Text>
-        </Box>
-      </Box>
-      {isOpen ? (
-        <Box marginTop={1} flexDirection="column">
-          {commands.map((cmd, i) => (
-            <Box key={i} paddingLeft={1}>
-              <Text wrap="wrap" color={cmd.isError ? 'error' : undefined}>{cmd.text}</Text>
-            </Box>
-          ))}
-        </Box>
-      ) : (
-        <Box paddingLeft={2} marginTop={1}>
-          <Text dimColor>ctrl+o open</Text>
-        </Box>
-      )}
-    </Box>
-  );
-}
-
-function MessageContent({ text, isStreaming = false }: { text: string; isStreaming?: boolean }) {
+function MessageContent({ text }: { text: string }) {
   if (!text) return null;
-  if (isStreaming) return <Text wrap="wrap">{text}</Text>;
-  return <Markdown>{text}</Markdown>;
+  return <Markdown text={text} />;
 }
 
-export function DeepiMessages({ messages, activeTools, toolHistory, isLoading, streamingText, reasoningText }: DeepiMessagesProps) {
-  const [openSection, setOpenSection] = useState<'thinking' | 'tools' | null>(null);
+function ReasoningCard({ text, isOpen }: { text: string; isOpen: boolean }) {
+  return (
+    <Card>
+      <CardHeader
+        glyph={isOpen ? '\u25BC' : '\u25B6'}
+        tone={TONE.accent}
+        title="Thinking"
+        right={!isOpen ? <Text dimColor>ctrl+o</Text> : undefined}
+      />
+      {isOpen && (
+        <Box marginTop={1} paddingLeft={2}>
+          <Text color={FG.sub} wrap="wrap">{text}</Text>
+        </Box>
+      )}
+    </Card>
+  );
+}
 
-  useInput((_input, key) => {
-    if (_input === '\x0f' || (key.ctrl && _input === 'o')) {
-      setOpenSection(prev => prev === 'thinking' ? null : 'thinking');
+function ToolUseSection({ tools, isOpen }: { tools: ToolStatus[]; isOpen: boolean }) {
+  if (tools.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader
+        glyph={isOpen ? '\u25BC' : '\u25B6'}
+        tone={TONE.brand}
+        title="Tool use"
+        meta={[`${tools.length}`]}
+        right={!isOpen ? <Text dimColor>ctrl+o</Text> : undefined}
+      />
+      {isOpen && (
+        <Box flexDirection="column" paddingLeft={2}>
+          {tools.map(tool => {
+            const card: ToolCardData = {
+              id: tool.key,
+              name: tool.name,
+              args: tool.args,
+              output: tool.status === 'error' ? formatToolOutput(tool) : '',
+              exitCode: tool.status === 'error' ? 1 : tool.status === 'done' ? 0 : undefined,
+              done: tool.status !== 'running',
+              elapsedMs: tool.elapsedMs,
+            };
+            return <ToolCard key={tool.key} card={card} isInflight={tool.status === 'running'} />;
+          })}
+        </Box>
+      )}
+    </Card>
+  );
+}
+
+function PlainMessage({ message }: { message: ChatMessage }) {
+  if (message.role === 'user') {
+    return (
+      <Card>
+        <Box flexDirection="column" backgroundColor={SURFACE.bgElev} paddingX={1} paddingY={1}>
+          <CardHeader glyph="\u25C7" tone={TONE.brand} title="You" />
+          <Box paddingLeft={1}><MessageContent text={message.content ?? ''} /></Box>
+        </Box>
+      </Card>
+    );
+  }
+  if (message.role === 'assistant') {
+    return (
+      <Card>
+        <CardHeader glyph="\u25CF" tone={TONE.ok} title="Assistant" />
+        <Box paddingLeft={1}><MessageContent text={message.content ?? ''} /></Box>
+      </Card>
+    );
+  }
+  return null;
+}
+
+function Turn({ turn, detailsOpen }: { turn: TurnView; detailsOpen: boolean }) {
+  const showDetails = turn.isLoading || detailsOpen;
+  return (
+    <Box flexDirection="column">
+      <PlainMessage message={{ role: 'user', content: turn.userText }} />
+      {turn.reasoningText && <ReasoningCard text={turn.reasoningText} isOpen={showDetails} />}
+      <ToolUseSection tools={turn.tools} isOpen={showDetails} />
+      {(turn.streamingText !== null || turn.assistantText) && (
+        <Card>
+          <CardHeader
+            glyph="\u25CF"
+            tone={TONE.ok}
+            title="Assistant"
+            right={turn.streamingText !== null ? <Spinner kind="braille" color={TONE.brand} bold /> : undefined}
+          />
+          <Box paddingLeft={1}>
+            {turn.streamingText !== null
+              ? <Text wrap="wrap">{turn.streamingText}<Text color={TONE.ok}>{'\u258A'}</Text></Text>
+              : <MessageContent text={turn.assistantText} />}
+          </Box>
+        </Card>
+      )}
+      {turn.isLoading && turn.streamingText === null && !turn.reasoningText && turn.tools.length === 0 && (
+        <Box>
+          <Spinner kind="braille" color={TONE.brand} bold />
+          <Text color={FG.sub}> thinking...</Text>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
+export function DeepiMessages({ timeline }: DeepiMessagesProps) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  useInput((input, key) => {
+    if (input === '\x0f' || (key.ctrl && input === 'o')) {
+      setDetailsOpen(prev => !prev);
     }
   });
 
   return (
     <Box flexDirection="column" width="100%" paddingX={1}>
-      {messages.map((msg, i) => {
-        const key = msg.role + i;
-        const isLast = i === messages.length - 1;
-
-        if (msg.role === 'user') {
-          return (
-            <Box key={key} backgroundColor="userMessageBackground" paddingX={1} paddingY={1} marginBottom={1} flexDirection="column">
-              <Box marginBottom={1}>
-                <Text bold color="briefLabelYou">You</Text>
-              </Box>
-              <MessageContent text={msg.content ?? ''} />
-            </Box>
-          );
-        }
-
-        if (msg.role === 'assistant') {
-          const hasThinking = isLast && !!reasoningText;
-          const hasTools = isLast && (activeTools.size > 0 || toolHistory.length > 0);
-          const showText = isLast ? (streamingText !== null || msg.content) : msg.content;
-
-          return (
-            <Box key={key} flexDirection="column">
-              {hasThinking && <ThinkingBubble text={reasoningText!} isOpen={openSection === 'thinking'} />}
-              {hasTools && <ToolUseBubble activeTools={activeTools} toolHistory={toolHistory} isOpen={openSection === 'tools'} />}
-              {showText && (
-                <Box paddingX={1} marginBottom={1}>
-                  {isLast && streamingText !== null ? (
-                    <Box>
-                      <Text wrap="wrap">{streamingText}</Text>
-                      <Text color="success">{'\u258A'}</Text>
-                    </Box>
-                  ) : (
-                    <MessageContent text={msg.content ?? ''} />
-                  )}
-                </Box>
-              )}
-            </Box>
-          );
-        }
-
-        return null;
-      })}
-
-      {isLoading && activeTools.size === 0 && toolHistory.length === 0 && !reasoningText && (
-        <Box>
-          <Text color="success">{'\u280B'} \u601D\u8003\u4E2D...</Text>
-        </Box>
+      {timeline.map(item =>
+        item.kind === 'message'
+          ? <PlainMessage key={item.id} message={item.message} />
+          : <Turn key={item.id} turn={item.turn} detailsOpen={detailsOpen} />
       )}
     </Box>
   );

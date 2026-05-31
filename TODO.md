@@ -1,81 +1,76 @@
 # Deepicode TODO
 
 本文只记录**待完成**工作。已完成项见 `DONE.md`。
-
+- deepicode-project：重要原则 — 能直接用 Claude Code 的代码就不要自己写
 > **关联文档**：[实施计划](Deepicode实施计划.md) | [ADVICE](ADVICE.md) | [DONE](DONE.md)
 
 
 ---
-## 一、TUI 界面重构
+## 一、TUI 界面重构（当前重点）
 
-整体设计：键盘快捷键驱动，鼠标仅用于终端文本选择。参考 Claude Code TUI 设计。
+整体设计：键盘快捷键驱动，鼠标仅用于终端文本选择。**显示框架对齐 Reasonix**，后端保留 deepicode 的 LoopEvent + bridge 架构。
 
-### Phase 1：气泡消息 + 主题扩展 + 可折叠思考 ✅
+### 当前 TUI 架构（2026-05-31）
 
-| # | 内容 | 涉及文件 | 状态 |
-|---|------|---------|------|
-| T1 | 新增主题键 `assistantMessageBackground`, `codeBlockBackground`, `reasoningBackground`（6 个主题） | `packages/ink/src/theme/theme-types.ts` | ✅ |
-| T2 | 禁用鼠标点击交互，移除 mouseTracking | `packages/tui/src/App.tsx`, `packages/ink/src/components/AlternateScreen.tsx` | ✅ |
-| T3 | 气泡消息：用户/助手不同背景色 + 角色标签 | `packages/tui/src/DeepiMessages.tsx` | ✅ |
-| T4 | 代码块渲染：检测 ``` 围栏，codeBlockBackground 背景 | `packages/tui/src/DeepiMessages.tsx` | ✅ |
-| T5 | 可折叠思考过程：Ctrl+O 切换，▶/▼ 指示器，折叠态显示 "ctrl+o open" | `packages/tui/src/DeepiMessages.tsx` | ✅ |
-| T5a | 思考内容回答后自动折叠修复：`finally` 块中保留 `reasoningText` 不清空；思考区块移至最后一条 assistant 消息上方（独立气泡） | `packages/tui/src/bridge.tsx`, `DeepiMessages.tsx` | ✅ |
-| T5b | Ctrl+O 在输入框中被拦截，防止插入为普通字符 | `packages/tui/src/DeepiPromptInput.tsx` | ✅ |
-| T5c | Assistant 回答消失修复：`assistant_final` 闭包引用 Bug——React 批处理时更新器读到已清空的变量，改为 const 局部变量保存引用 | `packages/tui/src/bridge.tsx` | ✅ |
+```
+engine.submit() → LoopEvent(15种) → bridge.tsx(事件→React状态) → DeepiMessages → Reasonix组件渲染
+```
+
+**后端不变**：`engine.ts`、`loop.ts`、`LoopEvent`、`bridge.tsx`（事件→状态映射）
+**前端已替换**：显示层全部使用 Reasonix 的组件（Markdown/Card/CardHeader/Spinner/ToolCard）
+
+### 剩余功能
+
+| # | 内容 | 优先级 | 说明 |
+|---|------|--------|------|
+| F3 | 流式输出无 token 速率显示 | P2 | Reasonix StreamingCard 有 t/s 显示 |
+| F5 | 无 `StreamingCard`（流式输出卡片） | P2 | Reasonix 有专用流式组件 |
+
+#### 架构差异（Reasonix vs Deepicode）
+
+| 维度 | Reasonix | Deepicode 现状 | 差距 |
+|------|----------|---------------|------|
+| 数据模型 | `Card[]`（18 种 Card 类型） | 轻量 `TimelineItem[] + TurnView` | 中 |
+| 事件转换 | `TurnTranslator`（有状态桥接） | `bridge.tsx`（直接 setState） | 中 |
+| 状态管理 | `Store`（dispatch + reduce + subscribe） | `useState<BridgeState>` | 中 |
+| 渲染 | `CardRenderer` 按 Card 类型分发 | `DeepiMessages` 一个组件处理所有 | 中 |
+
+**决定**：保持 deepicode 的后端架构不变，只替换显示层组件。不重构 Card/Store/TurnTranslator。
 
 ### Phase 2：多行输入 + 斜杠命令补全
 
 | # | 内容 | 涉及文件 | 状态 |
 |---|------|---------|------|
-| T6 | 多行输入：Ctrl+Enter 提交，Enter 换行，光标位置重构 | `packages/tui/src/DeepiPromptInput.tsx` | ⬜ |
-| T7 | 斜杠命令自动补全弹出窗口 | `packages/tui/src/CommandAutocomplete.tsx` (新) | ⬜ |
-| T8 | 光标/编辑体验增强（Ctrl+←→ 跳词，Ctrl+Backspace 删词） | `packages/tui/src/DeepiPromptInput.tsx` | ⬜ |
+| T20 | 多行输入：Ctrl+Enter 提交，Enter 换行 | `DeepiPromptInput.tsx` | ⬜ |
+| T21 | 斜杠命令自动补全弹出窗口 | `CommandAutocomplete.tsx` (新) | ⬜ |
+| T22 | 光标/编辑体验增强（Ctrl+←→ 跳词，Ctrl+Backspace 删词） | `DeepiPromptInput.tsx` | ⬜ |
 
 ### Phase 3：中英文切换
 
 | # | 内容 | 涉及文件 | 状态 |
 |---|------|---------|------|
-| T9 | i18n 基础设施（t() 函数，zh-CN/en JSON） | `packages/tui/src/i18n/` (新) | ⬜ |
-| T10 | 替换所有硬编码字符串（~30-40 处） | 所有 TUI 组件 | ⬜ |
-| T11 | `/lang` 命令切换语言 | `packages/tui/src/App.tsx` | ⬜ |
+| T30 | i18n 基础设施（t() 函数，zh-CN/en JSON） | `packages/tui/src/i18n/` (新) | ⬜ |
+| T31 | 替换所有硬编码字符串（~30-40 处） | 所有 TUI 组件 | ⬜ |
+| T32 | `/lang` 命令切换语言 | `packages/tui/src/App.tsx` | ⬜ |
 
 ### Phase 4：消息渲染增强
 
 | # | 内容 | 涉及文件 | 状态 |
 |---|------|---------|------|
-| T12 | 代码块语法高亮 | `packages/tui/src/HighlightedCode.tsx` (新) | ⬜ |
-| T13 | 虚拟消息列表（长会话性能） | `packages/tui/src/VirtualMessageList.tsx` (新) | ⬜ |
-| T14 | 消息搜索（Ctrl+F） | `packages/tui/src/SearchOverlay.tsx` (新) | ⬜ |
+| T40 | 虚拟消息列表（长会话性能） | `VirtualMessageList.tsx` (新) | ⬜ |
+| T41 | 消息搜索（Ctrl+F） | `SearchOverlay.tsx` (新) | ⬜ |
 
 ---
 
-### Existing: Bash 确认 UI ✅
-
-**已完成**：
-- `permission.ts`：exec tier → `"ask"`，deny 规则先拦截危险命令
-- `engine.ts`：`pendingPermission` + `respondPermission(allow, alwaysAllow?)` + `requestPermission` callback
-- `streaming-executor.ts`：权限"ask"逻辑移到 `executeToolCall`（async generator），yield `permission_ask` 事件 + await 用户响应
-- `interface.ts`：新增 `permission_ask` role
-- `bridge.tsx`：`permissionPrompt: { toolName, args }` 结构化对象，`permission_ask` → 设置提示
-- `App.tsx`：渲染 `PermissionPrompt` 组件，方向键选择+回车确认，权限期间禁用输入框
-- `PermissionPrompt.tsx`：↑↓ 导航，Enter/Esc 确认，三选项（允许/始终允许/拒绝），圆角边框+命令详情
-- `engine.ts`：`respondPermission(allow, alwaysAllow?)` — 始终允许时自动添加 AllowRule
-
----
 ## 二、Bug 修复（来自 ADVICE）
 
 | # | 问题 | 位置 | 优先级 |
 |---|------|------|--------|
-| B6 | SessionLoader 恢复时系统消息重复 | `core/src/session.ts` | P1 |
-| B5 | repair.ts 1e+1f 组合策略缺失 | `core/src/context/repair.ts` | P2 |
 | L2 | SessionWriter 队列无界增长 | `core/src/session.ts:114-142` | P2 |
 | L5 | fuzzy-edit/hash-edit 未归一化 CRLF | `tools/src/fuzzy-edit.ts`, `hash-edit.ts` | P2 |
-| L9 | reasoningText 消失导致布局跳动 | `tui/src/bridge.tsx:180-189` | P2 | ✅ 已修复：`finally` 块不再清空 `reasoningText`，改为保留 |
-| L10 | Assistant 回答完成后内容消失 | `tui/src/bridge.tsx` `assistant_final` | P1 | ✅ 已修复：闭包引用 Bug——React 批处理时更新器读到已清空的变量，改为 const 局部变量保存 |
 | — | notebook-edit 同步文件操作 → 异步 + 原子写入 | `tools/src/notebook-edit.ts` | P2 |
 | — | /skill 跨包相对路径 import → package alias | `tui/src/App.tsx:171` | P2 |
 | — | handleSessionSelect 卸载后 setState | `tui/src/App.tsx:217-230` | P3 |
-| Q10 | tool_start key fallback 不一致 | `tui/src/bridge.tsx:83,95,111` | P3 |
 | — | tool_call_id 规范化（跨 provider） | `core/src/loop.ts` | P3 |
 | — | client.ts 3 处 any/as 类型断言 | `core/src/client.ts` | P3 |
 
@@ -95,7 +90,7 @@
 
 ---
 
-## 五、测试待完成（来自 TEST.md）
+## 四、测试待完成（来自 TEST.md）
 
 ### 🟡 中等（1 项进行中）
 
@@ -133,7 +128,7 @@
 
 ---
 
-## 六、暂缓
+## 五、暂缓
 
 - TTSR 规则系统
 - Universal Config Discovery
@@ -143,21 +138,3 @@
 - E2E 测试覆盖 TUI 流程
 - 长会话压测（50+ 轮）
 - README / 配置指南 / 发布包
-
----
-
-## 进度总览
-
-| 内容 | 状态 |
-|------|------|
-| Phase 0-5 全部 + 安全层 + 壳层 + 多 Agent + 30+ 工具 + Skills + MCP | ✅ DONE.md |
-| ADVICE 审计修复 38 项 + P0-P3 批量修复 32 项 | ✅ DONE.md |
-| TT1-TT3 测试 | ✅ DONE.md |
-| TUI Phase 1（气泡 + 主题 + 可折叠思考 + 思考持久化 + 回答消失修复） | ✅ |
-| TUI 权限确认 UI（方向键选择 + 始终允许 + 结构化状态） | ✅ |
-| TUI Phase 2（多行输入 + 命令补全） | ⬜ |
-| TUI Phase 3（中英文切换） | ⬜ |
-| TUI Phase 4（语法高亮 + 虚拟列表 + 搜索） | ⬜ |
-| Bug 修复（B5/B6 等 11 项） | ⬜ |
-| Phase 2 智能推理调节（ST1-4） | ⬜ |
-| Phase 6/7 剩余 | ⬜ |

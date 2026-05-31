@@ -1,33 +1,52 @@
-import type { ReasonixEngine } from '@deepicode/core';
-import type { ChatMessage } from '@deepicode/core';
+import type { ChatMessage, ReasonixEngine } from '@deepicode/core';
 import { setTUIState } from './App.js';
 
 export interface ToolStatus {
+  key: string;
   name: string;
   status: 'running' | 'done' | 'error';
-  args?: Record<string, unknown>;
-  output?: string;
+  args: Record<string, unknown>;
+  output: string;
+  startedAt: number;
+  elapsedMs?: number;
 }
 
-export interface ToolCallRecord {
-  name: string;
-  command: string;
-  output: string;
-  isError: boolean;
+export interface TurnView {
+  id: string;
+  userText: string;
+  assistantText: string;
+  streamingText: string | null;
+  reasoningText: string;
+  tools: ToolStatus[];
+  isLoading: boolean;
+  cancelled?: boolean;
 }
+
+export type TimelineItem =
+  | { id: string; kind: 'message'; message: ChatMessage }
+  | { id: string; kind: 'turn'; turn: TurnView };
 
 export interface BridgeState {
-  messages: ChatMessage[];
+  timeline: TimelineItem[];
   isLoading: boolean;
-  streamingText: string | null;
-  reasoningText: string | null;
-  activeTools: Map<string, ToolStatus>;
-  toolHistory: ToolCallRecord[];
+  messageQueue: string[];
   tokens: { input: number; output: number; cacheHit: number; cacheMiss: number };
   contextUsage: number;
   warnings: string[];
   error: string | null;
   permissionPrompt: { toolName: string; args: Record<string, unknown> } | null;
+}
+
+export function timelineFromMessages(messages: ChatMessage[]): TimelineItem[] {
+  return messages.map((message, index) => ({
+    id: `message-${index}-${crypto.randomUUID()}`,
+    kind: 'message',
+    message,
+  }));
+}
+
+function fallbackToolKey(index: number | undefined, name: string | undefined): string {
+  return index === undefined ? `tool_${name ?? 'unknown'}` : `tool_${index}`;
 }
 
 export function createBridge(
@@ -37,138 +56,188 @@ export function createBridge(
   submit: (text: string) => Promise<void>;
   cancel: () => void;
 } {
-  let assistantContent = "";
-  let reasoningContent = "";
-  let activeAssistantMsg: ChatMessage | null = null;
-  const toolCallArgsAccum = new Map<number, string>();
+  let running = false;
+  let processingQueue = false;
+  let activeRequest = 0;
+
+  const updateTurn = (turnId: string, update: (turn: TurnView) => TurnView) => {
+    setState(prev => ({
+      ...prev,
+      timeline: prev.timeline.map(item =>
+        item.kind === 'turn' && item.turn.id === turnId
+          ? { ...item, turn: update(item.turn) }
+          : item
+      ),
+    }));
+  };
+
+  const processQueue = () => {
+    if (running || processingQueue) return;
+    processingQueue = true;
+    setState(prev => {
+      const [next, ...rest] = prev.messageQueue;
+      if (!next) {
+        processingQueue = false;
+        return prev;
+      }
+      setTimeout(() => {
+        processingQueue = false;
+        void submit(next);
+      }, 0);
+      return { ...prev, messageQueue: rest };
+    });
+  };
 
   const submit = async (text: string) => {
+    if (running) {
+      setState(prev => ({ ...prev, messageQueue: [...prev.messageQueue, text] }));
+      return;
+    }
+
+    running = true;
+    const requestId = ++activeRequest;
+    const turnId = `turn-${requestId}-${crypto.randomUUID()}`;
+    let assistantContent = '';
+    let reasoningContent = '';
+    const toolCallArgs = new Map<number, string>();
+    const activeToolKeys = new Map<number, string>();
+    let toolSequence = 0;
+
     setTUIState('loading');
     setState(prev => ({
       ...prev,
-      messages: [...prev.messages, { role: 'user' as const, content: text }],
       isLoading: true,
-      streamingText: null,
-      reasoningText: null,
-      toolHistory: [],
       error: null,
       warnings: [],
       permissionPrompt: null,
+      timeline: [...prev.timeline, {
+        id: turnId,
+        kind: 'turn',
+        turn: {
+          id: turnId,
+          userText: text,
+          assistantText: '',
+          streamingText: null,
+          reasoningText: '',
+          tools: [],
+          isLoading: true,
+        },
+      }],
     }));
-
-    assistantContent = "";
-    reasoningContent = "";
-    activeAssistantMsg = null;
-    toolCallArgsAccum.clear();
 
     try {
       for await (const event of engine.submit(text)) {
+        if (requestId !== activeRequest) continue;
+
         switch (event.role) {
-          case "assistant_delta":
-            if (!activeAssistantMsg) {
-              activeAssistantMsg = { role: 'assistant', content: '' };
-              setState(prev => ({
-                ...prev,
-                messages: [...prev.messages, activeAssistantMsg!],
-              }));
+          case 'assistant_delta':
+            assistantContent += event.content ?? '';
+            updateTurn(turnId, turn => ({ ...turn, streamingText: assistantContent }));
+            break;
+
+          case 'assistant_final':
+            assistantContent = event.content ?? assistantContent;
+            updateTurn(turnId, turn => ({
+              ...turn,
+              assistantText: assistantContent,
+              streamingText: null,
+            }));
+            break;
+
+          case 'reasoning_delta':
+            reasoningContent += event.content ?? '';
+            updateTurn(turnId, turn => ({ ...turn, reasoningText: reasoningContent }));
+            break;
+
+          case 'tool_call_delta':
+            if (event.toolCallIndex !== undefined && event.content) {
+              toolCallArgs.set(event.toolCallIndex, event.content);
             }
-            assistantContent += event.content ?? "";
-            setState(prev => ({ ...prev, streamingText: assistantContent }));
             break;
 
-          case "assistant_final": {
-            // Capture values BEFORE clearing — React batches setState
-            // and the functional updater captures variables by reference.
-            // By the time React executes the updater, these would be null/""
-            // if we clear them first.
-            const msgRef = activeAssistantMsg;
-            const content = assistantContent;
-            if (msgRef) {
-              setState(prev => ({
-                ...prev,
-                streamingText: null,
-                messages: prev.messages.map(m =>
-                  m === msgRef ? { ...m, content } : m
-                ),
-              }));
+          case 'tool_start': {
+            const key = `${fallbackToolKey(event.toolCallIndex, event.toolName)}_${++toolSequence}`;
+            if (event.toolCallIndex !== undefined) activeToolKeys.set(event.toolCallIndex, key);
+            const raw = event.toolCallIndex === undefined ? undefined : toolCallArgs.get(event.toolCallIndex);
+            let args: Record<string, unknown> = {};
+            if (raw) {
+              try { args = JSON.parse(raw); } catch {}
             }
-            activeAssistantMsg = null;
-            assistantContent = "";
-            break;
-          }
-
-          case "reasoning_delta":
-            reasoningContent += event.content ?? "";
-            setState(prev => ({ ...prev, reasoningText: reasoningContent }));
-            break;
-
-          case "tool_start": {
-            setState(prev => {
-              const newTools = new Map(prev.activeTools);
-              const key = `tool_${event.toolCallIndex ?? crypto.randomUUID()}`;
-              // Parse args from accumulated tool_call_delta data
-              let args: Record<string, unknown> = {};
-              const idx = event.toolCallIndex ?? 0;
-              const raw = toolCallArgsAccum.get(idx);
-              if (raw) {
-                try { args = JSON.parse(raw); } catch {}
-                toolCallArgsAccum.delete(idx);
-              }
-              newTools.set(key, {
+            updateTurn(turnId, turn => ({
+              ...turn,
+              tools: [...turn.tools.filter(tool => tool.key !== key), {
+                key,
                 name: event.toolName ?? 'unknown',
                 status: 'running',
                 args,
-              });
-              return { ...prev, activeTools: newTools };
-            });
+                output: '',
+                startedAt: Date.now(),
+              }],
+            }));
             break;
           }
 
-          case "tool_progress":
-            setState(prev => {
-              const newTools = new Map(prev.activeTools);
-              const key = `tool_${event.toolCallIndex}`;
-              const existing = newTools.get(key);
-              if (existing) {
-                const newStatus = event.content === 'done' ? 'done' : 'running';
-                newTools.set(key, { ...existing, status: newStatus });
-              }
-              return { ...prev, activeTools: newTools };
-            });
-            break;
-
-          case "tool_call_delta":
-            // Accumulate arguments JSON from streaming delta
-            if (event.toolCallIndex !== undefined && event.content) {
-              toolCallArgsAccum.set(event.toolCallIndex, event.content);
+          case 'tool_progress':
+            if (event.content === 'done') {
+              const key = event.toolCallIndex === undefined
+                ? fallbackToolKey(undefined, event.toolName)
+                : activeToolKeys.get(event.toolCallIndex) ?? fallbackToolKey(event.toolCallIndex, event.toolName);
+              updateTurn(turnId, turn => ({
+                ...turn,
+                tools: turn.tools.map(tool =>
+                  tool.key === key
+                    ? { ...tool, status: tool.status === 'error' ? 'error' : 'done', elapsedMs: Date.now() - tool.startedAt }
+                    : tool
+                ),
+              }));
+              if (event.toolCallIndex !== undefined) activeToolKeys.delete(event.toolCallIndex);
             }
             break;
 
-          case "tool": {
-            setState(prev => {
-              const newTools = new Map(prev.activeTools);
-              const key = `tool_${event.toolCallIndex}`;
-              const existing = newTools.get(key);
-              if (existing) {
-                newTools.set(key, { ...existing, status: 'done', output: event.content });
-              }
-              // Add to toolHistory as a single merged record
-              const record: ToolCallRecord = {
-                name: event.toolName ?? existing?.name ?? 'tool',
-                command: existing?.args?.command ? String(existing.args.command) : '',
-                output: event.content ?? '',
-                isError: event.severity === 'error',
-              };
-              return {
-                ...prev,
-                activeTools: newTools,
-                toolHistory: [...prev.toolHistory, record],
-              };
-            });
+          case 'tool': {
+            const key = event.toolCallIndex === undefined
+              ? fallbackToolKey(undefined, event.toolName)
+              : activeToolKeys.get(event.toolCallIndex) ?? fallbackToolKey(event.toolCallIndex, event.toolName);
+            updateTurn(turnId, turn => ({
+              ...turn,
+              tools: turn.tools.map(tool =>
+                tool.key === key
+                  ? {
+                      ...tool,
+                      status: event.severity === 'error' ? 'error' : 'done',
+                      output: event.content ?? '',
+                      elapsedMs: Date.now() - tool.startedAt,
+                    }
+                  : tool
+              ),
+            }));
             break;
           }
 
-          case "usage": {
+          case 'error':
+            if (event.toolCallIndex !== undefined) {
+              const key = activeToolKeys.get(event.toolCallIndex) ?? `${fallbackToolKey(event.toolCallIndex, event.toolName)}_${++toolSequence}`;
+              updateTurn(turnId, turn => {
+                const existing = turn.tools.find(tool => tool.key === key);
+                const failed: ToolStatus = existing
+                  ? { ...existing, status: 'error', output: event.content ?? 'Unknown error', elapsedMs: Date.now() - existing.startedAt }
+                  : {
+                      key,
+                      name: event.toolName ?? 'tool',
+                      status: 'error',
+                      args: {},
+                      output: event.content ?? 'Unknown error',
+                      startedAt: Date.now(),
+                      elapsedMs: 0,
+                    };
+                return { ...turn, tools: [...turn.tools.filter(tool => tool.key !== key), failed] };
+              });
+            } else {
+              setState(prev => ({ ...prev, error: event.content ?? 'Unknown error' }));
+            }
+            break;
+
+          case 'usage': {
             const addInput = typeof event.metadata?.input === 'number' ? event.metadata.input : 0;
             const addOutput = typeof event.metadata?.output === 'number' ? event.metadata.output : 0;
             const addCacheHit = typeof event.metadata?.cacheHit === 'number' ? event.metadata.cacheHit : 0;
@@ -181,63 +250,22 @@ export function createBridge(
                 cacheHit: prev.tokens.cacheHit + addCacheHit,
                 cacheMiss: prev.tokens.cacheMiss + addCacheMiss,
               },
-              // Current request's prompt tokens ≈ current context size
               contextUsage: addInput,
             }));
             break;
           }
 
-          case "error": {
-            if (event.toolCallIndex !== undefined) {
-              // Tool-related error: add to toolHistory
-              setState(prev => {
-                const toolKey = `tool_${event.toolCallIndex}`;
-                const existing = prev.activeTools.get(toolKey);
-                const record: ToolCallRecord = {
-                  name: event.toolName ?? existing?.name ?? 'tool',
-                  command: existing?.args?.command ? String(existing.args.command) : '',
-                  output: event.content ?? 'Unknown error',
-                  isError: true,
-                };
-                return {
-                  ...prev,
-                  toolHistory: [...prev.toolHistory, record],
-                };
-              });
-            } else {
-              setState(prev => ({
-                ...prev,
-                error: event.content ?? 'Unknown error',
-              }));
-            }
-            break;
-          }
-
-          case "warning":
-            setState(prev => ({
-              ...prev,
-              warnings: [...prev.warnings, event.content ?? 'Unknown warning'],
-            }));
+          case 'warning':
+            setState(prev => ({ ...prev, warnings: [...prev.warnings, event.content ?? 'Unknown warning'] }));
             break;
 
-          case "status":
+          case 'status':
             if (event.content && event.content !== 'interrupted' && event.content !== 'tools_completed') {
-              setState(prev => ({
-                ...prev,
-                warnings: [...prev.warnings, event.content!],
-              }));
+              setState(prev => ({ ...prev, warnings: [...prev.warnings, event.content!] }));
             }
             break;
 
-          case "done":
-            break;
-
-          case "strategy_notify":
-          case "strategy_estimate_refined":
-            // Phase 2 events — not yet implemented, ignore
-            break;
-
-          case "permission_ask": {
+          case 'permission_ask': {
             let args: Record<string, unknown> = {};
             try { args = JSON.parse(event.content ?? '{}'); } catch {}
             setState(prev => ({
@@ -247,61 +275,42 @@ export function createBridge(
             break;
           }
 
+          case 'done':
+          case 'strategy_notify':
+          case 'strategy_estimate_refined':
+            break;
+
           default: {
             const _exhaustiveCheck: never = event.role;
             void _exhaustiveCheck;
-            break;
           }
         }
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      setState(prev => ({ ...prev, error: msg }));
+      if (requestId === activeRequest) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setState(prev => ({ ...prev, error: msg }));
+      }
     } finally {
-      setTUIState('idle');
-      setState(prev => {
-        // If streamingText has content but no assistant_final copied it into
-        // a message, finalize it here as a fallback.
-        const content = prev.streamingText || assistantContent;
-        if (activeAssistantMsg && content) {
-          return {
-            ...prev,
-            isLoading: false,
-            streamingText: null,
-            messages: prev.messages.map(m =>
-              m === activeAssistantMsg ? { ...m, content } : m
-            ),
-            activeTools: new Map(),
-            permissionPrompt: null,
-          };
-        }
-        return {
-          ...prev,
-          isLoading: false,
+      if (requestId === activeRequest) {
+        setTUIState('idle');
+        updateTurn(turnId, turn => ({
+          ...turn,
+          assistantText: turn.assistantText || assistantContent,
           streamingText: null,
-          activeTools: new Map(),
-          permissionPrompt: null,
-        };
-      });
-      activeAssistantMsg = null;
-      assistantContent = "";
-      reasoningContent = "";
+          isLoading: false,
+        }));
+        setState(prev => ({ ...prev, isLoading: false, permissionPrompt: null }));
+      }
+      running = false;
+      processQueue();
     }
   };
 
   const cancel = () => {
+    engine.respondPermission(false);
     engine.interrupt();
-    setTUIState('idle');
-    // Immediately reset loading state so the UI is responsive even if
-    // the AsyncGenerator takes a moment to drain interrupted events
-    setState(prev => ({
-      ...prev,
-      isLoading: false,
-      streamingText: null,
-      reasoningText: null,
-      activeTools: new Map(),
-      permissionPrompt: null,
-    }));
+    setState(prev => ({ ...prev, permissionPrompt: null }));
   };
 
   return { submit, cancel };

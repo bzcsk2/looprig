@@ -15,7 +15,7 @@ export function DeepiPromptInput({ onSubmit, isLoading, disabled, queueCount = 0
   const [input, setInput] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState(-1);
-  const [cursor, setCursor] = useState(0);
+  const cursorRef = useRef(0);
   const escRef = useRef(0);
 
   const submitLine = useCallback(() => {
@@ -24,7 +24,7 @@ export function DeepiPromptInput({ onSubmit, isLoading, disabled, queueCount = 0
     setHistory(prev => [text, ...prev].slice(0, MAX_HISTORY));
     setHistoryIdx(-1);
     setInput('');
-    setCursor(0);
+    cursorRef.current = 0;
     onSubmit(text);
   }, [input, onSubmit]);
 
@@ -67,7 +67,7 @@ export function DeepiPromptInput({ onSubmit, isLoading, disabled, queueCount = 0
         const next = Math.min(prev + 1, history.length - 1);
         if (next >= 0) {
           setInput(history[next] ?? '');
-          setCursor((history[next] ?? '').length);
+          cursorRef.current = (history[next] ?? '').length;
         }
         return next;
       });
@@ -79,57 +79,57 @@ export function DeepiPromptInput({ onSubmit, isLoading, disabled, queueCount = 0
         const next = prev - 1;
         if (next < 0) {
           setInput('');
-          setCursor(0);
+          cursorRef.current = 0;
           return -1;
         }
         setInput(history[next] ?? '');
-        setCursor((history[next] ?? '').length);
+        cursorRef.current = (history[next] ?? '').length;
         return next;
       });
       return;
     }
 
     if (key.leftArrow) {
-      setCursor(prev => Math.max(0, prev - 1));
+      cursorRef.current = Math.max(0, cursorRef.current - 1);
       return;
     }
 
     if (key.rightArrow) {
-      setCursor(prev => Math.min(input.length, prev + 1));
+      cursorRef.current = Math.min(input.length, cursorRef.current + 1);
       return;
     }
 
     if (_input === 'a' && key.ctrl) {
-      setCursor(0);
+      cursorRef.current = 0;
       return;
     }
 
     if (_input === 'e' && key.ctrl) {
-      setCursor(input.length);
+      cursorRef.current = input.length;
       return;
     }
 
     if (key.home) {
-      setCursor(0);
+      cursorRef.current = 0;
       return;
     }
 
     if (key.end) {
-      setCursor(input.length);
+      cursorRef.current = input.length;
       return;
     }
 
     if (key.backspace) {
-      const pos = cursor;
+      const pos = cursorRef.current;
       if (pos > 0) {
         setInput(prev => prev.slice(0, pos - 1) + prev.slice(pos));
-        setCursor(pos - 1);
+        cursorRef.current = pos - 1;
       }
       return;
     }
 
     if (key.delete) {
-      const pos = cursor;
+      const pos = cursorRef.current;
       if (pos < input.length) {
         setInput(prev => prev.slice(0, pos) + prev.slice(pos + 1));
       }
@@ -137,7 +137,7 @@ export function DeepiPromptInput({ onSubmit, isLoading, disabled, queueCount = 0
     }
 
     if (_input === 'd' && key.ctrl) {
-      const pos = cursor;
+      const pos = cursorRef.current;
       if (pos < input.length) {
         setInput(prev => prev.slice(0, pos) + prev.slice(pos + 1));
       }
@@ -146,20 +146,20 @@ export function DeepiPromptInput({ onSubmit, isLoading, disabled, queueCount = 0
 
     if (_input === 'u' && key.ctrl) {
       setInput('');
-      setCursor(0);
+      cursorRef.current = 0;
       return;
     }
 
     if (_input === 'k' && key.ctrl) {
-      const pos = cursor;
+      const pos = cursorRef.current;
       setInput(prev => prev.slice(0, pos));
       return;
     }
 
     if (_input) {
-      const pos = cursor;
+      const pos = cursorRef.current;
       setInput(prev => prev.slice(0, pos) + _input + prev.slice(pos));
-      setCursor(pos + _input.length);
+      cursorRef.current = pos + _input.length;
     }
   });
 
@@ -168,7 +168,7 @@ export function DeepiPromptInput({ onSubmit, isLoading, disabled, queueCount = 0
   const loadingHint = isLoading ? ' (processing...)' : '';
   const displayText = isPlaceholder && !isLoading && queueCount === 0
     ? '输入消息...'
-    : `${input.slice(0, cursor)}▊${input.slice(cursor)}${queueHint}${loadingHint}`;
+    : `${input.slice(0, cursorRef.current)}▊${input.slice(cursorRef.current)}${queueHint}${loadingHint}`;
 
   return (
     <Box flexDirection="column" width="100%" borderStyle="round" paddingX={1}>

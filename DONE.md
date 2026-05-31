@@ -1,6 +1,6 @@
 # Deepicode 完成记录
 
-最后更新：2026-05-31（N1-N14 修复 + Bash 确认 UI 核心机制，575 pass）
+最后更新：2026-05-31（TUI timeline 状态模型收尾，584 tests）
 
 本文按 **阶段 (Phase)** + **时间线** 记录已完成内容。
 
@@ -11,7 +11,7 @@
 | 指标 | 状态 |
 |------|------|
 | TypeScript 编译 | `bun run typecheck` 零错误 |
-| 测试 | 576 pass / 3 skip / 5 fail（5 fail 均为网络/SSE 环境 flaky） |
+| 测试 | `bun test` 584 tests；已知 `FileSnapshot` 同毫秒快照排序存在偶发测试波动 |
 | 运行时 | Bun |
 | API 提供商 | DeepSeek / Zen (Free) / Mimo |
 | TUI 框架 | Ink (React)，复制自 best-claude-code |
@@ -321,7 +321,7 @@ AppState + QueryEngine + Build/Plan Agent。详见 Phase 3 Step 3.2。
 | 测试回归修复 | B1: hooks.ts afterToolCall try-catch 隔离；B2: McpAuth.set() stub `"stored"` → `"not_implemented"` |
 | **第二十四轮** | **S1-S15 简单（15项）+ M7/M8/M11/M14/M15 中等（5项）+ 源码补齐 isAllowed/isDenied/fromJSON；总计 561 pass / 3 skip / 0 fail** |
 | **第二十五轮** | **M1-M6 Context/Session + M9 SessionWriter + M12 WebFetch + M13 WebSearch + M16 Task 全流程（9项中等）；总计 580 pass / 3 skip / 0 fail；中等等级 15/18 ✅，剩余 M10 write_file 权限继承** |
-| **TUI 重设计** | **Phase 1 完成：气泡消息+主题扩展+可折叠思考+思考持久化+助手回答消失修复；Phase 2：权限确认方向键选择 UI** |
+| **TUI 重设计** | **Phase 1 完成：气泡消息+主题扩展+可折叠思考+思考持久化+助手回答消失修复；Phase 2：权限确认方向键选择 UI；工具调用合并气泡+JSON格式化+错误内联+布局重排；消息队列；Reasonix 显示框架移植（Markdown/Card/ToolCard/Spinner/Tokens）** |
 
 ---
 
@@ -357,6 +357,79 @@ AppState + QueryEngine + Build/Plan Agent。详见 Phase 3 Step 3.2。
 | assistant 回复以原始 markdown 格式显示 | 未做 markdown 渲染 | `DeepiMessages.tsx` + `markdown.ts` + `Markdown.tsx` (新) | 复用 Claude Code `marked.lexer` + `formatToken` 模式：heading/bold/italic/table/list/code 等 token 渲染为 ANSI 样式；安装 `marked` + `strip-ansi` |
 | 每个工具调用一个气泡，碎片化 | 工具消息逐条追加到 messages 数组 | `bridge.tsx` + `DeepiMessages.tsx` | 不再往 `messages` 追加 tool 消息；所有工具调用合并到一个 `codeBlockBackground` 气泡中渲染 |
 | toolCallArgs Map 类型不匹配 | number key vs string key | `bridge.tsx` + `DeepiMessages.tsx` | 移除 `toolCallArgs` Map，改用 `toolHistory` 数组 |
+
+### Reasonix 显示框架移植（2026-05-31）
+
+从 DeepSeek-Reasonix（Ink 7 + React 19，专为 DeepSeek 设计）移植核心显示组件：
+
+| 文件 | 行数 | 说明 |
+|------|------|------|
+| `reasonix/markdown.tsx` | 230 | 完整 Markdown→Ink 渲染（heading/list/code/table/blockquote/inline + cli-highlight 代码高亮） |
+| `reasonix/ToolCard.tsx` | 107 | 工具调用卡片（状态生命周期 running/ok/error + 输出预览 + 参数摘要） |
+| `reasonix/text-width.ts` | 55 | CJK 安全文本宽度（graphemes/clipToCells/wrapToCells/padToCells） |
+| `reasonix/CardHeader.tsx` | 36 | 卡片标题（glyph + title + subtitle + meta + right） |
+| `reasonix/tokens.ts` | 31 | 主题 token 系统（FG/TONE/SURFACE，Proxy 代理支持运行时切换） |
+| `reasonix/Spinner.tsx` | 16 | 动画 spinner（circle/braille 两套帧，keepAlive `useAnimationFrame` 驱动） |
+| `reasonix/html-entities.ts` | 12 | HTML 实体解码（LLM 输出中的 &quot; &amp; 等） |
+| `reasonix/Card.tsx` | 8 | 卡片容器 |
+| `reasonix/index.ts` | 7 | 导出 |
+| **总计** | **502** | |
+
+**适配改动**：
+- `ink` → `@deepicode/ink`
+- `useStdout` → `process.stdout.columns`
+- `useAnimation` → `useAnimationFrame`（deepicode Ink fork 的 keepAlive 共享时钟动画）
+- 移除 i18n/state 依赖（ToolCard 独立可用）
+- Token 颜色用 `as any` 绕过 Ink 类型限制（hex 字符串运行时有效但类型不匹配）
+
+**集成方式**：
+- `MarkdownRenderer.tsx` → 直接导出 `reasonix/markdown.js` 的 `Markdown`
+- `DeepiMessages.tsx` → User/Assistant 用 Reasonix `Card`+`CardHeader`，Tool 用 Reasonix `ToolCard`，Loading 用 Reasonix `Spinner`
+
+### Timeline 状态模型收尾（2026-05-31）
+
+保留 Deepicode 的 `LoopEvent → bridge.tsx → React` 架构，不引入 Reasonix Store/TurnTranslator。bridge 改为轻量 `TimelineItem[] + TurnView`，每轮持久保存 user、reasoning、tools、assistant 和 loading 状态。
+
+| 编号 | 问题 | 改动 |
+|------|------|------|
+| TUI-B1 | `tool_call_delta` 转发丢失 `toolCallIndex` | `loop.ts` 补齐索引；bridge 按索引关联参数 |
+| TUI-B2 | Thinking / Tool use 依附最后一条 assistant，纯工具轮次无容器 | 每次 submit 先创建 `TurnView`，纯工具轮次和下一轮开始后仍可渲染 |
+| TUI-B3 | App 同时挂载新旧 Tool/Spinner | 删除 App 中旧 `ToolCallBanner` 和旧 Spinner 挂载 |
+| TUI-B4 | cancel 后立即开放新 submit，旧 generator 与新请求串状态 | bridge 串行处理 submit；取消后等待旧 generator 退出再处理队列 |
+| TUI-B5 | Reasonix Spinner 使用非 keepAlive `useInterval`，无其他动画时不推进 | 改用 keepAlive `useAnimationFrame` |
+| TUI-B6 | 权限确认期间 cancel 无法兑现等待中的 Promise | cancel 时先 `respondPermission(false)`，再 interrupt |
+| TUI-B7 / Q10 | 同一轮后续工具批次重复使用 `toolCallIndex=0`；tool key fallback 不一致 | index 只作为活跃映射，每次 `tool_start` 分配唯一 key |
+
+同步完成的显示修复：
+
+| 编号 | 内容 |
+|------|------|
+| F1 | 普通与流式 Assistant 回复增加 `Assistant` CardHeader |
+| F2 | User 消息气泡使用 Reasonix `SURFACE.bgElev` |
+| F4 | bridge 记录工具 `startedAt / elapsedMs`，ToolCard 显示耗时 |
+| F6 | Ctrl+O 统一展开/折叠 Thinking 和 Tool use |
+| F7 | Spinner 改用 keepAlive `useAnimationFrame`，不再依赖非驱动型 `useInterval` |
+| — | PromptInput 光标从 ref 改为 state，左右移动会触发重绘 |
+
+从 TODO 清理的已完成核心项：
+
+| 编号 | 内容 | 验证 |
+|------|------|------|
+| B6 | Session 恢复时由 `engine._loadSessionMessages()` 过滤历史 system 消息，避免重复注入 | `session.test.ts` M4 |
+| B5 | repair Scavenge 增加 `1g`：未闭合引号 + 未闭合花括号组合修复 | `repair.test.ts` combined strategy 1g |
+
+新增 `packages/tui/__tests__/bridge.test.ts`，覆盖：
+- 纯工具轮次持久显示和参数索引关联
+- 后续批次重复使用 `toolCallIndex=0`
+- cancel 后排队串行执行
+- 权限提示期间 cancel 自动拒绝并退出 generator
+
+验证：
+- `bun run typecheck` 零错误
+- `git diff --check` 通过
+- TUI + engine 定向测试 14 pass / 0 fail
+- 完整测试曾运行通过：584 pass / 0 fail
+- `FileSnapshot` 同毫秒快照按随机后缀排序会偶发失败，单独重跑通过；与本轮 TUI 修改无关
 
 ---
 
@@ -666,5 +739,3 @@ AppState + QueryEngine + Build/Plan Agent。详见 Phase 3 Step 3.2。
 | M18 | 错误恢复 | repair 失败 → 不触发 API 重试 |
 
 ---
-
-
