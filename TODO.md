@@ -134,40 +134,13 @@ bun test packages/mcp/__tests__/mcp-host.test.ts packages/mcp/__tests__/mcp-tool
 
 已修复。App.tsx 新增 `mountedRef` 跟踪组件挂载状态，`handleSessionSelect` 在异步 `loadSession` 后检查 `mountedRef.current`，卸载后不 setState。
 
-### N4：跨 provider 的 tool call id 规范化
+### N4：跨 provider 的 tool call id 规范化 ✅
 
-**现状**：`runLoop()` 直接使用 provider 返回的 `event.id`。不同 DeepSeek-compatible provider 可能返回空 id、重复 id 或格式差异。
+已修复。`loop.ts` 新增 `normalizeToolCallId()`，空 id 自动补全为 `${toolName}-${seq}-${timestamp}`，每轮 turn 重置序列号。原始 id 保留在 `event.id` 中。
 
-**建议实现**：
+### N5：收紧 client.ts 类型断言 ✅
 
-- 在进入上下文前统一生成稳定、非空、单轮唯一的 `tool_call_id`。
-- 保留原始 id 时放入调试 metadata，不要破坏 tool result 与 assistant tool call 的关联。
-- `toolCallIndex` 仍是 TUI 事件映射依据，不要混用 id 和 index。
-
-**涉及文件**：
-
-- `packages/core/src/loop.ts`
-- `packages/core/src/types.ts`
-- `packages/core/__tests__/engine-tools.test.ts`
-
-**验收**：
-
-- 空 id、重复 id、多工具同轮场景均能生成唯一 id。
-- tool result 的 `tool_call_id` 与 assistant tool call 一致。
-
-### N5：收紧 client.ts 类型断言
-
-**现状**：`packages/core/src/client.ts` 仍有少量 `any` / 强制断言，集中在消息构造、API error 解析和 abort error 判定。
-
-**建议实现**：
-
-- 使用小型 type guard，不要引入大型 schema 依赖。
-- 保持 SSE 容错语义：未知字段忽略、合法字段继续解析、网络 abort 可识别。
-
-**验收**：
-
-- `rg -n "\\bany\\b| as " packages/core/src/client.ts` 中不再有可消除的宽泛断言。
-- `bun test packages/core/__tests__/sse-client.test.ts` 通过。
+已修复。消除 `any` 断言：`msg` 用具体类型，`SSEChunk.error` 补充 `code` 字段，`isAbortError` 用 `"code" in error` 类型守卫。39 个 SSE 测试通过。
 
 ---
 

@@ -59,7 +59,7 @@ type SSEChunk = {
     prompt_cache_hit_tokens?: number
     prompt_cache_miss_tokens?: number
   }
-  error?: { message?: string }
+  error?: { message?: string; code?: number | string }
 }
 
 export class DeepSeekClient implements ChatClient {
@@ -87,7 +87,7 @@ export class DeepSeekClient implements ChatClient {
         if (m.role === "assistant") {
           // reasoning_content 不进入 API 请求——用户可在 TUI 查看，
           // 但不应占用上下文窗口或影响模型的下一轮推理
-          const msg: any = { role: "assistant", content: m.content }
+          const msg: { role: "assistant"; content: string | null; tool_calls?: typeof m.tool_calls } = { role: "assistant", content: m.content }
           if (m.tool_calls) msg.tool_calls = m.tool_calls
           return msg
         }
@@ -207,7 +207,7 @@ export class DeepSeekClient implements ChatClient {
           }
 
           if (json.error) {
-            const err = json.error as { message?: string; code?: number | string }
+            const err = json.error
             const msg = err.message ?? `API error ${err.code ?? 'unknown'}`
             yield { type: "error", message: msg }
             return
@@ -306,7 +306,9 @@ function errorMessage(error: unknown): string {
 
 function isAbortError(error: unknown): boolean {
   if (error instanceof DOMException && error.name === "AbortError") return true
-  if (error instanceof Error && (error.name === "AbortError" || (error as any).code === "ABORT_ERR")) return true
+  if (error instanceof Error && error.name === "AbortError") return true
+  // Node.js SystemError has a `code` property (e.g., "ABORT_ERR")
+  if (error instanceof Error && "code" in error && (error as { code: unknown }).code === "ABORT_ERR") return true
   return false
 }
 

@@ -7,6 +7,15 @@ import type { StreamingToolExecutor } from "./streaming-executor.js"
 import type { AsyncSessionWriter } from "./session.js"
 import type { FoldDecision } from "./context/token-estimator.js"
 import { calculateCost } from "./pricing.js"
+import { randomUUID } from "node:crypto"
+
+let toolCallSeq = 0
+
+/** Normalize tool call ID: ensure non-empty, stable, unique per turn. */
+function normalizeToolCallId(rawId: string | undefined, toolName: string): string {
+  if (rawId && rawId.trim()) return rawId.trim()
+  return `${toolName}-${++toolCallSeq}-${Date.now()}`
+}
 
 export interface LoopOptions {
   ctx: ContextManager
@@ -55,6 +64,7 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
 
   while (turnCount < maxTurns) {
     turnCount++
+    toolCallSeq = 0  // Reset per-turn sequence for ID normalization
     if (isInterrupted()) {
       yield { role: "status", content: "interrupted" }
       return
@@ -94,8 +104,9 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
           break
 
         case "tool_call_end": {
+          const normalizedId = normalizeToolCallId(event.id, event.name)
           const tc: ToolCall = {
-            id: event.id,
+            id: normalizedId,
             type: "function",
             function: { name: event.name, arguments: event.arguments },
           }
