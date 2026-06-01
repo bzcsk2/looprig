@@ -20,8 +20,11 @@ export interface ToolCallHooks {
   onLoopEvent?: (event: Record<string, unknown>) => Promise<void>
 }
 
+export type HookPhase = "before" | "after" | "loop_event"
+
 export class HookManager {
   private hooks: ToolCallHooks[] = []
+  private onHookError?: (error: unknown, phase: HookPhase) => void
 
   addHooks(hooks: ToolCallHooks): void {
     this.hooks.push(hooks)
@@ -35,13 +38,19 @@ export class HookManager {
     this.hooks = []
   }
 
+  /** P5: Set optional error observation callback */
+  setErrorObserver(callback: (error: unknown, phase: HookPhase) => void): void {
+    this.onHookError = callback
+  }
+
   async runBeforeToolCall(context: BeforeToolCallContext): Promise<PermissionDecision | void> {
     for (const hooks of this.hooks) {
       if (hooks.beforeToolCall) {
         try {
           const result = await hooks.beforeToolCall(context)
           if (result === "deny" || result === "allow") return result
-        } catch {
+        } catch (e) {
+          this.onHookError?.(e, "before")
           return "deny" // hook failure = deny (fail-safe)
         }
       }
@@ -51,7 +60,10 @@ export class HookManager {
   async runAfterToolCall(toolName: string, result: ToolCallResult): Promise<void> {
     for (const hooks of this.hooks) {
       if (hooks.afterToolCall) {
-        try { await hooks.afterToolCall(toolName, result) } catch { /* swallow — fire-and-forget */ }
+        try { await hooks.afterToolCall(toolName, result) } catch (e) {
+          // P5: after hook failure must not interrupt main flow
+          this.onHookError?.(e, "after")
+        }
       }
     }
   }
@@ -59,7 +71,10 @@ export class HookManager {
   async runOnLoopEvent(event: Record<string, unknown>): Promise<void> {
     for (const hooks of this.hooks) {
       if (hooks.onLoopEvent) {
-        await hooks.onLoopEvent(event)
+        // P5: loop_event hook failure must not interrupt main flow
+        try { await hooks.onLoopEvent(event) } catch (e) {
+          this.onHookError?.(e, "loop_event")
+        }
       }
     }
   }

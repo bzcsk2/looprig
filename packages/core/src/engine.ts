@@ -282,7 +282,8 @@ export class ReasonixEngine implements CoreEngine {
 
       for await (const event of runLoop(loopOpts)) {
         yield event
-        try { this.hookManager.runOnLoopEvent(event as unknown as Record<string, unknown>) } catch { /* hook error — fire-and-forget */ }
+        // P5: Use .catch() for async hook — sync try/catch cannot catch Promise rejections
+        void this.hookManager.runOnLoopEvent(event as unknown as Record<string, unknown>).catch(() => {})
       }
     } finally {
       this.isSubmitting = false

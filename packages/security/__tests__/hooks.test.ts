@@ -140,4 +140,88 @@ describe("HookManager", () => {
     await hooks.runAfterToolCall("bash", { content: "ok", isError: false })
     expect(spy).toHaveBeenCalledWith("bash", { content: "ok", isError: false })
   })
+
+  // ─── P5: Hook Observability Enhancement ──────────────────────────
+
+  it("P5: onHookError called when beforeToolCall throws", async () => {
+    const hooks = new HookManager()
+    const errorSpy = vi.fn()
+    hooks.setErrorObserver(errorSpy)
+    hooks.addHooks({
+      beforeToolCall: async () => { throw new Error("before failed") },
+    })
+    const result = await hooks.runBeforeToolCall({ toolName: "bash", args: {}, tier: "exec", permissionDecision: "ask" })
+    expect(result).toBe("deny")
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    expect(errorSpy.mock.calls[0][0]).toBeInstanceOf(Error)
+    expect(errorSpy.mock.calls[0][1]).toBe("before")
+  })
+
+  it("P5: onHookError called when afterToolCall throws", async () => {
+    const hooks = new HookManager()
+    const errorSpy = vi.fn()
+    hooks.setErrorObserver(errorSpy)
+    hooks.addHooks({
+      afterToolCall: async () => { throw new Error("after failed") },
+    })
+    await hooks.runAfterToolCall("bash", { content: "ok", isError: false })
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    expect(errorSpy.mock.calls[0][0]).toBeInstanceOf(Error)
+    expect(errorSpy.mock.calls[0][1]).toBe("after")
+  })
+
+  it("P5: onHookError called when onLoopEvent throws", async () => {
+    const hooks = new HookManager()
+    const errorSpy = vi.fn()
+    hooks.setErrorObserver(errorSpy)
+    hooks.addHooks({
+      onLoopEvent: async () => { throw new Error("loop failed") },
+    })
+    // Should not throw — error is caught and reported
+    await hooks.runOnLoopEvent({ role: "test" })
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    expect(errorSpy.mock.calls[0][0]).toBeInstanceOf(Error)
+    expect(errorSpy.mock.calls[0][1]).toBe("loop_event")
+  })
+
+  it("P5: afterToolCall exception does not interrupt remaining hooks", async () => {
+    const hooks = new HookManager()
+    const errorSpy = vi.fn()
+    const spy1 = vi.fn()
+    const spy2 = vi.fn()
+    hooks.setErrorObserver(errorSpy)
+    hooks.addHooks({ afterToolCall: async () => { throw new Error("fail") } })
+    hooks.addHooks({ afterToolCall: spy1 })
+    hooks.addHooks({ afterToolCall: spy2 })
+    await hooks.runAfterToolCall("bash", { content: "ok", isError: false })
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    expect(spy1).toHaveBeenCalled()
+    expect(spy2).toHaveBeenCalled()
+  })
+
+  it("P5: onLoopEvent exception does not interrupt remaining hooks", async () => {
+    const hooks = new HookManager()
+    const errorSpy = vi.fn()
+    const spy1 = vi.fn()
+    const spy2 = vi.fn()
+    hooks.setErrorObserver(errorSpy)
+    hooks.addHooks({ onLoopEvent: async () => { throw new Error("fail") } })
+    hooks.addHooks({ onLoopEvent: spy1 })
+    hooks.addHooks({ onLoopEvent: spy2 })
+    await hooks.runOnLoopEvent({ role: "test" })
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    expect(spy1).toHaveBeenCalled()
+    expect(spy2).toHaveBeenCalled()
+  })
+
+  it("P5: no error observer — errors are silently swallowed (backward compat)", async () => {
+    const hooks = new HookManager()
+    hooks.addHooks({
+      afterToolCall: async () => { throw new Error("fail") },
+      onLoopEvent: async () => { throw new Error("fail") },
+    })
+    // Should not throw even without error observer
+    await hooks.runAfterToolCall("bash", { content: "ok", isError: false })
+    await hooks.runOnLoopEvent({ role: "test" })
+  })
 })
