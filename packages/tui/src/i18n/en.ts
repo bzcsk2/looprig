@@ -67,6 +67,8 @@ export const en: Strings = {
   exitCode: (code) => `exit ${code}`,
   // CommandAutocomplete
   cmdAutocompleteHint: '↑↓ select · Enter/Tab complete · Esc close',
+  // Search
+  searchHint: 'Enter next · ↑ previous · Esc close',
   // Bridge
   unknownError: 'Unknown error',
   unknownWarning: 'Unknown warning',

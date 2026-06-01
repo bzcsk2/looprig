@@ -14,6 +14,7 @@ import { ModelPicker } from './ModelPicker.js';
 import { SessionPicker } from './SessionPicker.js';
 import { PermissionPrompt } from './PermissionPrompt.js';
 import { CommandAutocomplete } from './CommandAutocomplete.js';
+import { SearchOverlay } from './SearchOverlay.js';
 import { t, setLocale, toggleLocale, getLocale } from './i18n/index.js';
 
 // ---- Module-level interrupt state (shared by SIGINT handler + useInput \x03 handler) ----
@@ -141,6 +142,9 @@ export function App({ engine, config }: AppProps) {
     if (input === '\x03' || (key.ctrl && input === 'c')) {
       doInterrupt();
     }
+    if (key.ctrl && input === 'f') {
+      setShowSearch(prev => !prev);
+    }
   });
 
   const handleCancel = useCallback(() => {
@@ -154,6 +158,7 @@ export function App({ engine, config }: AppProps) {
   const [showAutocomplete, setShowAutocomplete] = useState(false);
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showSessionPicker, setShowSessionPicker] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
   const [activeAgent, setActiveAgent] = useState(engine.getAgentName?.() ?? 'build');
 
   const handleSubmit = useCallback((text: string) => {
@@ -280,6 +285,11 @@ export function App({ engine, config }: AppProps) {
 
   const scrollableContent = (
     <>
+      <SearchOverlay
+        timeline={bridgeState.timeline}
+        isOpen={showSearch}
+        onClose={() => setShowSearch(false)}
+      />
       <DeepiMessages
         timeline={bridgeState.timeline}
         scrollRef={scrollRef}

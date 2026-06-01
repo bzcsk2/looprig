@@ -69,6 +69,8 @@ export interface Strings {
   exitCode: (code: number) => string;
   // CommandAutocomplete
   cmdAutocompleteHint: string;
+  // Search
+  searchHint: string;
   // Bridge
   unknownError: string;
   unknownWarning: string;

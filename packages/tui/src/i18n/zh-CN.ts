@@ -67,6 +67,8 @@ export const zhCN: Strings = {
   exitCode: (code) => `退出码 ${code}`,
   // CommandAutocomplete
   cmdAutocompleteHint: '↑↓ 选择 · Enter/Tab 补全 · Esc 关闭',
+  // Search
+  searchHint: 'Enter 下一个 · ↑ 上一个 · Esc 关闭',
   // Bridge
   unknownError: '未知错误',
   unknownWarning: '未知警告',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo, useMemo } from 'react';
 import { Box, Text, useInput } from '@deepicode/ink';
 import type { ChatMessage } from '@deepicode/core';
 import type { TimelineItem, ToolStatus, TurnView } from './bridge.js';
@@ -46,11 +46,12 @@ function formatToolOutput(tool: ToolStatus): string {
 }
 
 function MessageContent({ text }: { text: string }) {
-  if (!text) return null;
-  return <Markdown text={text} />;
+  const tokens = useMemo(() => text, [text]);
+  if (!tokens) return null;
+  return <Markdown text={tokens} />;
 }
 
-function ReasoningCard({ text, isOpen }: { text: string; isOpen: boolean }) {
+const MemoizedReasoningCard = memo(function ReasoningCard({ text, isOpen }: { text: string; isOpen: boolean }) {
   return (
     <Card>
       <CardHeader
@@ -66,9 +67,9 @@ function ReasoningCard({ text, isOpen }: { text: string; isOpen: boolean }) {
       )}
     </Card>
   );
-}
+});
 
-function ToolUseSection({ tools, isOpen }: { tools: ToolStatus[]; isOpen: boolean }) {
+const MemoizedToolUseSection = memo(function ToolUseSection({ tools, isOpen }: { tools: ToolStatus[]; isOpen: boolean }) {
   if (tools.length === 0) return null;
   return (
     <Card>
@@ -97,9 +98,9 @@ function ToolUseSection({ tools, isOpen }: { tools: ToolStatus[]; isOpen: boolea
       )}
     </Card>
   );
-}
+});
 
-function PlainMessage({ message }: { message: ChatMessage }) {
+const MemoizedPlainMessage = memo(function PlainMessage({ message }: { message: ChatMessage }) {
   if (message.role === 'user') {
     return (
       <Card>
@@ -121,16 +122,22 @@ function PlainMessage({ message }: { message: ChatMessage }) {
     );
   }
   return null;
-}
+});
 
-function Turn({ turn, detailsOpen }: { turn: TurnView; detailsOpen: boolean }) {
+const MemoizedTurn = memo(function Turn({ turn, detailsOpen }: { turn: TurnView; detailsOpen: boolean }) {
   const showDetails = turn.isLoading || detailsOpen;
+  const userMsg = useMemo<ChatMessage>(() => ({ role: 'user', content: turn.userText }), [turn.userText]);
+  const assistantMsg = useMemo<ChatMessage | null>(
+    () => turn.assistantText ? { role: 'assistant', content: turn.assistantText } : null,
+    [turn.assistantText]
+  );
+
   return (
     <Box flexDirection="column">
-      <PlainMessage message={{ role: 'user', content: turn.userText }} />
-      {turn.reasoningText && <ReasoningCard text={turn.reasoningText} isOpen={showDetails} />}
-      <ToolUseSection tools={turn.tools} isOpen={showDetails} />
-      {(turn.streamingText !== null || turn.assistantText) && (
+      <MemoizedPlainMessage message={userMsg} />
+      {turn.reasoningText && <MemoizedReasoningCard text={turn.reasoningText} isOpen={showDetails} />}
+      <MemoizedToolUseSection tools={turn.tools} isOpen={showDetails} />
+      {(turn.streamingText !== null || assistantMsg) && (
         turn.streamingText !== null
           ? <StreamingCard text={turn.streamingText} startTs={turn.startTs} />
           : (
@@ -138,7 +145,7 @@ function Turn({ turn, detailsOpen }: { turn: TurnView; detailsOpen: boolean }) {
               <Box flexDirection="column" paddingX={1} paddingY={1}>
                 <CardHeader glyph={'\u2039'} tone={TONE.ok} title={t().reply} />
                 <Box paddingLeft={1}>
-                  <MessageContent text={turn.assistantText} />
+                  <MessageContent text={assistantMsg!.content ?? ''} />
                 </Box>
               </Box>
             </Card>
@@ -152,7 +159,7 @@ function Turn({ turn, detailsOpen }: { turn: TurnView; detailsOpen: boolean }) {
       )}
     </Box>
   );
-}
+});
 
 export function DeepiMessages({ timeline }: DeepiMessagesProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -163,13 +170,18 @@ export function DeepiMessages({ timeline }: DeepiMessagesProps) {
     }
   });
 
+  const renderedItems = useMemo(() =>
+    timeline.map(item =>
+      item.kind === 'message'
+        ? <MemoizedPlainMessage key={item.id} message={item.message} />
+        : <MemoizedTurn key={item.id} turn={item.turn} detailsOpen={detailsOpen} />
+    ),
+    [timeline, detailsOpen]
+  );
+
   return (
     <Box flexDirection="column" width="100%" paddingX={1}>
-      {timeline.map(item =>
-        item.kind === 'message'
-          ? <PlainMessage key={item.id} message={item.message} />
-          : <Turn key={item.id} turn={item.turn} detailsOpen={detailsOpen} />
-      )}
+      {renderedItems}
     </Box>
   );
 }
