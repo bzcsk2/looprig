@@ -85,10 +85,13 @@ export class DeepSeekClient implements ChatClient {
           }
         }
         if (m.role === "assistant") {
-          // reasoning_content 不进入 API 请求——用户可在 TUI 查看，
-          // 但不应占用上下文窗口或影响模型的下一轮推理
-          const msg: { role: "assistant"; content: string | null; tool_calls?: typeof m.tool_calls } = { role: "assistant", content: m.content }
-          if (m.tool_calls) msg.tool_calls = m.tool_calls
+          // AS0: reasoning_content 回传用于 Thinking Mode 工具链连续性
+          // 只在有 tool_calls 时保留，普通文本回复不携带历史推理内容
+          const msg: { role: "assistant"; content: string | null; reasoning_content?: string; tool_calls?: typeof m.tool_calls } = { role: "assistant", content: m.content }
+          if (m.tool_calls) {
+            msg.tool_calls = m.tool_calls
+            if (m.reasoning_content) msg.reasoning_content = m.reasoning_content
+          }
           return msg
         }
         return { role: m.role, content: m.content ?? "" }

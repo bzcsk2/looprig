@@ -173,7 +173,7 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
             }
 
             finishedWithToolUse = true
-            ctx.log.append({ role: "assistant", content: fullContent || null, tool_calls: toolCalls })
+            ctx.log.append({ role: "assistant", content: fullContent || null, reasoning_content: fullReasoning || undefined, tool_calls: toolCalls })
             sessionWriter?.enqueue({ ts: Date.now(), type: "messages", payload: ctx.buildMessages() })
 
             try {
