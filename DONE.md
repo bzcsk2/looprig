@@ -22,16 +22,7 @@ bun test
 |--------|------|
 | TypeScript | `bun run typecheck` 通过 |
 | 测试 | `688 pass / 6 fail`，共 `694` tests |
-| 失败范围 | WebSearch, SSE performance, bridge.test.ts |
-
-当前 6 个失败：
-
-1. `M13: WebSearch`（3 个）：网络/超时问题，非代码缺陷。
-2. `TT3: SSE streaming performance`（1 个）：性能测试超时，非功能缺陷。
-3. `P0-6`：仍断言运行中输入进入 `messageQueue`，但当前实现已优先调用 `enqueueInstruction()`，测试预期已过时。
-4. `P3-2`：`full` fallback 场景中，`pendingInstructionCount` 断言期望 `10`，实际为 `0`，P3 尚未完成验收。
-
-因此当前仓库不能写成“全量测试全绿”。P3 的实现已进入工作区，但在修复这两个回归测试前，不计入已完成闭环。
+| 失败范围 | 见 TODO.md 第 8 节 |
 
 ---
 

@@ -199,44 +199,6 @@ engine.submit()
 
 ---
 
-## 4. 智能推理强度调节
-
-参考 RNX `src/loop.ts` 的 strategy select 思路，但不要把 RNX loop 整段搬进 Deepicode。Deepicode 已预留 `strategy_notify` 和 `strategy_estimate_refined` 两个 `LoopEvent` role。
-
-### ST1：Tier 配置定义
-
-新增 `packages/core/src/strategy/`：
-
-- 定义四档 tier，记录 CNY 预算、上下文阈值、推荐模型和最大链路长度。
-- 配置必须是纯数据，不 import TUI。
-- 默认行为保持现状；策略模块未启用时不能改变请求参数。
-
-### ST2：TaskClassifier
-
-- 纯规则、可测试、无网络请求。
-- 输入为用户文本和有限会话摘要，不读取完整工具输出。
-- 输出分类理由和分数，便于 TUI 展示和调试。
-
-### ST3：ChainEstimator
-
-- 根据最近 usage 事件、TPS 和工具调用次数估算剩余成本。
-- 使用滑动窗口，避免单次 usage 抖动。
-- 估算失败时返回 conservative fallback，不阻塞主 loop。
-
-### ST4：StrategySelector 与 TUI 倒计时
-
-- Core 只产出事件和建议，不直接渲染。
-- TUI 显示倒计时，用户可接受、覆盖或取消。
-- 未响应时采用文档明确的默认策略。
-
-**验收**：
-
-- 所有策略逻辑有纯单测。
-- strategy 模块异常不会中断正常问答。
-- 未开启策略功能时 API 请求与当前基线一致。
-
----
-
 ## 5. 测试矩阵待补齐
 
 ### M10：write_file 父目录权限继承
@@ -300,3 +262,22 @@ engine.submit()
 4. 如果实现改变用户可见行为，同步更新 `README.md` 和 `README.en.md`。
 
 不要在 TODO 中保留已经完成的 checkbox。TODO 是下一位 Agent 的工作队列，不是历史档案。
+
+---
+
+## 8. 当前测试失败（6 个）
+
+基线：`688 pass / 6 fail`，共 `694` tests。
+
+| 测试 | 数量 | 原因 | 优先级 |
+|------|------|------|--------|
+| M13: WebSearch | 3 | 网络/超时问题，非代码缺陷 | 低 |
+| TT3: SSE streaming performance | 1 | 性能测试超时，非功能缺陷 | 低 |
+| P0-6 | 1 | bridge 测试预期过时，已改为 enqueueInstruction() | 中 |
+| P3-2 | 1 | P3 尚未完成验收，pendingInstructionCount 断言失败 | 中 |
+
+**修复建议：**
+
+- `M13`、`TT3`：环境问题，可跳过或增加超时时间。
+- `P0-6`：更新测试预期，匹配当前 enqueueInstruction() 行为。
+- `P3-2`：完成 P3 TUI 注入反馈收口后修复。
