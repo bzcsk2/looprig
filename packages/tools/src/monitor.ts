@@ -1,8 +1,8 @@
-import { execSync } from "node:child_process"
 import { stat } from "node:fs/promises"
 import { resolve } from "node:path"
 import type { AgentTool } from "@deepicode/core"
 import { safeStringify } from "./safe-stringify.js"
+import { sampleDisk, sampleMemory, sampleProcesses } from "./platform/monitor-backend.js"
 
 const VALID_TARGETS = ["process", "disk", "memory", "file"] as const
 
@@ -77,21 +77,18 @@ export function createMonitorTool(): AgentTool {
 async function takeSample(
   target: typeof VALID_TARGETS[number],
   filePath: string | undefined,
-  ctx: { cwd: string },
+  ctx: { cwd: string; signal?: AbortSignal },
 ): Promise<unknown> {
   try {
     switch (target) {
       case "process": {
-        const out = execSync("ps aux --sort=-%mem | head -20", { encoding: "utf-8", timeout: 5000 })
-        return parsePsOutput(out)
+        return await sampleProcesses(ctx.signal)
       }
       case "disk": {
-        const out = execSync("df -h", { encoding: "utf-8", timeout: 5000 })
-        return { raw: out }
+        return await sampleDisk(ctx.signal)
       }
       case "memory": {
-        const out = execSync("free -h", { encoding: "utf-8", timeout: 5000 })
-        return { raw: out }
+        return sampleMemory()
       }
       case "file": {
         const fullPath = resolve(ctx.cwd, filePath!)
@@ -103,16 +100,7 @@ async function takeSample(
         }
       }
     }
-  } catch {
-    return { error: `Failed to sample ${target}` }
+  } catch (error) {
+    return { error: `Failed to sample ${target}: ${error instanceof Error ? error.message : String(error)}`, backend: target === "memory" || target === "file" ? "node" : "platform" }
   }
-}
-
-function parsePsOutput(raw: string): { header: string; processes: Array<Record<string, string>> } {
-  const lines = raw.trim().split("\n")
-  if (lines.length < 2) return { header: raw, processes: [] }
-  const header = lines[0]
-  const procLines = lines.slice(1).filter((l) => l.trim())
-  const processes = procLines.map((l) => ({ line: l }))
-  return { header, processes }
 }

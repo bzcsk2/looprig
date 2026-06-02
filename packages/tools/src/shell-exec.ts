@@ -1,11 +1,13 @@
 import { spawn } from "node:child_process"
-import * as os from "node:os"
 import { resolve } from "node:path"
 import type { AgentTool, ToolProgressUpdate } from "@deepicode/core"
 import { safeStringify, hasBinaryEncoding } from "./safe-stringify.js"
 import { isSensitive } from "./sensitive.js"
+import { normalizePlatform } from "./platform/capabilities.js"
+import { terminateProcessTree } from "./platform/process-tree.js"
+import { resolveShellBackend, type ShellBackendId } from "./platform/shell-backend.js"
 
-const DENY_PATTERNS = [
+const POSIX_DENY_PATTERNS = [
   /\brm\s+(?:-[A-Za-z]*r[A-Za-z]*\s+.*\/\*|.*-[A-Za-z]*r[A-Za-z]*\s+\/)/,
   /\bsudo\b/,
   /\bmkfs\b/,
@@ -18,8 +20,17 @@ const DENY_PATTERNS = [
   /\bgit\s+commit\b/,
 ]
 
-function isDenied(command: string): string | null {
-  for (const p of DENY_PATTERNS) {
+const POWERSHELL_DENY_PATTERNS = [
+  /\bRemove-Item\b[^;\n]*(?:-Recurse\b[^;\n]*)?(?:[A-Za-z]:\\|\/)\s*(?:-\w+\s*)*$/i,
+  /\bFormat-Volume\b/i,
+  /\bClear-Disk\b/i,
+  /\bInitialize-Disk\b/i,
+  /\bStart-Process\b[^;\n]*-Verb\s+RunAs\b/i,
+]
+
+function isDenied(command: string, backend: ShellBackendId): string | null {
+  const patterns = backend === "bash" ? POSIX_DENY_PATTERNS : POWERSHELL_DENY_PATTERNS
+  for (const p of patterns) {
     if (p.test(command.trim())) return p.source
   }
   return null
@@ -28,7 +39,7 @@ function isDenied(command: string): string | null {
 export function createBashTool(): AgentTool {
   return {
     name: "bash",
-    description: "Run a shell command (bash). Returns stdout+stderr (truncated).",
+    description: "Run a command using the current platform shell. The historical tool name remains bash for compatibility. Returns stdout+stderr (truncated).",
     parameters: {
       type: "object",
       properties: {
@@ -46,7 +57,13 @@ export function createBashTool(): AgentTool {
         return { content: safeStringify({ error: "command is required" }), isError: true }
       }
       const command = args.command.trim()
-      const denied = isDenied(command)
+      let backend
+      try {
+        backend = await resolveShellBackend(normalizePlatform())
+      } catch (error) {
+        return { content: safeStringify({ error: error instanceof Error ? error.message : String(error) }), isError: true }
+      }
+      const denied = isDenied(command, backend.id)
       if (denied) {
         return { content: safeStringify({ error: `Command denied: matches dangerous pattern /${denied}/` }), isError: true }
       }
@@ -62,7 +79,7 @@ export function createBashTool(): AgentTool {
       const timeoutMs = typeof args.timeout_ms === "number" ? Math.max(0, Math.floor(args.timeout_ms)) : 30_000
       const maxChars = typeof args.max_chars === "number" ? Math.max(0, Math.floor(args.max_chars)) : 200_000
 
-      const out = await runBash(command, cwd, timeoutMs, maxChars, ctx.signal, ctx.reportProgress)
+      const out = await runShell(command, cwd, timeoutMs, maxChars, ctx.signal, ctx.reportProgress, backend)
       if (hasBinaryEncoding(out.stdout) || hasBinaryEncoding(out.stderr)) {
         ;(out as any).encoding_warning = "output contains non-UTF-8 binary data"
       }
@@ -119,7 +136,8 @@ function createProgressThrottle(report?: (update: ToolProgressUpdate) => void): 
   }
 }
 
-async function runBash(command: string, cwd: string, timeoutMs: number, maxChars: number, signal?: AbortSignal, reportProgress?: (update: ToolProgressUpdate) => void): Promise<{
+async function runShell(command: string, cwd: string, timeoutMs: number, maxChars: number, signal: AbortSignal | undefined, reportProgress: ((update: ToolProgressUpdate) => void) | undefined, backend: { id: ShellBackendId; executable: string; args: string[] }): Promise<{
+  backend: ShellBackendId
   command: string
   cwd: string
   stdout: string
@@ -128,9 +146,9 @@ async function runBash(command: string, cwd: string, timeoutMs: number, maxChars
   timedOut: boolean
 }> {
   return await new Promise((resolve, reject) => {
-    const isWindows = os.platform() === "win32"
-    const child = spawn("bash", ["-c", command], {
-      cwd, detached: !isWindows,
+    const platform = normalizePlatform()
+    const child = spawn(backend.executable, [...backend.args, command], {
+      cwd, detached: platform !== "win32",
       env: { ...process.env, GIT_EDITOR: "true", GIT_SEQUENCE_EDITOR: "true", EDITOR: "true" },
     })
 
@@ -143,33 +161,11 @@ async function runBash(command: string, cwd: string, timeoutMs: number, maxChars
     const report = createProgressThrottle(reportProgress)
 
     const killChild = (graceful = false) => {
-      try {
-        if (graceful) {
-          if (!isWindows && child.pid) {
-            process.kill(-child.pid, "SIGTERM")
-          } else {
-            child.kill("SIGTERM")
-          }
-          sigtermTimer = setTimeout(() => {
-            try {
-              if (!isWindows && child.pid) {
-                process.kill(-child.pid, "SIGKILL")
-              } else {
-                child.kill("SIGKILL")
-              }
-            } catch {
-              child.kill("SIGKILL")
-            }
-          }, 5000)
-          return
-        }
-        if (!isWindows && child.pid) {
-          process.kill(-child.pid, "SIGKILL")
-        } else {
-          child.kill("SIGKILL")
-        }
-      } catch {
-        child.kill("SIGKILL")
+      terminateProcessTree(child, !graceful, platform)
+      if (graceful) {
+        sigtermTimer = setTimeout(() => {
+          terminateProcessTree(child, true, platform)
+        }, 5000)
       }
     }
 
@@ -197,6 +193,7 @@ async function runBash(command: string, cwd: string, timeoutMs: number, maxChars
       const stdoutFinal = finalizeBounded(stdoutBuf)
       const stderrFinal = finalizeBounded(stderrBuf)
       resolve({
+        backend: backend.id,
         command,
         cwd,
         stdout: stdoutFinal.text,

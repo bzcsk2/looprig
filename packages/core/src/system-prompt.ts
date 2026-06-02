@@ -7,6 +7,7 @@ const BASE_PROMPT = `你是 deepicode，一个终端原生的 AI 编程助手。
   工作目录：{cwd}
   工作区根目录：{workspaceRoot}
   平台：{platform}
+  Shell backend：{shellBackend}
   日期：{date}
 </env>
 
@@ -223,10 +224,13 @@ export function buildSystemPrompt(cwd: string): string {
   const now = new Date()
   const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
   const osPlatform = platform()
+  const shellBackend = process.env.DEEPICODE_SHELL
+    ?? (osPlatform === "win32" ? "PowerShell (pwsh.exe preferred, powershell.exe fallback)" : osPlatform === "darwin" ? "/bin/bash" : "bash")
 
   return BASE_PROMPT
     .replace("{cwd}", cwd)
     .replace("{workspaceRoot}", cwd)
     .replace("{platform}", osPlatform)
+    .replace("{shellBackend}", shellBackend)
     .replace("{date}", dateStr)
 }

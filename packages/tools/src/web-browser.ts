@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process"
 import { isIP } from "node:net"
+import { fileURLToPath } from "node:url"
 import type { AgentTool } from "@deepicode/core"
 import { safeStringify } from "./safe-stringify.js"
 import { hasPrivateIP, isPrivateHostname } from "./web-fetch.js"
@@ -125,7 +126,7 @@ export function createWebBrowserTool(): AgentTool {
       let stderr: string
       let exitCode: number | null
       try {
-        const result = await runPlaywright(runner.pathname, payload, timeoutMs + 5000, ctx.signal)
+        const result = await runPlaywright(fileURLToPath(runner), payload, timeoutMs + 5000, ctx.signal)
         stdout = result.stdout
         stderr = result.stderr
         exitCode = result.exitCode

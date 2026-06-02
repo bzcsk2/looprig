@@ -34,6 +34,8 @@ import { createSendMessageTool } from "./send-message.js"
 import { createLspTool } from "./lsp.js"
 import { safeStringify, hasBinaryEncoding } from "./safe-stringify.js"
 import { clearReadTracker } from "./stale-read.js"
+import { getPlatformCapabilities, normalizePlatform } from "./platform/capabilities.js"
+import { clearShellBackendCache, resolveShellBackend, setShellBackendLogger } from "./platform/shell-backend.js"
 
 export {
   ToolRegistry,
@@ -70,6 +72,11 @@ export {
   safeStringify,
   hasBinaryEncoding,
   clearReadTracker,
+  getPlatformCapabilities,
+  normalizePlatform,
+  clearShellBackendCache,
+  resolveShellBackend,
+  setShellBackendLogger,
 }
 export type { TaskItem }
 

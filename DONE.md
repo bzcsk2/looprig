@@ -21,7 +21,7 @@ bun test
 | 检查项 | 状态 |
 |--------|------|
 | TypeScript | `bun run typecheck` 通过 |
-| 测试 | `780 pass / 0 fail`，共 `55` 个测试文件 |
+| 测试 | `787 pass / 0 fail`，共 `56` 个测试文件 |
 
 ---
 
@@ -619,6 +619,22 @@ DEEPICODE_TRACE=1
 - `packages/tui/src/App.tsx` 的 `handleSubmit()` 改用上述 helper；React state、异步 Skill 加载、退出和 bridge submit 行为保持在组件内。
 - 新增 `packages/tui/__tests__/commands.test.ts`，覆盖命令别名、未知输入、thinking 校验、Agent 切换、help 文本、Skill 截断和 malformed fallback。
 - 验收：CL-52 专项 `6 pass / 0 fail`；typecheck 通过；全量 `780 pass / 0 fail`，共 `55` 个测试文件。
+
+### OS-00 / OS-10：平台适配原则与能力层
+
+- 新增 `packages/tools/src/platform/`：
+  - `capabilities.ts`：集中式平台能力模型
+  - `shell-backend.ts`：Bash / pwsh / powershell 探测、缓存、环境变量覆盖和诊断事件
+  - `process-tree.ts`：POSIX process group 与 Windows `taskkill.exe /T` 回收入口
+  - `monitor-backend.ts`：memory、process、disk 平台采样入口
+  - `scheduler-backend.ts`、`notification-backend.ts`：平台 backend 选择契约
+- `bash` 工具保持历史名称，内部改为平台 shell；system prompt 增加 shell backend 信息。
+- `glob` 使用 `relative()` + `isAbsolute()` 做目录边界判断；Browser runner 使用 `fileURLToPath()`。
+- MCP auth 的 `chmod(0600)` 在 Windows 上降级为 best-effort 文件写入。
+- Monitor 首轮接入异步平台 backend：memory 使用 Node `os`，process/disk 不再使用同步 shell pipeline。
+- 新增 7 个 OS-10 平台能力测试。
+- 保留边界：OS-11/12/13 尚需 macOS、Windows 原生验收；Scheduler、Notification 业务工具尚未切换 backend。
+- 验收：typecheck 通过；平台相关目标测试通过；全量 `787 pass / 0 fail`，共 `56` 个测试文件。
 
 ---
 

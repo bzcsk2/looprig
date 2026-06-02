@@ -1,4 +1,4 @@
-import { resolve } from "node:path"
+import { isAbsolute, relative, resolve } from "node:path"
 import { realpathSync } from "node:fs"
 import type { AgentTool } from "@deepicode/core"
 import { safeStringify } from "./safe-stringify.js"
@@ -29,7 +29,8 @@ export function createGlobTool(): AgentTool {
       try {
         const realSearch = realpathSync(searchPath)
         const realBase = realpathSync(ctx.cwd)
-        if (!realSearch.startsWith(realBase + "/") && realSearch !== realBase) {
+        const rel = relative(realBase, realSearch)
+        if (rel.startsWith("..") || isAbsolute(rel)) {
           return { content: safeStringify({ error: "path is outside the project directory" }), isError: true }
         }
       } catch {

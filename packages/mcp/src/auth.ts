@@ -86,7 +86,7 @@ async function readStore(filePath: string): Promise<AuthStore> {
 async function writeStore(filePath: string, store: AuthStore): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true })
   await writeFile(filePath, `${JSON.stringify(store, null, 2)}\n`, { encoding: "utf8", mode: 0o600 })
-  await chmod(filePath, 0o600)
+  if (process.platform !== "win32") await chmod(filePath, 0o600)
 }
 
 function mask(value: string): string {

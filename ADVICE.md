@@ -266,7 +266,7 @@ tool_progress(done)
 | macOS | 原生可用 | `/bin/bash -c`，允许配置覆盖 | 第一阶段兼容 `crontab`；第二阶段评估 `launchd` | `osascript`，失败时 terminal bell |
 | Windows | 原生 PowerShell 可用，不要求安装 WSL 或 Git Bash | 优先 `pwsh.exe -NoProfile -NonInteractive -Command`，fallback `powershell.exe` | `schtasks.exe` | PowerShell 通知能力或 terminal bell fallback |
 
-### OS-00 平台适配原则
+### ✅ OS-00 平台适配原则
 
 1. 保持对模型暴露的工具名 `bash` 暂时不变。该名称已经进入 agent tool 列表、权限规则、TUI 渲染和大量测试；立即改名会制造无关回归。
 2. 将 `bash` 视为历史兼容名，内部语义改为“执行当前平台 shell 命令”。工具 description 和 system prompt 必须告诉模型真实 backend。
@@ -275,7 +275,7 @@ tool_progress(done)
 5. 平台判断集中管理，禁止在每个工具中散落 `process.platform === ...` 分支。
 6. 所有外部命令使用 `spawn` / `execFile` 参数数组，避免拼接 shell 字符串导致转义和注入问题。
 
-### OS-10 建立平台能力层
+### ✅ OS-10 建立平台能力层
 
 建议新增：
 
@@ -304,6 +304,13 @@ interface PlatformCapabilities {
 - 覆盖值必须经过可执行文件探测；不可用时返回结构化错误，不静默回退到语义不同的 shell。
 - 默认探测只在首次使用时执行并缓存，避免每次工具调用产生额外子进程。
 - 将平台和选中的 backend 写入诊断日志，但不记录用户命令全文。
+
+完成边界：
+
+- 已新增 `packages/tools/src/platform/` 六个模块：capabilities、shell、process-tree、monitor、scheduler、notification。
+- Shell backend 支持缓存探测、`DEEPICODE_SHELL`、`DEEPICODE_SHELL_ARGS` 和诊断 logger 注入点。
+- `bash` 工具已开始消费 shell backend 和 process-tree helper；Monitor、glob、Browser runner、MCP auth 已完成第一轮接入。
+- `OS-11/12/13` 仍需在 macOS 和 Windows 原生环境验收并补平台专项测试，不因基础层完成而自动关闭。
 
 ### OS-11 Shell backend 与进程树终止
 
@@ -527,7 +534,7 @@ os: [ubuntu-latest, macos-latest, windows-latest]
 
 只有 Phase 0-5 完成且行为测试稳定后，才进入本阶段。
 
-当前状态说明：CL-50/51/52 已在测试保护下提前完成，但 Phase 4 平台适配仍未完成。下一步仍应回到 OS-00、OS-10，不要把 Phase 6 完成误解为 Windows/macOS 已可发布。
+当前状态说明：CL-50/51/52 已在测试保护下提前完成，但 Phase 4 平台适配仍未完成。OS-00/10 已完成，下一步应继续 OS-11/12/13，不要把 Phase 6 完成误解为 Windows/macOS 已可发布。
 
 ### ✅ CL-50 `StreamingToolExecutor` 渐进提取
 
