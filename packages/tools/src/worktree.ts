@@ -3,6 +3,8 @@ import { resolve } from "node:path"
 import type { AgentTool } from "@deepicode/core"
 import { safeStringify } from "./safe-stringify.js"
 import { isSensitive } from "./sensitive.js"
+import { terminateProcessTree } from "./platform/process-tree.js"
+import { normalizePlatform } from "./platform/capabilities.js"
 
 export function createWorktreeTool(): AgentTool {
   return {
@@ -68,8 +70,9 @@ export function createWorktreeTool(): AgentTool {
 }
 
 function runGit(args: string[], cwd: string, timeoutMs: number, signal?: AbortSignal): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  const platform = normalizePlatform()
   return new Promise((resolve) => {
-    const child = spawn("git", args, { cwd })
+    const child = spawn("git", args, { cwd, detached: platform !== "win32" })
     let stdout = ""
     let stderr = ""
     let done = false
@@ -82,13 +85,13 @@ function runGit(args: string[], cwd: string, timeoutMs: number, signal?: AbortSi
     }
 
     const timer = setTimeout(() => {
-      child.kill("SIGKILL")
+      terminateProcessTree(child, true, platform)
       finish(124)
     }, timeoutMs)
 
     if (signal) {
-      if (signal.aborted) { child.kill("SIGKILL"); finish(130); return }
-      signal.addEventListener("abort", () => { child.kill("SIGKILL"); finish(130) }, { once: true })
+      if (signal.aborted) { terminateProcessTree(child, true, platform); finish(130); return }
+      signal.addEventListener("abort", () => { terminateProcessTree(child, true, platform); finish(130) }, { once: true })
     }
 
     child.stdout.on("data", (b) => { stdout += String(b) })

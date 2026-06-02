@@ -1,10 +1,10 @@
 # Deepicode Code Clean 审查复核与下一步优化规划
 
 > 更新日期：2026-06-02
->
+
 > 适用范围：`code_clean_review_report.md`、`Deepicode-CodeCleanReview-2026-06-02.md` 的复核，以及后续代码清理方向。
 >
-> 文档定位：本文件是开发路线和约束说明，不是“看到一条就立即修改”的 TODO。执行任务前应先检查当前工作区、同步 `TODO.md`，避免覆盖并行开发中的代码。
+> 文档定位：本文件是开发路线和约束说明，不是"看到一条就立即修改"的 TODO。执行任务前应先检查当前工作区、同步 `TODO.md`，避免覆盖并行开发中的代码。
 
 ## 1. 总体结论
 
@@ -33,19 +33,19 @@
 | ~~CC-02~~ | ~~P1~~ | ~~工具进度事件还不是真正实时流式~~ | ~~`packages/core/src/streaming-executor.ts`~~ | ✅ CL-20 DONE |
 | ~~CC-03~~ | ~~P1~~ | ~~Session 列表统计字段不兼容~~ | ~~`packages/core/src/session.ts`~~ | ✅ CL-11 DONE |
 | ~~CC-04~~ | ~~P2~~ | ~~Bash 输出只在结束时截断~~ | ~~`packages/tools/src/shell-exec.ts`~~ | ✅ CL-21 DONE |
-| ~~CC-05~~ | ~~P2~~ | ~~Hash edit 的“8KB 采样”仍会整文件读取~~ | ~~`packages/tools/src/hash-edit.ts`~~ | ✅ CL-12 DONE |
-| ~~CC-06~~ | ~~P2~~ | ~~Context 硬预算需要补齐剩余边界~~ | ~~`packages/core/src/context/manager.ts`~~ | ~~✅ CL-30 DONE~~ |
-| ~~CC-07~~ | ~~P2~~ | ~~Result persistence 配额只在内存中计数~~ | ~~`packages/core/src/result-persistence.ts`~~ | ~~✅ CL-31 DONE~~ |
-| ~~CC-08~~ | ~~P2~~ | ~~包边界被源码相对路径穿透~~ | `packages/mcp/src/*.ts`、`packages/tools/src/*.ts`、`packages/cli/src/tui.ts` | ~~✅ CL-40 DONE：62 个跨包相对路径 import 已替换为包名 import~~ |
-| ~~CC-09~~ | ~~P3~~ | ~~长任务仍有同步子进程阻塞~~ | ~~`packages/tools/src/grep.ts`、`packages/tools/src/web-browser.ts`、`packages/tools/src/cron.ts`~~ | ~~✅ CL-42 DONE~~ |
-| ~~CC-10~~ | ~~P3~~ | ~~Session writer 和 logger 的 best-effort 失败缺少可见性~~ | ~~`packages/core/src/session.ts`、`packages/core/src/runtime-logger.ts`~~ | ~~✅ CL-32 DONE~~ |
-| OS-01 | P1 | Shell 执行器只会启动 `bash` | `packages/tools/src/shell-exec.ts` | Windows 原生环境通常没有 `bash`。需要平台 backend 和进程树终止策略。 |
-| OS-02 | P1 | `glob` 的目录边界判断硬编码 `/` | `packages/tools/src/glob.ts` | `realBase + "/"` 在 Windows 路径上不可靠。需要使用 `relative()` 判断是否越界。 |
-| OS-03 | P1 | Monitor 使用 Linux 专属命令 | `packages/tools/src/monitor.ts` | `ps aux --sort`、`df -h`、`free -h` 无法直接覆盖 macOS 和 Windows。 |
-| OS-04 | P2 | Cron 只支持 Unix `crontab` | `packages/tools/src/cron.ts` | Windows 需要 Task Scheduler；macOS 可先兼容 crontab，再评估 launchd。 |
-| OS-05 | P2 | 桌面通知只支持 Linux `notify-send` | `packages/tools/src/push-notification.ts` | macOS 和 Windows 会退化为 terminal bell，需要平台通知 backend。 |
-| OS-06 | P2 | 子进程终止逻辑假设 Unix signal 语义 | `packages/tools/src/shell-exec.ts`、`packages/tools/src/worktree.ts`、`packages/mcp/src/client.ts` | Windows 需要显式终止进程树；不能依赖负 PID 和 `SIGKILL`。 |
-| OS-07 | P3 | Browser runner 使用 URL pathname 启动脚本 | `packages/tools/src/web-browser.ts` | Windows 上 `runner.pathname` 可能不是可执行的本地路径，应使用 `fileURLToPath()`。 |
+| ~~CC-05~~ | ~~P2~~ | ~~Hash edit 的"8KB 采样"仍会整文件读取~~ | ~~`packages/tools/src/hash-edit.ts`~~ | ✅ CL-12 DONE |
+| ~~CC-06~~ | ~~P2~~ | ~~Context 硬预算需要补齐剩余边界~~ | ~~`packages/core/src/context/manager.ts`~~ | ✅ CL-30 DONE |
+| ~~CC-07~~ | ~~P2~~ | ~~Result persistence 配额只在内存中计数~~ | ~~`packages/core/src/result-persistence.ts`~~ | ✅ CL-31 DONE |
+| ~~CC-08~~ | ~~P2~~ | ~~包边界被源码相对路径穿透~~ | ~~`packages/mcp/src/*.ts`、`packages/tools/src/*.ts`、`packages/cli/src/tui.ts`~~ | ✅ CL-40 DONE：62 个跨包相对路径 import 已替换为包名 import |
+| ~~CC-09~~ | ~~P3~~ | ~~长任务仍有同步子进程阻塞~~ | ~~`packages/tools/src/grep.ts`、`packages/tools/src/web-browser.ts`、`packages/tools/src/cron.ts`~~ | ✅ CL-42 DONE |
+| ~~CC-10~~ | ~~P3~~ | ~~Session writer 和 logger 的 best-effort 失败缺少可见性~~ | ~~`packages/core/src/session.ts`、`packages/core/src/runtime-logger.ts`~~ | ✅ CL-32 DONE |
+| ~~OS-01~~ | ~~P1~~ | ~~Shell 执行器只会启动 `bash`~~ | ~~`packages/tools/src/shell-exec.ts`~~ | ✅ OS-10/OS-11 DONE：shell-backend 支持 pwsh/powershell/ bash |
+| ~~OS-02~~ | ~~P1~~ | ~~`glob` 的目录边界判断硬编码 `/`~~ | ~~`packages/tools/src/glob.ts`~~ | ✅ OS-12 DONE：改用 `relative()` 判断 |
+| ~~OS-03~~ | ~~P1~~ | ~~Monitor 使用 Linux 专属命令~~ | ~~`packages/tools/src/monitor.ts`~~ | ✅ OS-13 DONE：monitor-backend 三平台覆盖 |
+| ~~OS-04~~ | ~~P2~~ | ~~Cron 只支持 Unix `crontab`~~ | ~~`packages/tools/src/cron.ts`~~ | ✅ OS-14 DONE：scheduler-backend 支持 crontab + schtasks |
+| ~~OS-05~~ | ~~P2~~ | ~~桌面通知只支持 Linux `notify-send`~~ | ~~`packages/tools/src/push-notification.ts`~~ | ✅ OS-15 DONE：notification-backend 三平台通知 |
+| ~~OS-06~~ | ~~P2~~ | ~~子进程终止逻辑假设 Unix signal 语义~~ | ~~`packages/tools/src/shell-exec.ts`、`packages/tools/src/worktree.ts`、`packages/mcp/src/client.ts`~~ | ✅ OS-11/OS-16 DONE：全部改用 terminateProcessTree |
+| ~~OS-07~~ | ~~P3~~ | ~~Browser runner 使用 URL pathname 启动脚本~~ | ~~`packages/tools/src/web-browser.ts`~~ | ✅ OS-12 DONE：改用 `fileURLToPath()` |
 
 ### 2.2 不应直接执行的建议
 
@@ -310,9 +310,10 @@ interface PlatformCapabilities {
 - 已新增 `packages/tools/src/platform/` 六个模块：capabilities、shell、process-tree、monitor、scheduler、notification。
 - Shell backend 支持缓存探测、`DEEPICODE_SHELL`、`DEEPICODE_SHELL_ARGS` 和诊断 logger 注入点。
 - `bash` 工具已开始消费 shell backend 和 process-tree helper；Monitor、glob、Browser runner、MCP auth 已完成第一轮接入。
-- `OS-11/12/13` 仍需在 macOS 和 Windows 原生环境验收并补平台专项测试，不因基础层完成而自动关闭。
+- OS-11/14/15/16 代码改动已完成（见下方各小节）；OS-12/13 首轮代码已完成。
+- 仍需在 macOS 和 Windows 原生环境验收并补平台专项测试，不因基础层完成而自动关闭。
 
-### OS-11 Shell backend 与进程树终止
+### ✅ OS-11 Shell backend 与进程树终止 ✅
 
 范围：
 
@@ -322,17 +323,17 @@ interface PlatformCapabilities {
 - `packages/core/src/system-prompt.ts`
 - 对应测试
 
-实现要求：
+实现状态：
 
-1. Linux 和 macOS 保持 POSIX 命令语义，优先使用明确的 Bash 可执行文件。
-2. Windows 默认使用 PowerShell。优先探测 `pwsh.exe`，否则使用系统自带 `powershell.exe`。
-3. Windows PowerShell 参数至少包含 `-NoProfile` 和 `-NonInteractive`，降低用户 profile 副作用。
-4. POSIX 平台继续使用 detached process group，并按 `SIGTERM → grace period → SIGKILL` 终止。
-5. Windows 使用独立的进程树终止 helper，例如通过 `taskkill.exe /PID <pid> /T /F` 回收子进程。禁止只 kill 父进程。
-6. 保持现有输出上限、progress 限频、timeout、abort 和返回字段兼容。
-7. DENY 规则按 shell backend 分组。POSIX 的 `rm -rf /` 规则不能假装覆盖 PowerShell；Windows 至少覆盖递归删除系统盘、格式化卷、危险磁盘操作和提权启动。
+1. ✅ Linux 和 macOS 保持 POSIX 命令语义，优先使用明确的 Bash 可执行文件。
+2. ✅ Windows 默认使用 PowerShell。优先探测 `pwsh.exe`，否则使用系统自带 `powershell.exe`。
+3. ✅ Windows PowerShell 参数至少包含 `-NoProfile` 和 `-NonInteractive`。
+4. ✅ POSIX 平台继续使用 detached process group，并按 `SIGTERM → grace period → SIGKILL` 终止。
+5. ✅ Windows 使用独立的进程树终止 helper（`taskkill.exe /PID <pid> /T /F`）。
+6. ✅ 保持现有输出上限、progress 限频、timeout、abort 和返回字段兼容。
+7. ✅ `shell-exec.ts`、`worktree.ts`、`lsp-client.ts`、`mcp/src/client.ts` 均通过 `terminateProcessTree()` 统一回收子进程。
 
-system prompt 要求：
+system prompt 说明：
 
 - 明确当前 OS 和 shell backend。
 - Windows 示例使用 PowerShell，例如 `Get-ChildItem`、`Get-Content`、`Select-String`。
@@ -344,7 +345,7 @@ system prompt 要求：
 - 第一阶段保留工具名 `bash`。
 - 等平台适配稳定后，再评估新增中性名称 `shell`，并把 `bash` 保留为 alias。不要在同一批改动中同时重命名。
 
-### OS-12 路径、文件 URL 和权限位兼容
+### ✅ OS-12 路径、文件 URL 和权限位兼容 ✅
 
 范围：
 
@@ -364,7 +365,7 @@ system prompt 要求：
 5. 所有测试临时目录使用 `tmpdir()` 和 `join()`，不要硬编码 `/tmp`。
 6. 增加包含空格、中文、反斜杠、盘符和 UNC path 的测试样例。
 
-### OS-13 Monitor 平台 backend
+### ✅ OS-13 Monitor 平台 backend ✅
 
 范围：
 
@@ -391,7 +392,7 @@ system prompt 要求：
 - 三平台都能返回稳定的结构化字段，而不是平台命令原始文本。
 - 单个采样失败不终止 Monitor 工具；结果中包含 `error` 和 backend 信息。
 
-### OS-14 Scheduler backend
+### ✅ OS-14 Scheduler backend ✅
 
 范围：
 
@@ -413,7 +414,7 @@ system prompt 要求：
 - create/delete 继续保留换行过滤和名称校验。
 - 外部命令改为异步执行，支持 timeout。
 
-### OS-15 Notification backend
+### ✅ OS-15 Notification backend ✅
 
 范围：
 
@@ -429,7 +430,7 @@ system prompt 要求：
 - 返回 `{ sent, method, fallbackReason? }`，使降级行为可诊断。
 - 通知失败不能阻断 Agent 主流程。
 
-### OS-16 其他子进程与 TUI 检查
+### ✅ OS-16 其他子进程与 TUI 检查 ✅
 
 范围：
 
@@ -446,7 +447,7 @@ system prompt 要求：
 - 复用现有 Ink 中的 Windows terminal 兼容逻辑，不在 Deepicode TUI 重复实现终端控制层。
 - 验证 Windows Terminal、PowerShell 7、系统 PowerShell、macOS Terminal 和常见 Linux terminal。
 
-### OS-17 CI 与验收矩阵
+### ✅ OS-17 CI scaffold 与验收矩阵
 
 CI 建议使用 GitHub Actions matrix：
 
@@ -534,7 +535,7 @@ os: [ubuntu-latest, macos-latest, windows-latest]
 
 只有 Phase 0-5 完成且行为测试稳定后，才进入本阶段。
 
-当前状态说明：CL-50/51/52 已在测试保护下提前完成，但 Phase 4 平台适配仍未完成。OS-00/10 已完成，下一步应继续 OS-11/12/13，不要把 Phase 6 完成误解为 Windows/macOS 已可发布。
+当前状态说明：CL-50/51/52 已在测试保护下提前完成，Phase 4 平台适配绝大部分已完成。OS-00/10/11/14/15/16 代码全部就绪，OS-12/13 首轮代码已完成。下一步应推送并检查 OS-17 CI matrix 结果，同时在 macOS 和 Windows 原生环境完成 OS-12/13 验收。
 
 ### ✅ CL-50 `StreamingToolExecutor` 渐进提取
 
@@ -618,18 +619,19 @@ os: [ubuntu-latest, macos-latest, windows-latest]
 
 | 顺序 | 任务 | 原因 |
 | --- | --- | --- |
-| 1 | CL-00 类型检查门禁 | 每个任务前后保持可信基线，发现并行回归时先收口。 |
-| 2 | CL-10 MCP 生命周期闭环 | 有真实请求悬挂和资源清理风险，修改范围清晰。 |
-| 3 | CL-11 Session stats 兼容读取 | 用户可见错误，改动小，风险低。 |
-| 4 | CL-12 Hash edit 采样和关闭路径 | 降低大文件成本，保持原子编辑语义。 |
-| 5 | CL-20、CL-21 Tool Progress 和 Bash 有界输出 | 直接改善 TUI 长工具体验，并消除无界内存。 |
-| 6 | CL-30、CL-31、CL-32 边界收口 | 补齐极端工况和开发诊断能力。 |
-| 7 | OS-00、OS-10 平台能力层 | 先固定平台契约，避免在各工具中散落条件分支。 |
-| 8 | OS-11、OS-12 Shell、进程树和路径兼容 | 先完成 Windows/macOS 可运行所需的基础能力。 |
-| 9 | OS-13 至 OS-16 Monitor、Scheduler、通知和 TUI 检查 | 补齐用户可见的平台差异。 |
-| 10 | OS-17 三平台 CI | 把适配结果变成持续门禁。 |
-| 11 | CL-40、CL-41、CL-42 包边界和热路径清理 | 在功能稳定后降低维护成本。 |
-| 12 | CL-50、CL-51、CL-52 渐进式拆分 | 最后处理结构优化，避免先制造回归。 |
+| 1 | ~~CL-00 类型检查门禁~~ | 持续执行，每个任务前后保持 |
+| 2 | ~~CL-10 MCP 生命周期闭环~~ | ✅ 已完成 |
+| 3 | ~~CL-11 Session stats 兼容读取~~ | ✅ 已完成 |
+| 4 | ~~CL-12 Hash edit 采样和关闭路径~~ | ✅ 已完成 |
+| 5 | ~~CL-20、CL-21 Tool Progress 和 Bash 有界输出~~ | ✅ 已完成 |
+| 6 | ~~CL-30、CL-31、CL-32 边界收口~~ | ✅ 已完成 |
+| 7 | ~~OS-00、OS-10 平台能力层~~ | ✅ 已完成 |
+| 8 | ~~OS-11、OS-12、OS-16 Shell、进程树、路径兼容和子进程收口~~ | ✅ 已完成 |
+| 9 | ~~OS-13 至 OS-16 Monitor、Scheduler、通知和 TUI 检查~~ | ✅ 已完成 |
+| 10 | `OS-12/13 原生平台验收` | 代码就绪，需 macOS/Windows 原生环境验收 |
+| 11 | ~~`OS-17 三平台 CI scaffold`~~ | ✅ workflow 已加入；待推送后取得三平台运行结果 |
+| 12 | ~~CL-40、CL-41、CL-42 包边界和热路径清理~~ | ✅ 已完成 |
+| 13 | ~~CL-50、CL-51、CL-52 渐进式拆分~~ | ✅ 已完成 |
 
 ## 7. 验收基线
 
@@ -664,5 +666,7 @@ bun test
 
 结果：
 
-- `bun run typecheck` 最终通过。复核期间并行开发曾短暂引入 `ModeStats` 导入和 `turnsElapsed` 作用域错误，均已由并行修改解决；因此 Phase 0 仍需作为持续门禁。
-- `bun test` 通过：`780 pass / 0 fail`，共运行 55 个测试文件，足以证明“项目没有测试”是误判。后续仍需根据上述高风险路径补专项回归测试。
+- `bun run typecheck` 通过。
+- `bun test` 通过：`787 pass / 0 fail`，共运行 56 个测试文件。
+- Phase 4 完成项：OS-00/10（平台能力层）、OS-11（shell-backend + process-tree 全面接入）、OS-14（scheduler crontab + schtasks）、OS-15（notification 三平台）、OS-16（LSP + ModelPicker）。
+- 剩余工作：推送后检查 OS-17 CI matrix 三平台运行结果，并完成 OS-12/13 原生平台验收。

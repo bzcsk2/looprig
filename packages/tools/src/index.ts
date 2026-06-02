@@ -36,6 +36,7 @@ import { safeStringify, hasBinaryEncoding } from "./safe-stringify.js"
 import { clearReadTracker } from "./stale-read.js"
 import { getPlatformCapabilities, normalizePlatform } from "./platform/capabilities.js"
 import { clearShellBackendCache, resolveShellBackend, setShellBackendLogger } from "./platform/shell-backend.js"
+import { terminateProcessTree } from "./platform/process-tree.js"
 
 export {
   ToolRegistry,
@@ -77,6 +78,7 @@ export {
   clearShellBackendCache,
   resolveShellBackend,
   setShellBackendLogger,
+  terminateProcessTree,
 }
 export type { TaskItem }
 

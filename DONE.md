@@ -636,6 +636,60 @@ DEEPICODE_TRACE=1
 - 保留边界：OS-11/12/13 尚需 macOS、Windows 原生验收；Scheduler、Notification 业务工具尚未切换 backend。
 - 验收：typecheck 通过；平台相关目标测试通过；全量 `787 pass / 0 fail`，共 `56` 个测试文件。
 
+### OS-11：子进程终止收口（worktree + MCP client）
+
+- `packages/tools/src/worktree.ts` 的 `runGit()` 改用 `terminateProcessTree()` 终止子进程，设置 `detached: platform !== "win32"`。
+- `packages/mcp/src/client.ts` 的 `connect()` 和 `disconnect()` 改用 `terminateProcessTree()` 替代直接 `proc.kill("SIGTERM"/"SIGKILL")`。
+- `packages/tools/src/index.ts` 新增 `terminateProcessTree` 导出供 MCP 包消费。
+- 验收：typecheck 通过；MCP 22/22 测试通过；cron+worktree 19/19 测试通过。
+
+### OS-14：Scheduler backend 集成
+
+- `packages/tools/src/platform/scheduler-backend.ts` 大幅扩展：新增 `listJobs()`、`createJob()`、`deleteJob()` 统一入口，内部包含 crontab 和 schtasks 两条实现路径：
+  - Crontab（POSIX）：保持原有 `getCrontab`/`setCrontab`/`parseCronJobs`/`removeCronJob` 逻辑。
+  - Schtasks（Windows）：新增 `listSchTasksJobs()`、`createSchTaskJob()`、`deleteSchTaskJob()`，任务名前加 `DEEPICODE_TASK_PREFIX`。
+  - `cronToSchTaskSchedule()`：支持 MINUTE、HOURLY、DAILY、WEEKLY、MONTHLY 子集映射；不支持表达式返回明确错误。
+- `packages/tools/src/cron.ts` 完全重写为调用 `scheduler-backend.ts` 统一入口，不再直接操作 `crontab`。
+- `getSchedulerBackend()` 和 `normalizePlatform()` 保持导出。
+- 验收：typecheck 通过；9/9 cron 测试 + 10/10 cron-worktree 测试通过。
+
+### OS-15：Notification backend 集成
+
+- `packages/tools/src/push-notification.ts` 完全重写：
+  - Linux 使用 `execFile("notify-send", args)`，不拼接 shell 字符串。
+  - macOS 使用 `execFile("osascript", ...)`，参数经过 `osAEscape()` 转义。
+  - Windows 使用 `spawn("powershell.exe", ...)` 通过 `WScript.Shell.Popup` 弹窗，无需额外依赖。
+  - 所有路径失败均降级为 terminal bell（`process.stdout.write("\x07")`）。
+  - 返回 `{ sent, method, fallbackReason? }` 结构化结果。
+- 验收：typecheck 通过。
+
+### OS-16：LSP client 子进程终止 + ModelPicker Windows 剪贴板
+
+- `packages/tools/src/lsp-client.ts` 的 `runLspRequest()` 改用 `terminateProcessTree()` 替代直接 `child.kill()`：
+  - `spawn()` 增加 `detached: platform !== "win32"`。
+  - AbortSignal 监听器、`withTimeout` 回调和 `finally` 清理路径统一使用 `terminateProcessTree(child, true, platform)`。
+- `packages/tui/src/ModelPicker.tsx` 的 `tryReadClipboard()` 新增 Windows 剪贴板读取：
+  - 使用 `powershell.exe -NoProfile -NonInteractive -Command Get-Clipboard`。
+  - 按 `darwin → win32 → linux` 优先级探测，各平台互斥。
+  - 修复 import 路径（`'child_process'` → `'node:child_process'`）。
+- Ink 包已具备丰富的 Windows terminal 兼容逻辑（`clearTerminal.ts`、`termio/osc.ts`、`terminal.ts`、`use-terminal-title.ts`、`App.tsx` 等），Deepicode TUI 无需重复实现。
+- 验收：typecheck 通过；MCP 22/22、cron 19/19、bridge 12/12 测试全部通过。
+
+### OS-11：System prompt 平台集成
+
+- `buildSystemPrompt()` 新增 `options` 参数（`{ osPlatform?, shellBackend? }`），允许调用方传入平台信息。
+- `packages/cli/src/tui.ts` 在设置 system prompt 前调用 `normalizePlatform()` + `resolveShellBackend()` 获取平台能力，传给 `buildSystemPrompt()`。
+- 未传入 options 时保持向后兼容：自动使用 `process.platform` 和 `DEEPICODE_SHELL` 环境变量。
+- 验收：typecheck 通过；81/81 core 测试通过。
+
+### OS-17：三平台 CI scaffold
+
+- 新增 `.github/workflows/ci.yml`：GitHub Actions matrix（`ubuntu-latest`、`macos-latest`、`windows-latest`）。
+- 每个平台执行：typecheck、全量测试、shell backend 探测（POSIX: bash, Windows: pwsh/powershell）、进程树回收验证、glob 路径边界、atomic rename 测试、Monitor memory/cpu 检测、scheduler 和 notification backend 可用性报告。
+- 耗时步骤使用 `fail-fast: false` 确保一个平台失败不影响其他平台结果。
+- workflow 监听 `master` push / pull request，也支持手工 `workflow_dispatch`。
+- 验收边界：本地已完成格式检查；三平台运行结果必须在推送后由 GitHub Actions 产生，不能用本地 Linux 结果代替。
+
 ---
 
 ## 6. 文档维护规则

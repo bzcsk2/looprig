@@ -3,7 +3,7 @@ import { writeSync } from "node:fs"
 import { loadConfig } from "@deepicode/core"
 import { ReasonixEngine } from "@deepicode/core"
 import { buildSystemPrompt } from "@deepicode/core"
-import { createDefaultTools, clearReadTracker } from "@deepicode/tools"
+import { createDefaultTools, clearReadTracker, normalizePlatform, resolveShellBackend } from "@deepicode/tools"
 import { McpHost, createListMcpResourcesTool, createReadMcpResourceTool, createMcpAuthTool, createListMcpToolsTool, createCallMcpToolTool, setMcpHost } from "@deepicode/mcp"
 import React from "react"
 import { wrappedRender as render } from "@deepicode/ink"
@@ -40,7 +40,12 @@ async function main(): Promise<void> {
   const engine = sessionId
     ? await ReasonixEngine.recover(config, sessionId)
     : new ReasonixEngine(config, clearReadTracker)
-  engine.setSystemPrompt(buildSystemPrompt(process.cwd()))
+  const platform = normalizePlatform()
+  const shellBackend = await resolveShellBackend(platform)
+  engine.setSystemPrompt(buildSystemPrompt(process.cwd(), {
+    osPlatform: platform,
+    shellBackend: `${shellBackend.id} (${shellBackend.executable})`,
+  }))
   for (const tool of createDefaultTools()) {
     engine.registerTool(tool)
   }

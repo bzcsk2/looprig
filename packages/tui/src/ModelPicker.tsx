@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Box, Text, useInput } from '@deepicode/ink';
 import { PROVIDERS, getApiKeyEnvVar } from '@deepicode/core';
-import { execFile } from 'child_process';
+import { execFile } from 'node:child_process';
 import { t } from './i18n/index.js';
 
 interface ModelPickerProps {
@@ -20,7 +20,9 @@ async function tryReadClipboard(): Promise<string | null> {
   const cmds: Array<{ bin: string; args: string[] }> = [];
   if (platform === 'darwin') {
     cmds.push({ bin: 'pbpaste', args: [] });
-  } else if (platform === 'linux') {
+  } else if (platform === 'win32') {
+    cmds.push({ bin: 'powershell.exe', args: ['-NoProfile', '-NonInteractive', '-Command', 'Get-Clipboard'] });
+  } else {
     cmds.push({ bin: 'wl-paste', args: [] });
     cmds.push({ bin: 'xclip', args: ['-o', '-selection', 'clipboard'] });
     cmds.push({ bin: 'xsel', args: ['--clipboard', '--output'] });

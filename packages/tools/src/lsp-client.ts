@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process"
 import { readFile } from "node:fs/promises"
 import { pathToFileURL } from "node:url"
+import { terminateProcessTree } from "./platform/process-tree.js"
+import { normalizePlatform } from "./platform/capabilities.js"
 
 interface LspRequestOptions {
   command: string
@@ -17,7 +19,8 @@ interface LspRequestOptions {
 }
 
 export async function runLspRequest(options: LspRequestOptions): Promise<unknown> {
-  const child = spawn(options.command, options.args, { cwd: options.cwd, stdio: ["pipe", "pipe", "pipe"] })
+  const platform = normalizePlatform()
+  const child = spawn(options.command, options.args, { cwd: options.cwd, stdio: ["pipe", "pipe", "pipe"], detached: platform !== "win32" })
   let nextId = 1
   let buffer: Buffer<ArrayBufferLike> = Buffer.alloc(0)
   let stderr = ""
@@ -40,7 +43,7 @@ export async function runLspRequest(options: LspRequestOptions): Promise<unknown
     })
   })
 
-  const abort = () => child.kill()
+  const abort = () => terminateProcessTree(child, true, platform)
   options.signal?.addEventListener("abort", abort, { once: true })
   try {
     const request = (method: string, params: unknown): Promise<unknown> => {
@@ -48,7 +51,7 @@ export async function runLspRequest(options: LspRequestOptions): Promise<unknown
       send(child.stdin, { jsonrpc: "2.0", id, method, params })
       return withTimeout(new Promise((resolve, reject) => pending.set(id, { resolve, reject })), options.timeoutMs, () => {
         pending.delete(id)
-        child.kill()
+        terminateProcessTree(child, true, platform)
       })
     }
     const notify = (method: string, params: unknown) => send(child.stdin, { jsonrpc: "2.0", method, params })
@@ -74,7 +77,7 @@ export async function runLspRequest(options: LspRequestOptions): Promise<unknown
     throw error
   } finally {
     options.signal?.removeEventListener("abort", abort)
-    child.kill()
+    terminateProcessTree(child, true, platform)
   }
 }
 

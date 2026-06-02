@@ -220,11 +220,12 @@ const BASE_PROMPT = `你是 deepicode，一个终端原生的 AI 编程助手。
 - 当前对话最多 10 轮工具调用循环。你需要在限制内高效完成工作
 - 如果达到限制仍未完成，在最终回复中说明已做了什么、还剩什么`
 
-export function buildSystemPrompt(cwd: string): string {
+export function buildSystemPrompt(cwd: string, options?: { osPlatform?: string; shellBackend?: string }): string {
   const now = new Date()
   const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
-  const osPlatform = platform()
-  const shellBackend = process.env.DEEPICODE_SHELL
+  const osPlatform = options?.osPlatform ?? platform()
+  const shellBackend = options?.shellBackend
+    ?? process.env.DEEPICODE_SHELL
     ?? (osPlatform === "win32" ? "PowerShell (pwsh.exe preferred, powershell.exe fallback)" : osPlatform === "darwin" ? "/bin/bash" : "bash")
 
   return BASE_PROMPT

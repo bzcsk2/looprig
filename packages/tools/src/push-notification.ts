@@ -1,6 +1,8 @@
-import { execSync } from "node:child_process"
+import { execFile, spawn } from "node:child_process"
 import type { AgentTool } from "@deepicode/core"
 import { safeStringify } from "./safe-stringify.js"
+import { getNotificationBackend } from "./platform/notification-backend.js"
+import { normalizePlatform } from "./platform/capabilities.js"
 
 export function createPushNotificationTool(): AgentTool {
   return {
@@ -28,20 +30,81 @@ export function createPushNotificationTool(): AgentTool {
         ? args.urgency
         : "normal"
 
+      const platform = normalizePlatform()
+      const backend = getNotificationBackend(platform)
+
+      let fallbackReason: string | undefined
+
       try {
-        execSync(`notify-send --urgency=${urgency} ${escapeShell(args.title)} ${escapeShell(args.message)}`, {
-          timeout: 5000,
-        })
-        return { content: safeStringify({ sent: true, method: "notify-send", title: args.title, message: args.message }), isError: false }
-      } catch {
-        // Fallback to terminal bell
-        process.stdout.write("\x07")
-        return { content: safeStringify({ sent: true, method: "terminal-bell", title: args.title, message: args.message }), isError: false }
+        if (backend.id === "notify-send") {
+          await sendNotifySend(args.title, args.message, urgency)
+          return { content: safeStringify({ sent: true, method: "notify-send", title: args.title, message: args.message }), isError: false }
+        }
+
+        if (backend.id === "osascript") {
+          await sendOsAScript(args.title, args.message)
+          return { content: safeStringify({ sent: true, method: "osascript", title: args.title, message: args.message }), isError: false }
+        }
+
+        if (backend.id === "powershell") {
+          const sent = await sendPowerShell(args.title, args.message)
+          if (sent) {
+            return { content: safeStringify({ sent: true, method: "powershell", title: args.title, message: args.message }), isError: false }
+          }
+          fallbackReason = "PowerShell notification not available"
+        }
+      } catch (e) {
+        fallbackReason = e instanceof Error ? e.message : String(e)
+      }
+
+      // Fallback to terminal bell
+      process.stdout.write("\x07")
+      return {
+        content: safeStringify({ sent: true, method: "terminal-bell", fallbackReason, title: args.title, message: args.message }),
+        isError: false,
       }
     },
   }
 }
 
-function escapeShell(s: string): string {
-  return `'${s.replace(/'/g, "'\\''")}'`
+function notifySendArgs(title: string, message: string, urgency: string): string[] {
+  return ["--urgency=" + urgency, title, message]
+}
+
+function sendNotifySend(title: string, message: string, urgency: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile("notify-send", notifySendArgs(title, message, urgency), { timeout: 5000 }, (err) => {
+      if (err) reject(err)
+      else resolve()
+    })
+  })
+}
+
+function sendOsAScript(title: string, message: string): Promise<void> {
+  const script = `display notification ${osAEscape(message)} with title ${osAEscape(title)}`
+  return new Promise((resolve, reject) => {
+    execFile("osascript", ["-e", script], { timeout: 5000 }, (err) => {
+      if (err) reject(err)
+      else resolve()
+    })
+  })
+}
+
+function osAEscape(s: string): string {
+  // osascript uses double quotes in AppleScript string literals;
+  // escape internal quotes and backslashes
+  return `"${s.replace(/[\\"]/g, "\\$&")}"`
+}
+
+function sendPowerShell(title: string, message: string): Promise<boolean> {
+  // Use WScript COM popup for Windows notifications (no extra dependencies)
+  const escapedMessage = message.replace(/["\\]/g, "\\$&")
+  const escapedTitle = title.replace(/["\\]/g, "\\$&")
+  const script = `(New-Object -ComObject WScript.Shell).Popup("${escapedMessage}", 0, "${escapedTitle}", 64)`
+
+  return new Promise((resolve) => {
+    const proc = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], { timeout: 5000 })
+    proc.on("error", () => resolve(false))
+    proc.on("close", (code) => resolve(code === 0))
+  })
 }

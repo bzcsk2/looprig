@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process"
 import { resolve } from "node:path"
 import { readFile } from "node:fs/promises"
+import { terminateProcessTree, normalizePlatform } from "@deepicode/tools"
 import type { DiagnosticLogger } from "./diagnostics.js"
 import { noopDiagnosticLogger } from "./diagnostics.js"
 
@@ -55,10 +56,12 @@ export class McpClient {
   private _connected = false
   private name: string
   private logger: DiagnosticLogger
+  private platform: ReturnType<typeof normalizePlatform>
 
   constructor(name: string, logger: DiagnosticLogger = noopDiagnosticLogger) {
     this.name = name
     this.logger = logger
+    this.platform = normalizePlatform()
   }
 
   get connected(): boolean { return this._connected }
@@ -73,6 +76,7 @@ export class McpClient {
     this.proc = spawn(command, args, {
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, ...env },
+      detached: this.platform !== "win32",
     })
 
     this.proc.stdout?.on("data", (chunk: Buffer) => {
@@ -104,7 +108,7 @@ export class McpClient {
       clientInfo: { name: "deepicode", version: "0.1.0" },
     }).catch((err) => {
       // initialize failed — clean up before rethrowing
-      this.proc?.kill("SIGTERM")
+      if (this.proc) terminateProcessTree(this.proc, false, this.platform)
       rejectAllPending(this.pending, err)
       this.proc = null
       this._connected = false
@@ -113,7 +117,7 @@ export class McpClient {
 
     const initResult = result as { protocolVersion?: string; capabilities?: Record<string, unknown>; serverInfo?: Record<string, unknown> }
     if (!initResult?.protocolVersion) {
-      this.proc?.kill("SIGTERM")
+      if (this.proc) terminateProcessTree(this.proc, false, this.platform)
       rejectAllPending(this.pending, new Error("MCP initialize failed: no protocolVersion in response"))
       this.proc = null
       this._connected = false
@@ -132,9 +136,9 @@ export class McpClient {
     if (!this.proc) return
     rejectAllPending(this.pending, new Error("MCP client disconnected"))
     try {
-      this.proc.kill("SIGTERM")
+      if (this.proc) terminateProcessTree(this.proc, false, this.platform)
       await new Promise<void>(resolve => {
-        const t = setTimeout(() => { try { this.proc?.kill("SIGKILL") } catch {} resolve() }, 5000)
+        const t = setTimeout(() => { if (this.proc) terminateProcessTree(this.proc, true, this.platform); resolve() }, 5000)
         this.proc?.once("exit", () => { clearTimeout(t); resolve() })
       })
     } catch {}
