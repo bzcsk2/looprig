@@ -59,9 +59,9 @@ bun test packages/mcp/__tests__/mcp-host.test.ts packages/mcp/__tests__/mcp-tool
 
 | 顺序 | 任务 | 原因 |
 |------|------|------|
-| 1 | `P5.5` | 工具执行期间细粒度进度 |
+| 1 | ~~`P5.5`~~ | 已完成 |
 | 2 | `ST2–ST4` | 策略系统后续阶段 |
-| 3 | `M10`、`H1–H23` | 文件权限、困难场景和压力测试 |
+
 
 不要一次领取多个任务。每个编号完成后都应保持全量测试为绿色。
 
@@ -69,24 +69,9 @@ bun test packages/mcp/__tests__/mcp-host.test.ts packages/mcp/__tests__/mcp-tool
 
 ## 3. 功能补齐
 
-### P5.5：工具执行期间细粒度进度流（可选）
+---
 
-**目标**：工具执行期间提供 heartbeat 和 bash stdout/stderr 尾部预览。
-
-**涉及文件**：
-
-- `packages/core/src/interface.ts`：添加 `ToolProgressUpdate` 和可选 `reportProgress()`
-- `packages/core/src/progress-channel.ts`：新增单 run 有界异步进度通道
-- `packages/core/src/streaming-executor.ts`：handler 运行期间转发 progress 和 heartbeat
-- `packages/core/src/loop.ts`：transient progress 不写 SessionWriter
-- `packages/tools/src/shell-exec.ts`：实时报告 stdout、stderr、timeout、abort
-- `packages/tui/src/bridge.tsx`、`DeepiMessages.tsx`：live preview 与耗时状态
-
-**测试**：
-
-- 有界队列、合并、清理、shared 顺序、中断、bash progress、TUI preview。
-
-### ST2–ST4：策略系统后续阶段
+## 3. 策略系统后续阶段
 
 继续开发前先补专项设计，只领取一个阶段：
 

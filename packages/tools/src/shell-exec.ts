@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process"
 import * as os from "node:os"
 import { resolve } from "node:path"
-import type { AgentTool } from "../../core/src/interface.js"
+import type { AgentTool, ToolProgressUpdate } from "../../core/src/interface.js"
 import { safeStringify, hasBinaryEncoding } from "./safe-stringify.js"
 import { isSensitive } from "./sensitive.js"
 
@@ -64,7 +64,7 @@ export function createBashTool(): AgentTool {
       const timeoutMs = typeof args.timeout_ms === "number" ? Math.max(0, Math.floor(args.timeout_ms)) : 30_000
       const maxChars = typeof args.max_chars === "number" ? Math.max(0, Math.floor(args.max_chars)) : 200_000
 
-      const out = await runBash(command, cwd, timeoutMs, maxChars, ctx.signal)
+      const out = await runBash(command, cwd, timeoutMs, maxChars, ctx.signal, ctx.reportProgress)
       if (hasBinaryEncoding(out.stdout) || hasBinaryEncoding(out.stderr)) {
         ;(out as any).encoding_warning = "output contains non-UTF-8 binary data"
       }
@@ -73,7 +73,7 @@ export function createBashTool(): AgentTool {
   }
 }
 
-async function runBash(command: string, cwd: string, timeoutMs: number, maxChars: number, signal?: AbortSignal): Promise<{
+async function runBash(command: string, cwd: string, timeoutMs: number, maxChars: number, signal?: AbortSignal, reportProgress?: (update: ToolProgressUpdate) => void): Promise<{
   command: string
   cwd: string
   stdout: string
@@ -166,8 +166,14 @@ async function runBash(command: string, cwd: string, timeoutMs: number, maxChars
       }, { once: true })
     }
 
-    child.stdout.on("data", (b) => { stdout += String(b) })
-    child.stderr.on("data", (b) => { stderr += String(b) })
+    child.stdout.on("data", (b) => {
+      stdout += String(b)
+      reportProgress?.({ content: `stdout: ${String(b).slice(-200)}` })
+    })
+    child.stderr.on("data", (b) => {
+      stderr += String(b)
+      reportProgress?.({ content: `stderr: ${String(b).slice(-200)}` })
+    })
     child.on("error", (e) => {
       clearTimeout(timer)
       if (sigtermTimer) clearTimeout(sigtermTimer)

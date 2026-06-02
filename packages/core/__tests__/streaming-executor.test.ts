@@ -503,3 +503,52 @@ describe("StreamingToolExecutor", () => {
     expect(results).toHaveLength(2)
   })
 })
+
+describe("P5.5: tool progress via reportProgress", () => {
+  it("should flush buffered progress events before tool result", async () => {
+    const { StreamingToolExecutor } = await import("../src/streaming-executor.js")
+    let progressCb: ((u: { content: string }) => void) | undefined
+    const progressTool: AgentTool = {
+      name: "prog", description: "", parameters: {},
+      concurrency: "exclusive", approval: "read",
+      async execute(_args, ctx) {
+        progressCb = ctx.reportProgress as typeof progressCb
+        ctx.reportProgress?.({ content: "step 1" })
+        ctx.reportProgress?.({ content: "step 2" })
+        return { content: "done", isError: false }
+      },
+    }
+    const tools = new Map<string, AgentTool>([["prog", progressTool]])
+    const executor = new StreamingToolExecutor(tools, "test-session", process.cwd())
+    const toolCalls = [
+      { id: "1", type: "function" as const, function: { name: "prog", arguments: "{}" } },
+    ]
+    const events: LoopEvent[] = []
+    for await (const e of executor.run(toolCalls, new AbortController().signal, () => {})) { events.push(e) }
+
+    // Order: start → running → step1 → step2 → tool → done
+    expect(events[0]).toMatchObject({ role: "tool_start" })
+    expect(events[1]).toMatchObject({ role: "tool_progress", content: "running" })
+    expect(events[2]).toMatchObject({ role: "tool_progress", content: "step 1" })
+    expect(events[3]).toMatchObject({ role: "tool_progress", content: "step 2" })
+    expect(events[4]).toMatchObject({ role: "tool" })
+    expect(events[5]).toMatchObject({ role: "tool_progress", content: "done" })
+  })
+
+  it("should not crash when tool does not use reportProgress", async () => {
+    const { StreamingToolExecutor } = await import("../src/streaming-executor.js")
+    const simpleTool: AgentTool = {
+      name: "simple", description: "", parameters: {},
+      concurrency: "exclusive", approval: "read",
+      async execute() { return { content: "ok", isError: false } },
+    }
+    const tools = new Map<string, AgentTool>([["simple", simpleTool]])
+    const executor = new StreamingToolExecutor(tools, "test-session", process.cwd())
+    const toolCalls = [
+      { id: "1", type: "function" as const, function: { name: "simple", arguments: "{}" } },
+    ]
+    const events: LoopEvent[] = []
+    for await (const e of executor.run(toolCalls, new AbortController().signal, () => {})) { events.push(e) }
+    expect(events).toHaveLength(4) // start, running, tool, done
+  })
+})

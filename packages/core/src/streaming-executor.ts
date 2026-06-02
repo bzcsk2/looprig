@@ -1,4 +1,4 @@
-import type { AgentTool, LoopEvent, ToolContext, ToolResult } from "./interface.js"
+import type { AgentTool, LoopEvent, ToolContext, ToolResult, ToolProgressUpdate } from "./interface.js"
 import type { ToolCall } from "./types.js"
 import { repairToolArguments } from "./context/repair.js"
 import type { PermissionEngine, HookManager, PermissionDecision } from "@deepicode/security"
@@ -199,14 +199,14 @@ export class StreamingToolExecutor {
   }
 
   // Execute tool and return result without appending to context
-  private async executeToolResult(tc: ToolCall, index: number, signal: AbortSignal, baseLogger = this.logger): Promise<{ event: LoopEvent; result: ToolResult }> {
+  private async executeToolResult(tc: ToolCall, index: number, signal: AbortSignal, baseLogger = this.logger, reportProgress?: (update: ToolProgressUpdate) => void): Promise<{ event: LoopEvent; result: ToolResult }> {
     const diagnosticsEnabled = baseLogger.isEnabled("error")
     const startedAt = diagnosticsEnabled ? Date.now() : 0
     const logger = diagnosticsEnabled
       ? baseLogger.child({ toolCallId: tc.id, toolName: tc.function.name, toolCallIndex: index })
       : baseLogger
     const handler = this.tools.get(tc.function.name)
-    const toolCtx = this.createToolContext(signal, [tc.function.name])
+    const toolCtx = this.createToolContext(signal, [tc.function.name], reportProgress)
 
     if (!handler) {
       const result = makeToolError(`Unknown tool: ${tc.function.name}`)
@@ -297,11 +297,12 @@ export class StreamingToolExecutor {
     }
   }
 
-  private createToolContext(signal: AbortSignal, stack: string[]): ToolContext {
+  private createToolContext(signal: AbortSignal, stack: string[], reportProgress?: (update: ToolProgressUpdate) => void): ToolContext {
     return {
       cwd: this.cwd,
       sessionId: this.sessionId,
       signal,
+      reportProgress,
       delegateTask: this.delegateTask,
       switchAgent: this.switchAgent,
       invokeTool: async (name, args) => {
@@ -335,6 +336,12 @@ export class StreamingToolExecutor {
   ): AsyncGenerator<LoopEvent, void> {
     yield { role: "tool_progress", toolName: tc.function.name, toolCallIndex: index, content: "running" }
 
+    // P5.5: Progress buffer — tools push updates via reportProgress, flushed after execution
+    const progressBuffer: ToolProgressUpdate[] = []
+    const reportProgress = (update: ToolProgressUpdate) => {
+      progressBuffer.push(update)
+    }
+
     const permResult = await this.checkAskPermission(tc, index)
     if (permResult === "deny") {
       const result = makeToolError(`Tool call denied: ${tc.function.name} requires manual approval`)
@@ -356,8 +363,12 @@ export class StreamingToolExecutor {
       }
     }
 
-    const { event, result } = await this.executeToolResult(tc, index, signal, logger)
+    const { event, result } = await this.executeToolResult(tc, index, signal, logger, reportProgress)
     settle(tc, index, result)
+    // P5.5: Flush buffered progress before "done"
+    for (const p of progressBuffer) {
+      yield { role: "tool_progress", toolName: tc.function.name, toolCallIndex: index, content: p.content, metadata: p.metadata }
+    }
     yield event
     yield { role: "tool_progress", toolName: tc.function.name, toolCallIndex: index, content: "done" }
   }

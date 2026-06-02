@@ -198,7 +198,10 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
             try {
               for await (const toolEvent of toolExecutor.run(toolCalls, signal, appendToolResult, diagnosticsEnabled ? { submitId, turnCount } : undefined)) {
                 yield toolEvent
-                sessionWriter?.enqueue({ ts: Date.now(), type: "event", payload: toolEvent })
+                // P5.5: tool_progress is transient — don't persist to session
+                if (toolEvent.role !== 'tool_progress') {
+                  sessionWriter?.enqueue({ ts: Date.now(), type: "event", payload: toolEvent })
+                }
               }
               // persist messages with tool results for crash recovery
               sessionWriter?.enqueue({ ts: Date.now(), type: "messages", payload: ctx.buildMessages() })

@@ -52,9 +52,16 @@ export interface ToolContext {
   cwd: string
   sessionId: string
   signal?: AbortSignal
+  reportProgress?: (update: ToolProgressUpdate) => void
   invokeTool?: (name: string, args: Record<string, unknown>) => Promise<ToolResult>
   delegateTask?: (task: string, agentType: "build" | "plan", files: string[]) => Promise<string>
   switchAgent?: (name: "build" | "plan") => string
+}
+
+export interface ToolProgressUpdate {
+  content: string
+  toolName?: string
+  metadata?: Record<string, unknown>
 }
 
 export interface ToolResult {

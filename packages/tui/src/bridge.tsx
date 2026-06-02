@@ -213,6 +213,19 @@ export function createBridge(
                 ),
               }));
               if (event.toolCallIndex !== undefined) activeToolKeys.delete(event.toolCallIndex);
+            } else if (event.content !== 'running') {
+              // P5.5: intermediate progress — update tool output preview
+              const key = event.toolCallIndex === undefined
+                ? fallbackToolKey(undefined, event.toolName)
+                : activeToolKeys.get(event.toolCallIndex) ?? fallbackToolKey(event.toolCallIndex, event.toolName);
+              updateTurn(turnId, turn => ({
+                ...turn,
+                tools: turn.tools.map(tool =>
+                  tool.key === key
+                    ? { ...tool, output: tool.output + (tool.output ? '\n' : '') + event.content, elapsedMs: Date.now() - tool.startedAt }
+                    : tool
+                ),
+              }));
             }
             break;
 
