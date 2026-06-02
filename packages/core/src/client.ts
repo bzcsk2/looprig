@@ -172,6 +172,7 @@ export class DeepSeekClient implements ChatClient {
     try {
       const decoder = new TextDecoder("utf-8")
       let buf = ""
+      let firstChunk = true
 
       const toolState = new Map<number, { id?: string; name?: string; args: string }>()
       const finalized = new Set<number>()
@@ -199,7 +200,15 @@ export class DeepSeekClient implements ChatClient {
         const { value, done } = await reader.read()
         clearTimeout(watchdog)
         if (done) break
-        buf += decoder.decode(value, { stream: true })
+        let chunk = decoder.decode(value, { stream: true })
+        // Strip BOM (U+FEFF) from first chunk
+        if (firstChunk) {
+          firstChunk = false
+          if (chunk.charCodeAt(0) === 0xFEFF) {
+            chunk = chunk.slice(1)
+          }
+        }
+        buf += chunk
         resetWatchdog()
 
         while (true) {

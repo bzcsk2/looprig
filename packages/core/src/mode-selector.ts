@@ -16,6 +16,7 @@ export type SwitchDecision =
 const COOLDOWN_MS = 120_000
 const ERROR_THRESHOLD = 3
 const ERROR_WINDOW_MS = 10 * 60_000
+const EMERGENCY_RECOVERY_MS = 5 * 60_000 // 5 minutes recovery time
 
 export type ModeSelectorState = {
   currentMode: ThinkingMode
@@ -41,7 +42,14 @@ export function evaluateModeSwitch(
   now: number = Date.now()
 ): SwitchDecision {
   if (state.emergencyMode) {
-    return { action: "keep", reason: "emergency_mode_active" }
+    // Auto-recover after EMERGENCY_RECOVERY_MS
+    if (now - state.lastSwitchTime >= EMERGENCY_RECOVERY_MS) {
+      state.emergencyMode = false
+      state.emergencyPreviousMode = null
+      // Continue with normal evaluation
+    } else {
+      return { action: "keep", reason: "emergency_mode_active" }
+    }
   }
 
   const cooldownRemaining = COOLDOWN_MS - (now - state.lastSwitchTime)

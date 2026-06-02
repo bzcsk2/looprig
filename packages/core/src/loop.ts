@@ -21,7 +21,7 @@ let toolCallSeq = 0
 /** Normalize tool call ID: ensure non-empty, stable, unique per turn. */
 function normalizeToolCallId(rawId: string | undefined, toolName: string): string {
   if (rawId && rawId.trim()) return rawId.trim()
-  return `${toolName}-${++toolCallSeq}-${Date.now()}`
+  return `${toolName}-${++toolCallSeq}-${randomUUID()}`
 }
 
 export interface PendingInstruction {

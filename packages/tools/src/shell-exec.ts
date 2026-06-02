@@ -51,11 +51,12 @@ export function createBashTool(): AgentTool {
         return { content: safeStringify({ error: `Command denied: matches dangerous pattern /${denied}/` }), isError: true }
       }
       // Extract file paths from command and check sensitive files
-      const pathRe = /\b([\w./-]*(?:\.\w{1,10}))\b/g
+      // Match files with extensions OR dotfiles (like .env, .npmrc) OR known sensitive filenames
+      const pathRe = /\b([\w./-]*(?:\.\w{1,10}))\b|\b([\w./-]*\/?\.[\w.-]+)\b|\b([\w./-]*(?:id_rsa|id_ed25519|credentials\.json|service-account\.json|token\.json))\b/g
       let pathMatch: RegExpExecArray | null
       while ((pathMatch = pathRe.exec(command)) !== null) {
-        const fp = pathMatch[1]
-        if (isSensitive(fp)) {
+        const fp = pathMatch[1] || pathMatch[2] || pathMatch[3]
+        if (fp && isSensitive(fp)) {
           return { content: safeStringify({ error: `Command references sensitive file: ${fp}` }), isError: true }
         }
       }

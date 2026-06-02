@@ -349,7 +349,7 @@ function sanitizeValue(value: unknown, key = "", depth = 0): unknown {
 }
 
 function isSensitiveKey(key: string): boolean {
-  return /api[-_]?key|authorization|password|passwd|secret|token|credential|cookie/i.test(key)
+  return /api[-_]?key|authorization|password|passwd|secret|token|credential|cookie|private[-_]?key|access[-_]?key|auth[-_]?token/i.test(key)
 }
 
 function serializeError(error: unknown): Record<string, unknown> | undefined {
