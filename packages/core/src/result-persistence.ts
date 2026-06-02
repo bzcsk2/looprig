@@ -1,13 +1,3 @@
-/**
- * P4: Result Overflow Persistence
- *
- * When tool results exceed a size threshold, the full content is written to
- * a file under `.deepicode/results/<sessionId>/` and the context receives
- * only a preview with metadata pointing to the persisted file.
- *
- * AUD-02: Per-session quota accounting, preview fallback, file cleanup.
- */
-
 import { mkdir, writeFile, readdir, rm, stat } from "node:fs/promises"
 import { join } from "node:path"
 import { randomUUID } from "node:crypto"
@@ -26,26 +16,51 @@ export interface ResultPersistenceConfig {
 }
 
 export interface PersistedResult {
-  /** The preview text to use in context */
   preview: string
-  /** Path to the full persisted file */
   persistedPath: string
-  /** Original content size in chars */
   originalChars: number
-  /** Preview size in chars */
   previewChars: number
 }
 
-/** Per-session byte usage tracker (in-memory, resets on restart) */
+/** Per-session byte usage tracker (process-lifetime soft quota) */
 const sessionByteUsage = new Map<string, number>()
+/** Track which sessions have been initialized from disk */
+const sessionInitialized = new Set<string>()
 
-/**
- * Check if a tool result needs persistence and optionally persist it.
- * Returns the original result if under threshold, or a modified result
- * with preview + metadata if over threshold.
- *
- * Write failures fall back to truncated preview with a warning — never blocks main flow.
- */
+async function initSessionUsage(sessionId: string, logger: RuntimeLogger): Promise<void> {
+  if (sessionInitialized.has(sessionId)) return
+  sessionInitialized.add(sessionId)
+  const dir = join(process.cwd(), ".deepicode", "results", sanitizeId(sessionId))
+  try {
+    const files = await readdir(dir)
+    let totalBytes = 0
+    for (const f of files) {
+      try {
+        const s = await stat(join(dir, f))
+        totalBytes += s.size
+      } catch {
+        continue
+      }
+    }
+    sessionByteUsage.set(sessionId, totalBytes)
+    if (logger.isEnabled("debug")) {
+      logger.debug("tool.result.usage_init", { sessionId, existingBytes: totalBytes, fileCount: files.length })
+    }
+  } catch {
+    sessionByteUsage.set(sessionId, 0)
+  }
+}
+
+function addByteUsage(sessionId: string, bytes: number): void {
+  const current = sessionByteUsage.get(sessionId) ?? 0
+  sessionByteUsage.set(sessionId, current + bytes)
+}
+
+function subtractByteUsage(sessionId: string, bytes: number): void {
+  const current = sessionByteUsage.get(sessionId) ?? 0
+  sessionByteUsage.set(sessionId, Math.max(0, current - bytes))
+}
+
 export async function maybePersistResult(
   content: string,
   sessionId: string,
@@ -65,7 +80,9 @@ export async function maybePersistResult(
     logger.info("tool.result.overflow", { toolName, originalChars: content.length, previewChars: previewLen })
   }
 
-  // AUD-02: Check session quota before persisting
+  // CL-31: Initialize usage from disk on first use for this session
+  await initSessionUsage(sessionId, logger)
+
   const quota = config?.sessionQuotaBytes ?? DEFAULT_SESSION_QUOTA_BYTES
   const contentBytes = Buffer.byteLength(content, "utf-8")
   const used = sessionByteUsage.get(sessionId) ?? 0
@@ -94,8 +111,7 @@ export async function maybePersistResult(
     const filePath = join(dir, filename)
     await writeFile(filePath, content, { mode: 0o600 })
 
-    // AUD-02: Track byte usage
-    sessionByteUsage.set(sessionId, used + contentBytes)
+    addByteUsage(sessionId, contentBytes)
 
     const persisted: PersistedResult = {
       preview,
@@ -108,9 +124,8 @@ export async function maybePersistResult(
       logger.info("tool.result.persisted", { toolName, persistedPath: filePath, originalChars: content.length })
     }
 
-    // AUD-02: Cleanup old files if exceeding max count
     const maxFiles = config?.maxFilesPerSession ?? DEFAULT_MAX_FILES_PER_SESSION
-    cleanupOldFiles(dir, maxFiles, logger).catch(() => {})
+    cleanupOldFiles(dir, maxFiles, sessionId, logger).catch(() => {})
 
     return {
       content: preview,
@@ -128,7 +143,7 @@ export async function maybePersistResult(
   }
 }
 
-async function cleanupOldFiles(dir: string, maxFiles: number, logger: RuntimeLogger): Promise<void> {
+async function cleanupOldFiles(dir: string, maxFiles: number, sessionId: string, logger: RuntimeLogger): Promise<void> {
   let files: string[]
   try {
     files = await readdir(dir)
@@ -151,43 +166,44 @@ async function cleanupOldFiles(dir: string, maxFiles: number, logger: RuntimeLog
   )
 
   const valid = entries.filter((e): e is NonNullable<typeof e> => e !== null)
-  valid.sort((a, b) => b.mtimeMs - a.mtimeMs) // newest first
+  valid.sort((a, b) => b.mtimeMs - a.mtimeMs)
 
   const toRemove = valid.slice(maxFiles)
+  let totalRemovedBytes = 0
   for (const entry of toRemove) {
     try {
       await rm(join(dir, entry.name))
+      totalRemovedBytes += entry.size
       if (logger.isEnabled("debug")) {
-        logger.debug("tool.result.cleanup", { removed: entry.name })
+        logger.debug("tool.result.cleanup", { removed: entry.name, size: entry.size })
       }
-    } catch {
-      // best-effort
+    } catch (e) {
+      if (logger.isEnabled("warn")) {
+        logger.warn("tool.result.cleanup_error", { file: entry.name, error: e instanceof Error ? e.message : String(e) })
+      }
     }
+  }
+
+  // CL-31: Reclaim memory count for removed files
+  if (totalRemovedBytes > 0) {
+    subtractByteUsage(sessionId, totalRemovedBytes)
   }
 }
 
-/**
- * Reset session byte usage (for testing).
- */
 export function resetSessionByteUsage(sessionId?: string): void {
   if (sessionId) {
     sessionByteUsage.delete(sessionId)
+    sessionInitialized.delete(sessionId)
   } else {
     sessionByteUsage.clear()
+    sessionInitialized.clear()
   }
 }
 
-/**
- * Get current byte usage for a session (for testing).
- */
 export function getSessionByteUsage(sessionId: string): number {
   return sessionByteUsage.get(sessionId) ?? 0
 }
 
-/**
- * Sanitize an ID for use in file paths. Replaces non-alphanumeric chars
- * with hyphens, prevents path traversal.
- */
 function sanitizeId(raw: string): string {
   return raw.replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 64)
 }

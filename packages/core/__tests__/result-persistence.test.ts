@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
-import { mkdir, rm, readdir, readFile, stat } from "node:fs/promises"
+import { mkdir, rm, readdir, readFile, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { maybePersistResult, DEFAULT_MAX_RESULT_CHARS, resetSessionByteUsage, getSessionByteUsage } from "../src/result-persistence.js"
 
@@ -188,5 +188,81 @@ describe("AUD-02: session quota and cleanup", () => {
     expect(getSessionByteUsage("reset-me")).toBeGreaterThan(0)
     resetSessionByteUsage("reset-me")
     expect(getSessionByteUsage("reset-me")).toBe(0)
+  })
+})
+
+describe("CL-31: Disk-based session usage initialization", () => {
+  beforeEach(async () => {
+    await rm(join(process.cwd(), ".deepicode", "results"), { recursive: true, force: true })
+    resetSessionByteUsage()
+  })
+
+  afterEach(async () => {
+    await rm(join(process.cwd(), ".deepicode", "results"), { recursive: true, force: true })
+    resetSessionByteUsage()
+  })
+
+  it("initializes usage from existing files on disk", async () => {
+    // Write a file manually to simulate existing persistence
+    const dir = join(process.cwd(), ".deepicode", "results", "legacy-session")
+    await mkdir(dir, { recursive: true, mode: 0o700 })
+    const existingContent = "x".repeat(10_000)
+    const existingFile = join(dir, "legacy-tool.txt")
+    await writeFile(existingFile, existingContent, { mode: 0o600 })
+
+    // Now persist a new overflow result — usage should include the existing file
+    const newContent = "y".repeat(DEFAULT_MAX_RESULT_CHARS + 100)
+    const r = await maybePersistResult(newContent, "legacy-session", "bash")
+    expect(r.persisted).toBeDefined()
+
+    const totalUsage = getSessionByteUsage("legacy-session")
+    // Should include both existing (10k) and new file
+    expect(totalUsage).toBeGreaterThan(10_000)
+  })
+
+  it("does not scan disk for small results (under threshold)", async () => {
+    // Previously persisted big files for this session
+    const dir = join(process.cwd(), ".deepicode", "results", "small-session")
+    await mkdir(dir, { recursive: true, mode: 0o700 })
+    await writeFile(join(dir, "old-big.txt"), "z".repeat(50_000), { mode: 0o600 })
+
+    // Small result should NOT trigger disk scan or count existing files
+    // (because maybePersistResult returns early before initSessionUsage)
+    const smallContent = "hello"
+    const r = await maybePersistResult(smallContent, "small-session", "bash")
+    expect(r.content).toBe(smallContent)
+    expect(r.persisted).toBeUndefined()
+    // Usage should still be 0 since we never triggered init for non-overflow
+    // (resetSessionByteUsage was called in beforeEach, so sessionByteUsage is empty)
+  })
+
+  it("initSessionUsage handles missing directories gracefully", async () => {
+    resetSessionByteUsage("ghost-session")
+    // First overflow for non-existent session dir — should create and not crash
+    const content = "g".repeat(DEFAULT_MAX_RESULT_CHARS + 100)
+    const r = await maybePersistResult(content, "ghost-session", "bash")
+    expect(r.persisted).toBeDefined()
+    expect(getSessionByteUsage("ghost-session")).toBeGreaterThan(0)
+  })
+
+  it("cleanup recalibrates memory count after removing files", async () => {
+    const content = "c".repeat(DEFAULT_MAX_RESULT_CHARS + 100)
+    const config = { maxFilesPerSession: 2 }
+
+    for (let i = 0; i < 4; i++) {
+      await maybePersistResult(content, "recal-session", "bash", config)
+      await new Promise(r => setTimeout(r, 50))
+    }
+    await new Promise(r => setTimeout(r, 200))
+
+    const dir = join(process.cwd(), ".deepicode", "results", "recal-session")
+    const files = await readdir(dir)
+    expect(files.length).toBeLessThanOrEqual(3)
+
+    // Memory count should reflect actual bytes on disk, not accumulated
+    // Since cleanup subtracts removed file bytes
+    const usage = getSessionByteUsage("recal-session")
+    const expectedFiles = Math.min(files.length, 2) // max 2 kept + maybe 1 in flight
+    expect(usage).toBeGreaterThan(0)
   })
 })

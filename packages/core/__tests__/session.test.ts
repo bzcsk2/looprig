@@ -764,3 +764,119 @@ describe("CL-11: Session stats compatibility", () => {
     expect(sessions[0].outputTokens).toBe(0)
   })
 })
+
+describe("CL-32: Session writer observability", () => {
+  let tmpDir: string
+  let logLines: string[]
+
+  const testLogger = {
+    info: vi.fn(),
+    warn: vi.fn(),
+    debug: vi.fn(),
+    error: vi.fn(),
+    isEnabled: vi.fn(() => true),
+    setLevel: vi.fn(),
+  }
+
+  beforeEach(async () => {
+    tmpDir = join(tmpdir(), `deepicode-cl32-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    await mkdir(tmpDir, { recursive: true })
+    logLines = []
+  })
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true }).catch(() => {})
+    vi.clearAllMocks()
+  })
+
+  it("logs session.writer.ready on init", async () => {
+    const sessPath = join(tmpDir, "test.jsonl")
+    const writer = new AsyncSessionWriter(sessPath, testLogger as any)
+    await writer.init()
+    expect(testLogger.debug).toHaveBeenCalledWith("session.writer.ready", expect.objectContaining({ path: sessPath }))
+  })
+
+  it("logs session.writer.serialize_error for unserializable records", () => {
+    const sessPath = join(tmpDir, "test.jsonl")
+    const writer = new AsyncSessionWriter(sessPath, testLogger as any)
+    const circular: Record<string, unknown> = { a: null }
+    circular.a = circular
+    writer.enqueue({ ts: 1, type: "event", payload: circular })
+    expect(testLogger.debug).toHaveBeenCalledWith("session.writer.serialize_error", expect.objectContaining({ type: "event" }))
+  })
+
+  it("logs session.writer.overflow when queue exceeds limit", async () => {
+    const sessPath = join(tmpDir, "test.jsonl")
+    const writer = new AsyncSessionWriter(sessPath, testLogger as any)
+    await writer.init()
+
+    for (let i = 0; i < 600; i++) {
+      writer.enqueue({ ts: i, type: "event", payload: { n: i } })
+    }
+
+    expect(testLogger.debug).toHaveBeenCalledWith("session.writer.overflow", expect.objectContaining({ droppedCount: expect.any(Number) }))
+  })
+
+  it("logs session.writer.append_error on write failure", async () => {
+    // Use a path that will fail (directory that doesn't exist and can't be created)
+    const sessPath = join(tmpDir, "nonexistent", "nested", "fail.jsonl")
+    const writer = new AsyncSessionWriter(sessPath, testLogger as any)
+
+    // Don't call init — skip the mkdir so write fails
+    // Manually set initPromise to resolve (bypass directory creation)
+    ;(writer as any).initPromise = Promise.resolve()
+
+    writer.enqueue({ ts: 1, type: "event", payload: { msg: "test" } })
+    await new Promise(r => setTimeout(r, 200))
+
+    expect(testLogger.debug).toHaveBeenCalledWith("session.writer.append_error", expect.objectContaining({
+      path: sessPath,
+    }))
+  })
+
+  it("tolerates last-line corruption (async-append guarantee)", async () => {
+    const sessPath = join(tmpDir, "robust.jsonl")
+    const writer = new AsyncSessionWriter(sessPath)
+    await writer.init()
+
+    writer.enqueue({ ts: 1, type: "messages", payload: [{ role: "user", content: "hello" }] })
+    await new Promise(r => setTimeout(r, 100))
+
+    // Manually append a corrupted line
+    const { appendFile } = await import("node:fs/promises")
+    await appendFile(sessPath, "corrupted garbage\n", "utf-8")
+
+    writer.enqueue({ ts: 2, type: "messages", payload: [{ role: "assistant", content: "world" }] })
+    await new Promise(r => setTimeout(r, 100))
+
+    SessionLoader.sessionDir = tmpDir
+    const msgs = await SessionLoader.read("robust")
+    expect(msgs).toHaveLength(1)
+    expect(msgs[0].content).toBe("world")
+  })
+
+  it("append-only model — no renames or fsync required", async () => {
+    const sessPath = join(tmpDir, "append-only.jsonl")
+    const writer = new AsyncSessionWriter(sessPath)
+    await writer.init()
+
+    writer.enqueue({ ts: 1, type: "event", payload: { step: 1 } })
+    writer.enqueue({ ts: 2, type: "event", payload: { step: 2 } })
+    await new Promise(r => setTimeout(r, 100))
+
+    const content = await readFile(sessPath, "utf-8")
+    const lines = content.trim().split("\n")
+    expect(lines).toHaveLength(2)
+
+    // Append more — should not rewrite existing content
+    writer.enqueue({ ts: 3, type: "event", payload: { step: 3 } })
+    await new Promise(r => setTimeout(r, 100))
+
+    const content2 = await readFile(sessPath, "utf-8")
+    const lines2 = content2.trim().split("\n")
+    expect(lines2).toHaveLength(3)
+    // First two lines should be unchanged
+    expect(lines2[0]).toBe(lines[0])
+    expect(lines2[1]).toBe(lines[1])
+  })
+})

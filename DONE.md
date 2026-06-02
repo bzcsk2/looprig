@@ -531,6 +531,36 @@ DEEPICODE_TRACE=1
 - Spawn error 使用 `reject`（不混淆为非零退出码）。
 - 验收：5 个 CL-21 专项测试 + 14 个 bash 回归测试 + 基线 759/759 无回归。
 
+### CL-30：Context budget 完整定义
+
+- `prefix` 单独超过 `window`：抛异常 `prefix alone exceeds window`。
+- `scratch` 单独超过 `window`：抛异常 `scratch alone exceeds window`。
+- `truncateToBudget` 处理无 user messages 的极端情况（仅 assistant+tool 循环），
+  避免无限循环。
+- `getBudget()` 方法返回 `{ prefixTokens, logTokens, scratchTokens, totalTokens, window }`。
+- 最后一个超出警告由 loop 层处理 fold signal，不抛异常。
+- 验收：新增 5 个 CL-30 边界测试 + 基线 759/759 无回归。
+
+### CL-31：Result persistence 磁盘扫描初始化
+
+- `maybePersistResult` 首次 overflow 时扫描 `.deepicode/results/<sessionId>/` 初始化用量。
+- 每个 session 只扫描一次（`sessionInitialized` 集合）。
+- 未超过 threshold 的小结果不触发扫描。
+- `cleanupOldFiles` 删除文件后同步减去内存计数（`subtractByteUsage`）。
+- cleanup 失败走 `logger.warn` 通路。
+- 验收：新增 4 个 CL-31 测试 + 基线 763/763 无回归。
+
+### CL-32：Session writer observability
+
+- `AsyncSessionWriter` 构造函数增加 `RuntimeLogger`，默认 `noopRuntimeLogger`。
+- `init()` 成功后 debug log `session.writer.ready`。
+- `enqueue` 序列化失败 debug log `session.writer.serialize_error`。
+- `evictIfNeeded` queue overflow debug log `session.writer.overflow`。
+- `flushSoon` append 失败 debug log `session.writer.append_error`。
+- 保持 append-only JSONL 模式，不要求 fsync/rename 每行。
+- Loader 继续容忍末尾行损坏。
+- 验收：新增 6 个 CL-32 测试 + 基线 769/769 无回归。
+
 ---
 
 ## 6. 文档维护规则

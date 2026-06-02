@@ -33,11 +33,11 @@
 | ~~CC-03~~ | ~~P1~~ | ~~Session 列表统计字段不兼容~~ | ~~`packages/core/src/session.ts`~~ | ✅ CL-11 DONE |
 | ~~CC-04~~ | ~~P2~~ | ~~Bash 输出只在结束时截断~~ | ~~`packages/tools/src/shell-exec.ts`~~ | ✅ CL-21 DONE |
 | ~~CC-05~~ | ~~P2~~ | ~~Hash edit 的“8KB 采样”仍会整文件读取~~ | ~~`packages/tools/src/hash-edit.ts`~~ | ✅ CL-12 DONE |
-| CC-06 | P2 | Context 硬预算需要补齐剩余边界 | `packages/core/src/context/manager.ts` | 机械截断已经存在，但 prefix/scratch 本身超预算、无 user 边界、tool-only log 等情况需要明确策略和测试。 |
-| CC-07 | P2 | Result persistence 配额只在内存中计数 | `packages/core/src/result-persistence.ts` | 重启后计数归零；清理旧文件后内存计数不回收。当前可作为软保护，但不能宣称是严格磁盘配额。 |
+| | ~~CC-06~~ | ~~P2~~ | ~~Context 硬预算需要补齐剩余边界~~ | ~~`packages/core/src/context/manager.ts`~~ | ~~✅ CL-30 DONE~~ |
+| ~~CC-07~~ | ~~P2~~ | ~~Result persistence 配额只在内存中计数~~ | ~~`packages/core/src/result-persistence.ts`~~ | ~~✅ CL-31 DONE~~ |
 | CC-08 | P2 | 包边界被源码相对路径穿透 | `packages/mcp/src/*.ts`、`packages/tools/src/*.ts`、`packages/cli/src/tui.ts` | 多个 workspace 直接引用其他包的 `src`。短期可运行，但包导出、构建和测试边界脆弱。 |
 | CC-09 | P3 | 长任务仍有同步子进程阻塞 | `packages/tools/src/grep.ts`、`packages/tools/src/web-browser.ts`、`packages/tools/src/cron.ts` | `spawnSync` 会阻塞 TUI spinner、日志 flush 和中断响应。优先改可能长时间运行的 `grep` 和浏览器调用。 |
-| CC-10 | P3 | Session writer 和 logger 的 best-effort 失败缺少可见性 | `packages/core/src/session.ts`、`packages/core/src/runtime-logger.ts` | 静默吞错符合“不阻断主流程”，但开发诊断模式下至少应记录 drop 数、最后一次写入错误和 flush 状态。 |
+| ~~CC-10~~ | ~~P3~~ | ~~Session writer 和 logger 的 best-effort 失败缺少可见性~~ | ~~`packages/core/src/session.ts`、`packages/core/src/runtime-logger.ts`~~ | ~~✅ CL-32 DONE~~ |
 
 ### 2.2 不应直接执行的建议
 
@@ -199,16 +199,16 @@ tool_progress(done)
 - 区分 timeout、abort、spawn error 和正常非零退出。
 - 保持结果字段兼容：`stdout`、`stderr`、`exitCode`、`timedOut`。
 
-## Phase 3：上下文和持久化边界收口
+## ✅ Phase 3：上下文和持久化边界收口 ✅
 
-### CL-30 Context budget 完整定义
+### ~~CL-30 Context budget 完整定义~~ ✅
 
 范围：
 
 - `packages/core/src/context/manager.ts`
 - `packages/core/__tests__/context.test.ts`
 
-要求：
+~~要求：
 
 1. 保留三区域顺序和 prefix 字节稳定性。
 2. 对以下边界明确行为：
@@ -220,7 +220,7 @@ tool_progress(done)
 3. 无法安全截断时返回结构化错误或 fold 信号，不要静默发送必然超限的请求。
 4. Token estimator 继续作为快速机械兜底。先记录实际 usage 偏差，再决定是否引入新 tokenizer。
 
-### CL-31 Result persistence 从软配额升级为可解释配额
+### ~~CL-31 Result persistence 从软配额升级为可解释配额~~ ✅
 
 范围：
 
@@ -234,7 +234,7 @@ tool_progress(done)
 - 清理失败在诊断模式记录，不影响主流程。
 - 不在每次小结果返回时扫描目录，只在首次使用或溢出结果时执行。
 
-### CL-32 Session writer 可观测性
+### ~~CL-32 Session writer 可观测性~~ ✅
 
 范围：
 

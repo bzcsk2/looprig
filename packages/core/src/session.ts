@@ -1,6 +1,7 @@
 import { mkdir, appendFile, readFile, readdir } from "node:fs/promises"
 import { dirname, resolve } from "node:path"
 import type { ChatMessage } from "./types.js"
+import { noopRuntimeLogger, type RuntimeLogger } from "./runtime-logger.js"
 
 export interface SessionRecord {
   ts: number
@@ -120,16 +121,22 @@ export class AsyncSessionWriter {
   private flushing = false
   private initPromise?: Promise<void>
   private droppedCount = 0
+  private logger: RuntimeLogger
 
   private static MAX_QUEUE_SIZE = 500
 
-  constructor(path: string) {
+  constructor(path: string, logger: RuntimeLogger = noopRuntimeLogger) {
     this.path = path
+    this.logger = logger
   }
 
   async init(): Promise<void> {
     if (!this.initPromise) {
-      this.initPromise = mkdir(dirname(this.path), { recursive: true }).then(() => {})
+      this.initPromise = mkdir(dirname(this.path), { recursive: true }).then(() => {
+        if (this.logger.isEnabled("debug")) {
+          this.logger.debug("session.writer.ready", { path: this.path })
+        }
+      })
     }
     await this.initPromise
   }
@@ -141,14 +148,19 @@ export class AsyncSessionWriter {
       this.queueRecords.push(record)
       this.evictIfNeeded()
       this.flushSoon().catch(() => {})
-    } catch {
-      // best-effort: drop unserializable records silently
+    } catch (err) {
+      if (this.logger.isEnabled("debug")) {
+        this.logger.debug("session.writer.serialize_error", {
+          type: record.type,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
     }
   }
 
   private evictIfNeeded(): void {
+    const before = this.queue.length
     while (this.queue.length > AsyncSessionWriter.MAX_QUEUE_SIZE) {
-      // Find the oldest "event" record to drop (least important)
       const idx = this.queueRecords.findIndex(r => r.type === "event")
       if (idx >= 0) {
         this.queue.splice(idx, 1)
@@ -156,7 +168,6 @@ export class AsyncSessionWriter {
         this.droppedCount++
         continue
       }
-      // No more events — drop oldest messages/stats (but keep at least 1)
       if (this.queue.length > 1) {
         this.queue.shift()
         this.queueRecords.shift()
@@ -164,6 +175,13 @@ export class AsyncSessionWriter {
       } else {
         break
       }
+    }
+    if (this.droppedCount > 0 && this.logger.isEnabled("debug")) {
+      this.logger.debug("session.writer.overflow", {
+        droppedCount: this.droppedCount,
+        queueSize: this.queue.length,
+        evicted: before - this.queue.length,
+      })
     }
   }
 
@@ -176,12 +194,22 @@ export class AsyncSessionWriter {
     this.flushing = true
     try {
       if (this.initPromise) {
-        await this.initPromise.catch(() => {}) // wait for init to finish (or fail)
+        await this.initPromise.catch(() => {})
       }
       while (this.queue.length > 0) {
         const chunk = this.queue.splice(0, 50).join("")
         this.queueRecords.splice(0, 50)
-        await appendFile(this.path, chunk, "utf-8")
+        try {
+          await appendFile(this.path, chunk, "utf-8")
+        } catch (err) {
+          if (this.logger.isEnabled("debug")) {
+            this.logger.debug("session.writer.append_error", {
+              error: err instanceof Error ? err.message : String(err),
+              path: this.path,
+            })
+          }
+          throw err
+        }
       }
     } catch {
       // best-effort: swallow write errors silently

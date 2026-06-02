@@ -533,7 +533,7 @@ describe("AUD-03: token budget force hard boundary", () => {
   })
 
   it("does not deadlock when budget is extremely small", () => {
-    const cm = new ContextManager(20, 1) // impossibly small
+    const cm = new ContextManager(20, 20) // small window but > prefix overhead
     cm.prefix.build("x")
     for (let i = 0; i < 10; i++) {
       cm.log.append({ role: "user", content: "hello ".repeat(100) })
@@ -543,5 +543,66 @@ describe("AUD-03: token budget force hard boundary", () => {
     // Should not infinite-loop
     const messages = cm.buildMessages()
     expect(Array.isArray(messages)).toBe(true)
+  })
+})
+
+describe("CL-30: Context budget boundaries", () => {
+  it("throws when prefix alone exceeds window", () => {
+    const cm = new ContextManager(1, 1) // 1 token window
+    cm.prefix.build("Hello world, this is a very long prefix that definitely should exceed one token in length")
+    cm.log.append({ role: "user", content: "hi" })
+    expect(() => cm.buildMessages()).toThrow("prefix alone")
+  })
+
+  it("throws when scratch alone exceeds window", () => {
+    const cm = new ContextManager(1, 1)
+    cm.scratch.append({ role: "assistant", content: "this is a very long scratch content that exceeds the tiny window" })
+    expect(() => cm.buildMessages()).toThrow("scratch alone")
+  })
+
+  it("truncates tool-only log when no user messages exist", () => {
+    const cm = new ContextManager(5, 500)
+    cm.prefix.build("system prompt")
+    for (let i = 0; i < 10; i++) {
+      cm.log.append({ role: "assistant", content: "response " + "x".repeat(500), tool_calls: [{ id: `tc-${i}`, type: "function", function: { name: "tool", arguments: "{}" } }] })
+      cm.log.append({ role: "tool", content: "result", tool_call_id: `tc-${i}` })
+    }
+    const msgs = cm.buildMessages()
+    // Should not loop forever and should produce valid messages
+    expect(msgs.length).toBeGreaterThan(0)
+    expect(msgs[0].role).toBe("system")
+  })
+
+  it("preserves assistant-tool atomicity during truncation", () => {
+    const cm = new ContextManager(2, 5000)
+    cm.prefix.build("system")
+    // Add 3 rounds of user/assistant/tool
+    for (let i = 0; i < 3; i++) {
+      cm.log.append({ role: "user", content: `user-${i}` })
+      cm.log.append({ role: "assistant", content: `response-${i}`, tool_calls: [{ id: `tc-${i}`, type: "function", function: { name: "tool", arguments: "{}" } }] })
+      cm.log.append({ role: "tool", content: `result-${i}`, tool_call_id: `tc-${i}` })
+    }
+    const msgs = cm.buildMessages()
+    // Should keep at most 2 user rounds
+    const userMsgs = msgs.filter(m => m.role === "user")
+    expect(userMsgs.length).toBeLessThanOrEqual(2)
+    // Each assistant with tool_calls should have matching tool result
+    const toolCalls = msgs.filter(m => m.role === "assistant" && m.tool_calls).length
+    const toolResults = msgs.filter(m => m.role === "tool").length
+    expect(toolCalls).toBe(toolResults)
+  })
+
+  it("getBudget returns correct breakdown", async () => {
+    const cm = new ContextManager(5, 10000)
+    cm.prefix.build("system prompt here")
+    cm.log.append({ role: "user", content: "hello" })
+    cm.log.append({ role: "assistant", content: "world" })
+    cm.scratch.append({ role: "user", content: "temp" })
+    const budget = await cm.getBudget()
+    expect(budget.prefixTokens).toBeGreaterThan(0)
+    expect(budget.logTokens).toBeGreaterThan(0)
+    expect(budget.scratchTokens).toBeGreaterThan(0)
+    expect(budget.totalTokens).toBe(budget.prefixTokens + budget.logTokens + budget.scratchTokens)
+    expect(budget.window).toBe(10000)
   })
 })
