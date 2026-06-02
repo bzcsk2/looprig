@@ -3,8 +3,7 @@ import { writeSync } from "node:fs"
 import { loadConfig } from "@deepicode/core"
 import { ReasonixEngine } from "@deepicode/core"
 import { buildSystemPrompt } from "@deepicode/core"
-import { createBashTool, createEditTool, createReadFileTool, createWriteFileTool, createListDirTool, createGrepTool, createTodoWriteTool, createGlobTool, createWebFetchTool, createWebSearchTool, createSkillTool, createTaskCreateTool, createTaskUpdateTool, createTaskListTool, createTaskGetTool, createTaskStopTool, createAskUserQuestionTool, createPlanModeTool, createNotebookEditTool, createSleepTool, createPushNotificationTool, createMonitorTool, createWebBrowserTool, createWorktreeTool, createCronTool, createWorkflowTool, createAgentToolTool, createSendMessageTool, createLspTool } from "@deepicode/tools"
-import { clearReadTracker } from "@deepicode/tools"
+import { createDefaultTools, clearReadTracker } from "@deepicode/tools"
 import { McpHost, createListMcpResourcesTool, createReadMcpResourceTool, createMcpAuthTool, createListMcpToolsTool, createCallMcpToolTool, setMcpHost } from "@deepicode/mcp"
 import React from "react"
 import { wrappedRender as render } from "@deepicode/ink"
@@ -42,40 +41,15 @@ async function main(): Promise<void> {
     ? await ReasonixEngine.recover(config, sessionId)
     : new ReasonixEngine(config, clearReadTracker)
   engine.setSystemPrompt(buildSystemPrompt(process.cwd()))
-  engine.registerTool(createReadFileTool())
-  engine.registerTool(createBashTool())
-  engine.registerTool(createEditTool())
-  engine.registerTool(createWriteFileTool())
-  engine.registerTool(createListDirTool())
-  engine.registerTool(createGrepTool())
-  engine.registerTool(createTodoWriteTool())
-  engine.registerTool(createGlobTool())
-  engine.registerTool(createWebFetchTool())
-  engine.registerTool(createWebSearchTool())
-  engine.registerTool(createSkillTool())
+  for (const tool of createDefaultTools()) {
+    engine.registerTool(tool)
+  }
+  // MCP tools are registered separately (dynamic, discovered at runtime)
   engine.registerTool(createListMcpResourcesTool())
   engine.registerTool(createReadMcpResourceTool())
   engine.registerTool(createMcpAuthTool())
   engine.registerTool(createListMcpToolsTool())
   engine.registerTool(createCallMcpToolTool())
-  engine.registerTool(createTaskCreateTool())
-  engine.registerTool(createTaskUpdateTool())
-  engine.registerTool(createTaskListTool())
-  engine.registerTool(createTaskGetTool())
-  engine.registerTool(createTaskStopTool())
-  engine.registerTool(createAskUserQuestionTool())
-  engine.registerTool(createPlanModeTool())
-  engine.registerTool(createNotebookEditTool())
-  engine.registerTool(createSleepTool())
-  engine.registerTool(createPushNotificationTool())
-  engine.registerTool(createMonitorTool())
-  engine.registerTool(createWebBrowserTool())
-  engine.registerTool(createWorktreeTool())
-  engine.registerTool(createCronTool())
-  engine.registerTool(createWorkflowTool())
-  engine.registerTool(createAgentToolTool())
-  engine.registerTool(createSendMessageTool())
-  engine.registerTool(createLspTool())
 
   if (!input.isTTY) {
     await runPipeMode(engine)

@@ -573,6 +573,14 @@ DEEPICODE_TRACE=1
 - 38 个源文件的 `../../core/src/...`、`../../tools/src/...`、`../../mcp/src/...` 相对路径 import 全部替换为包名 import（`@deepicode/core`、`@deepicode/tools`、`@deepicode/mcp`、`@deepicode/tui`）。
 - 验收：typecheck 通过 + 774/774 测试通过 + 0 跨包相对路径引用残留。
 
+### CL-41：工具注册表收敛
+
+- `packages/tools/src/index.ts` 新增 `createDefaultTools()` 工厂函数，返回 29 个内置工具实例。
+- 构造顺序与 system prompt 工具规格排序一致。
+- `packages/cli/src/tui.ts` 改用 `createDefaultTools()` 循环注册，不再逐个 import + register。
+- MCP 动态工具仍单独注册（`createListMcpToolsTool`、`createCallMcpToolTool` 等）。
+- 验收：typecheck 通过 + 774/774 测试通过。
+
 ---
 
 ## 6. 文档维护规则

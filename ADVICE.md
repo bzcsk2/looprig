@@ -494,7 +494,7 @@ os: [ubuntu-latest, macos-latest, windows-latest]
 - 不把 runtime logger 强行放入所有 package。
 - 不一次性迁移所有文件。
 
-### CL-41 工具注册表收敛
+### ✅ CL-41 工具注册表收敛
 
 范围：
 
