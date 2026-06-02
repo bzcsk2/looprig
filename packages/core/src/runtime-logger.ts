@@ -1,5 +1,5 @@
-import { appendFile, mkdir, symlink, unlink } from "node:fs/promises"
-import { dirname, resolve } from "node:path"
+import { appendFile, mkdir, symlink, unlink, readdir, stat } from "node:fs/promises"
+import { dirname, resolve, join } from "node:path"
 
 export type RuntimeLogLevel = "debug" | "info" | "warn" | "error"
 
@@ -251,8 +251,8 @@ export function createRuntimeLoggerFromEnv(
   return new RuntimeLogger({ enabled, level, filePath, bindings, filter, createSymlink })
 }
 
-export function parseDebugArgs(args: string[]): { level?: RuntimeLogLevel; filter?: string; file?: string } {
-  const result: { level?: RuntimeLogLevel; filter?: string; file?: string } = {}
+export function parseDebugArgs(args: string[]): { level?: RuntimeLogLevel; filter?: string; file?: string; trace?: boolean } {
+  const result: { level?: RuntimeLogLevel; filter?: string; file?: string; trace?: boolean } = {}
   for (const arg of args) {
     if (arg === "--debug" || arg === "-d") {
       result.level = "debug"
@@ -262,6 +262,8 @@ export function parseDebugArgs(args: string[]): { level?: RuntimeLogLevel; filte
       if (value) result.filter = value
     } else if (arg.startsWith("--debug-file=")) {
       result.file = arg.slice("--debug-file=".length)
+    } else if (arg === "--trace") {
+      result.trace = true
     }
   }
   return result
@@ -360,4 +362,71 @@ function serializeError(error: unknown): Record<string, unknown> | undefined {
     }
   }
   return { message: String(error) }
+}
+
+/**
+ * Clean up old log files based on retention settings.
+ * Runs in background, does not block TUI.
+ */
+export async function cleanupOldLogs(logsDir?: string): Promise<void> {
+  const retentionDays = parseInt(process.env.DEEPICODE_LOG_RETENTION_DAYS ?? "7", 10)
+  const maxTotalMB = parseInt(process.env.DEEPICODE_LOG_MAX_TOTAL_MB ?? "100", 10)
+
+  if (retentionDays <= 0 && maxTotalMB <= 0) return
+
+  const dir = logsDir ?? join(process.cwd(), ".deepicode", "logs")
+
+  try {
+    await mkdir(dir, { recursive: true })
+    const files = await readdir(dir)
+    const logFiles = files.filter(f => f.startsWith("runtime-") && f.endsWith(".jsonl"))
+
+    if (logFiles.length === 0) return
+
+    const now = Date.now()
+    const cutoffMs = retentionDays > 0 ? retentionDays * 24 * 60 * 60 * 1000 : Infinity
+    let totalBytes = 0
+    const fileInfo: Array<{ name: string; size: number; mtimeMs: number }> = []
+
+    for (const file of logFiles) {
+      const filePath = join(dir, file)
+      const fileStat = await stat(filePath).catch(() => null)
+      if (fileStat) {
+        totalBytes += fileStat.size
+        fileInfo.push({ name: file, size: fileStat.size, mtimeMs: fileStat.mtimeMs })
+      }
+    }
+
+    // Delete files older than retention period
+    if (cutoffMs < Infinity) {
+      for (const file of fileInfo) {
+        if (now - file.mtimeMs > cutoffMs) {
+          await unlink(join(dir, file.name)).catch(() => {})
+          totalBytes -= file.size
+        }
+      }
+    }
+
+    // Delete oldest files if over size limit
+    const maxTotalBytes = maxTotalMB * 1024 * 1024
+    if (totalBytes > maxTotalBytes) {
+      const sorted = fileInfo.sort((a, b) => a.mtimeMs - b.mtimeMs)
+      for (const file of sorted) {
+        if (totalBytes <= maxTotalBytes) break
+        await unlink(join(dir, file.name)).catch(() => {})
+        totalBytes -= file.size
+      }
+    }
+  } catch {}
+}
+
+/**
+ * Check for deprecated DEEPICODE_DEBUG env var and warn
+ */
+export function checkDeprecatedDebugEnv(): void {
+  if (process.env.DEEPICODE_DEBUG !== undefined) {
+    console.error(
+      "[deprecated] DEEPICODE_DEBUG is deprecated. Use DEEPICODE_LOG_LEVEL=debug instead.",
+    )
+  }
 }
