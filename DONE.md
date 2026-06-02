@@ -301,6 +301,16 @@ DEEPICODE_TRACE=1
 | LOG6 | Perfetto Trace（可选） | 已完成 |
 | LOG7 | 轮转、清理和文档 | 已完成 |
 
+### 4.6 ADVICE.md Bug 修复（AUD-01~10）
+
+| 编号 | 优先级 | 内容 | 状态 |
+|------|--------|------|------|
+| AUD-01 | P0 | bash 敏感文件扫描绕过 | 已修复 |
+| AUD-04 | P1 | thinking mode emergency 生命周期 | 已修复 |
+| AUD-06 | P2 | fallback tool-call ID 并发稳健性 | 已修复 |
+| AUD-09 | P3 | SSE 首事件 BOM 容错 | 已修复 |
+| AUD-10 | P3 | 敏感 key 规则补充 | 已修复 |
+
 ---
 
 ## 5. 已出现但尚未作为完整闭环验收
