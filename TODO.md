@@ -281,3 +281,34 @@ engine.submit()
 - `M13`、`TT3`：环境问题，可跳过或增加超时时间。
 - `P0-6`：更新测试预期，匹配当前 enqueueInstruction() 行为。
 - `P3-2`：完成 P3 TUI 注入反馈收口后修复。
+
+---
+
+## 9. 完整实施方案待办
+
+### 9.1 P5.5：工具执行期间细粒度进度流（可选）
+
+**目标**：工具执行期间提供实时进度更新（heartbeat、bash stdout/stderr 尾部预览）。
+
+**涉及文件**：
+- `packages/core/src/interface.ts`：添加 `ToolProgressUpdate` 和可选 `reportProgress()`
+- `packages/core/src/progress-channel.ts`：新增单 run 有界异步进度通道
+- `packages/core/src/streaming-executor.ts`：handler 运行期间转发 progress 和 heartbeat
+- `packages/core/src/loop.ts`：transient progress 不写 SessionWriter
+- `packages/tools/src/shell-exec.ts`：stdout、stderr、timeout、abort 实时报告
+- `packages/tui/src/bridge.tsx`：live preview 与耗时状态
+- `packages/tui/src/DeepiMessages.tsx`：running 工具的尾部预览
+
+**测试**：
+- `packages/core/__tests__/progress-channel.test.ts`：有界队列、合并和清理
+- `packages/core/__tests__/streaming-executor.test.ts`：progress、shared 顺序和中断
+- `packages/tools/__tests__/bash.test.ts`：bash 进度报告
+- `packages/tui/__tests__/bridge.test.ts`：TUI live preview
+
+### 9.2 P6：本轮明确暂缓项
+
+以下功能明确不实现：
+
+- 动态 bash 并发判断
+- bash 特判级联取消
+- 默认 LLM 摘要不进入首轮实现

@@ -269,10 +269,12 @@ DEEPICODE_TRACE=1
 
 | 编号 | 内容 | 状态 |
 |------|------|------|
-| P0 | 工具结果、中断、权限和 TUI 队列契约测试 | 已建立 |
+| P0 | 工具结果、中断、权限和 TUI 队列契约测试 | 已完成 |
 | P1 | tool result exactly-once | 已完成 |
 | P2 | Core 中途指令队列和 loop 安全点 | 已完成 |
-| P3 | TUI 注入优先路由和反馈 | 已实现，尚有 2 个 bridge 测试待收口 |
+| P3 | TUI 注入优先路由和反馈 | 已完成 |
+| P4 | 结果溢出持久化 | 已完成 |
+| P5 | Hook 可观测性增强 | 已完成 |
 
 ### 4.4 自动推理模式切换（AS0-AS6）
 
@@ -307,9 +309,6 @@ DEEPICODE_TRACE=1
 
 | 范围 | 当前代码状态 | 仍需确认 |
 |------|--------------|----------|
-| P3 TUI 注入反馈 | bridge、App、StatusBar 已接线 | 修复 2 个 bridge 测试并跑全量 |
-| P4 结果溢出持久化 | `result-persistence.ts` 已接入 executor，已有 10 个测试 | session 配额与清理策略尚未闭环 |
-| P5 Hook 可观测性 | `setErrorObserver()` 和对应测试已存在 | 与当前工作区变更一起完成全量回归 |
 | ST1 策略 tiers | `strategy/tiers.ts` 和 10 个测试已存在 | ST2–ST4 尚未实现 |
 
 ---
@@ -356,9 +355,6 @@ DEEPICODE_TRACE=1
 
 本节只提供入口，不展开待办细节：
 
-- P3 bridge 测试收口。
-- P4 配额和清理策略。
-- P5 全量回归确认。
 - P5.5 工具执行期间细粒度 progress：heartbeat、bash stdout/stderr 尾部预览和 transient 过滤。
 - ST2–ST4 策略系统。
 - `M10` write_file 父目录权限继承。
