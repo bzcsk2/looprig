@@ -14,6 +14,7 @@ interface StatusBarProps {
   pendingInstructionCount?: number;
   statusMessage?: string | null;
   thinkingMode?: string;
+  tier?: string;
 }
 
 function fmt(n: number): string {
@@ -28,29 +29,30 @@ function cacheRate(hit: number, miss: number): string {
   return `${Math.round((hit / total) * 100)}%`;
 }
 
-export function StatusBar({ model, provider, agent, inputTokens, outputTokens, cacheHitTokens, cacheMissTokens, contextUsed, contextTotal, pendingInstructionCount, statusMessage, thinkingMode }: StatusBarProps) {
+export function StatusBar({ model, provider, agent, inputTokens, outputTokens, cacheHitTokens, cacheMissTokens, contextUsed, contextTotal, pendingInstructionCount, statusMessage, thinkingMode, tier }: StatusBarProps) {
   const rate = cacheRate(cacheHitTokens, cacheMissTokens);
   return (
     <Box width="100%" flexDirection="column">
       {statusMessage && (
         <Box>
-          <Text inverse color="warning">{` ⚠ ${statusMessage} `}</Text>
+          <Text inverse color="warning">{` \u26a0 ${statusMessage} `}</Text>
         </Box>
       )}
       {pendingInstructionCount ? (
         <Box>
-          <Text inverse color="success">{` 📥 ${t().pendingTasks}${pendingInstructionCount} `}</Text>
+          <Text inverse color="success">{` \u{1F4E5} ${t().pendingTasks}${pendingInstructionCount} `}</Text>
         </Box>
       ) : null}
       {thinkingMode && thinkingMode !== 'off' ? (
         <Box>
-          <Text inverse color="success">{` 🧠 Thinking: ${thinkingMode} `}</Text>
+          <Text inverse color="success">{` \u{1F9E0} Thinking: ${thinkingMode} `}</Text>
         </Box>
       ) : null}
       <Box width="100%" flexDirection="row">
         <Text inverse>{` ${provider}`}</Text>
         <Text inverse>{` ${model} `}</Text>
         <Text inverse>{` [${agent}] `}</Text>
+        {tier ? <Text inverse>{` [${tier}] `}</Text> : null}
         <Box flexGrow={1} />
         <Text inverse>{` ${t().inputTokens}${fmt(inputTokens)}`}</Text>
         <Text inverse>{` ${t().cacheHit}${rate}`}</Text>

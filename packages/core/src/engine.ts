@@ -18,6 +18,7 @@ import { createModeStats, getModeSummary } from "./mode-stats.js"
 import type { ModeStats } from "./mode-stats.js"
 import { createRuntimeLoggerFromEnv, type RuntimeLogger } from "./runtime-logger.js"
 import type { ResultPersistenceConfig } from "./result-persistence.js"
+import { getTier, type StrategyTier } from "./strategy/tiers.js"
 
 /**
  * ReasonixEngine 是 Deepicode 的核心引擎，负责：
@@ -77,6 +78,12 @@ export class ReasonixEngine implements CoreEngine {
 
   /** AS6: Thinking mode statistics */
   private modeStats: ModeStats = createModeStats()
+
+  /** ST2: Current strategy tier */
+  private currentTier: StrategyTier = getTier("normal")
+
+  /** ST2: Pending tier decision from TUI */
+  private pendingTierDecision: { resolve: (v: boolean) => void; tier: string } | null = null
 
   /** AS3: Set thinking mode for auto-switch */
   setThinkingMode(mode: ThinkingMode): void {
@@ -250,14 +257,28 @@ export class ReasonixEngine implements CoreEngine {
     return def.label
   }
 
-  /** 处理 tier 决策（由权限引擎发起，外部 UI 通过此方法响应） */
-  resolveTierDecision(_tier: string): void {
-    // 由外部 UI（如 TUI）覆盖此方法的实现来提供交互式批准
+  /** ST2: Process tier decision from UI — sets current tier */
+  resolveTierDecision(tier: string): void {
+    const resolved = getTier(tier)
+    this.currentTier = resolved
+    if (this.logger.isEnabled("info")) {
+      this.logger.info("tier.resolved", { tier: resolved.id, label: resolved.label })
+    }
   }
 
   /** 获取当前 agent 名称 */
   getAgentName(): string {
     return this.currentAgent
+  }
+
+  /** ST2: Get current strategy tier */
+  getTier(): StrategyTier {
+    return this.currentTier
+  }
+
+  /** ST2: Set strategy tier */
+  setTier(tierId: string): void {
+    this.currentTier = getTier(tierId)
   }
 
   /**
@@ -299,6 +320,9 @@ export class ReasonixEngine implements CoreEngine {
     if (diagnosticsEnabled) submitLogger.info("submit.start", { agent: this.currentAgent, inputLength: userInput.length })
 
     try {
+      // ST3: Notify current tier at submit start
+      yield { role: "strategy_notify", content: this.currentTier.id, metadata: { tier: this.currentTier } }
+
       const toolSpecs: ToolSpec[] = []
       for (const tool of this.tools.values()) {
         if (ac.toolNames && !ac.toolNames.includes(tool.name)) continue
@@ -346,6 +370,7 @@ export class ReasonixEngine implements CoreEngine {
         modeStats: this.modeStats,
         logger: submitLogger,
         submitId,
+        tier: this.currentTier,
       }
 
       for await (const event of runLoop(loopOpts)) {

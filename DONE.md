@@ -427,6 +427,68 @@ DEEPICODE_TRACE=1
 - 新增 3 个 AUD-08 专项测试。
 - 验收：23 个 repair 测试全通过。
 
+### AS2 emergency fix：state.lastSwitchTime 紧急触发
+
+- `engine.ts` interrupt() 和 emergency paths 中设置 `state.lastSwitchTime`。
+- 修复 emergency 场景中 `lastSwitchTime` 保持 0 导致时间计算错误的问题。
+
+### P5.5：工具进度流
+
+- `interface.ts` 新增 `ToolProgressUpdate` 类型，`ToolContext.reportProgress` 回调。
+- `streaming-executor.ts` 维护 progress buffer，在 `executeToolCall` 末尾 flush。
+- `shell-exec.ts` 数据处理器调用 `reportProgress` 报告实时 stdout/stderr。
+- `loop.ts` 产出 `tool_progress` 事件，仅转发不持久化。
+- `bridge.tsx` 显示工具进度中间内容。
+- 验收：24/24 executor 测试通过。
+
+### S2：Session 验证 + list() 修复
+
+- `session.ts` 新增 `validateSessionId()` 和 `safePath()` 函数。
+- `list()` 修复消息计数和排序（按 ts 降序）。
+- `engine.ts` loadSession/recover 增加验证。
+
+### S1：Session 切换全重建
+
+- `streaming-executor.ts` 新增 `setSessionId()` 方法。
+- `engine.ts` switchAgent/setSessionId 触发 rebindSessionWriter + logger.child。
+- `isSubmitting` guard 防止切换冲突。
+
+### P3-R：Bridge 测试修复
+
+- P0-6 更新为 `enqueueInstruction` 路径。
+- P3-2 修复：full 回退加 `pendingInstructionCount`。
+- 验收：12/12 bridge 测试通过。
+
+### T21-R：Autocomplete 键盘冲突
+
+- `DeepiPromptInput` forwardRef + suppressHistory 属性。
+- `App.tsx` + `CommandAutocomplete` 通过 ref 控制。
+
+### ST2：StrategyTier 引擎集成
+
+- `engine.ts` 新增 `currentTier` 字段、`resolveTierDecision()` / `setTier()` / `getTier()`。
+- `loop.ts` 根据 tier 覆盖 `maxChainLength`、`enableReasoning`、`model`、`temperature`。
+- `submit` 时 budget 超标给出警告。
+- `interface.ts` `CoreEngine` 新增 `getTier?` / `setTier?`。
+- 验收：15 个 strategy tier 测试全通过。
+
+### ST3：策略事件 + TUI
+
+- `engine.ts submit()` 首事件产出 `strategy_notify`。
+- `loop.ts` 工具批处理后产出 `strategy_estimate_refined`。
+- `bridge.tsx` 消费两个事件（目前空 break）。
+- `StatusBar.tsx` 可选 `tier` 属性，`App.tsx` 从 engine 取值传入。
+- 验收：typecheck 通过，基线 729/729 无回归。
+
+### ST4：动态 Tier 推荐器
+
+- 新增 `strategy/recommender.ts`：`recommendTier()` 函数，分析 cost/turn/context 模式。
+- 规则：budget 超标降级、最大轮数近 + 高上下文升级、多工具 + 余量升级、持续低消耗降级。
+- `loop.ts` 在工具批处理后调用 `recommendTier`，非 stay 时产出 `tier_recommendation` 事件。
+- `interface.ts` `LoopEventRole` 新增 `tier_recommendation`。
+- `bridge.tsx` 消费事件（空 break）。
+- 验收：7 个 recommender 测试 + 基线 736/736 无回归。
+
 ---
 
 ## 6. 文档维护规则

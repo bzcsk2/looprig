@@ -320,7 +320,12 @@ export function createBridge(
 
           case 'done':
           case 'strategy_notify':
+            break;
+
           case 'strategy_estimate_refined':
+            break;
+
+          case 'tier_recommendation':
             break;
 
           default: {

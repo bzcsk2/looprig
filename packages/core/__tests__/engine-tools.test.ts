@@ -303,8 +303,11 @@ describe("P2: Mid-session instruction queue", () => {
     engine.registerTool({ name: "ok", description: "ok", parameters: { type: "object", properties: {} }, concurrency: "shared", approval: "read", async execute() { return { content: "ok", isError: false } } })
 
     const gen = engine.submit("start")
-    // Pull first event to start the generator (isSubmitting = true)
-    const first = await gen.next()
+    // Skip strategy_notify event first (ST3)
+    let first = await gen.next()
+    if (first.value?.role === "strategy_notify") {
+      first = await gen.next()
+    }
     expect(first.value?.role).toBe("tool_call_delta")
 
     // Enqueue while tool is executing

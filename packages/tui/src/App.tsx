@@ -368,6 +368,7 @@ export function App({ engine, config }: AppProps) {
         pendingInstructionCount={bridgeState.pendingInstructionCount}
         statusMessage={statusMessage}
         thinkingMode={bridgeState.thinkingMode}
+        tier={engine.getTier?.()?.label}
       />
     </Box>
   );

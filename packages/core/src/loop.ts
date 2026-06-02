@@ -10,9 +10,11 @@ import type { ModeSelectorState, SwitchSignal } from "./mode-selector.js"
 import type { ThinkingMode } from "./provider-thinking.js"
 import { evaluateModeSwitch } from "./mode-selector.js"
 import { createDeepSeekCapabilities } from "./provider-thinking.js"
-import type { ModeStats } from "./mode-stats.js"
+import type { StrategyTier } from "./strategy/tiers.js"
 import { logModeSwitch } from "./mode-stats.js"
+import type { ModeStats } from "./mode-stats.js"
 import { calculateCost } from "./pricing.js"
+import { recommendTier, type TierRecommendation } from "./strategy/recommender.js"
 import { randomUUID } from "node:crypto"
 import { noopRuntimeLogger, type RuntimeLogger } from "./runtime-logger.js"
 
@@ -53,13 +55,26 @@ export interface LoopOptions {
   modeStats?: ModeStats
   logger?: RuntimeLogger
   submitId?: string
+  tier?: StrategyTier
 }
 
 const DEFAULT_MAX_TURNS = 100
 
 export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
-  const { ctx, client, toolExecutor, toolSpecs, config, signal, sessionWriter, stats, isInterrupted, appendToolResult, takePendingInstruction, maxTurns = DEFAULT_MAX_TURNS, thinkingMode = "off", modeSelectorState, modeStats, logger = noopRuntimeLogger, submitId } = opts
+  const { ctx, client, toolExecutor, toolSpecs, config, signal, sessionWriter, stats, isInterrupted, appendToolResult, takePendingInstruction, maxTurns: maxTurnsOverride, thinkingMode: thinkingModeOverride = "off", modeSelectorState, modeStats, logger = noopRuntimeLogger, submitId, tier } = opts
   const diagnosticsEnabled = logger.isEnabled("error")
+
+  // ST2: Derive maxTurns and thinkingMode from tier if not explicitly overridden
+  const maxTurns = maxTurnsOverride ?? tier?.maxChainLength ?? DEFAULT_MAX_TURNS
+  const thinkingMode = (thinkingModeOverride !== "off")
+    ? thinkingModeOverride
+    : (tier && !tier.enableReasoning ? "off" as const : thinkingModeOverride)
+
+  // ST2: Apply tier overrides to config
+  if (tier) {
+    if (tier.recommendedModel) config.model = tier.recommendedModel
+    if (tier.temperature !== null) config.temperature = tier.temperature
+  }
 
   // P2: Safe-point helper — consume one pending instruction from the queue.
   // Returns a status event if an instruction was injected, null otherwise.
@@ -164,6 +179,10 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
           stats.cacheHitTokens += event.usage.cacheHitTokens ?? 0
           stats.cacheMissTokens += event.usage.cacheMissTokens ?? 0
           stats.totalCost = calculateCost(config.model, stats.promptTokens, stats.completionTokens, stats.cacheHitTokens, stats.cacheMissTokens)
+          // ST2: Budget check — warn when tier budget is exceeded
+          if (tier && stats.totalCost > tier.budgetCNY) {
+            yield { role: "warning", content: `Budget exceeded: ${stats.totalCost.toFixed(4)} CNY > ${tier.budgetCNY} CNY (tier: ${tier.id})`, severity: "warning" as const, metadata: { tier: tier.id, budget: tier.budgetCNY, cost: stats.totalCost } }
+          }
           yield { role: "usage", metadata: { input: event.usage.promptTokens, output: event.usage.completionTokens, cacheHit: event.usage.cacheHitTokens ?? 0, cacheMiss: event.usage.cacheMissTokens ?? 0 } as Record<string, unknown> }
           sessionWriter?.enqueue({ ts: Date.now(), type: "stats", payload: { ...stats } })
           break
@@ -211,6 +230,27 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
             }
             yield { role: "status", content: "tools_completed" }
             sessionWriter?.enqueue({ ts: Date.now(), type: "event", payload: { role: "status", content: "tools_completed" } })
+            // ST3: Emit refined estimate after tool batch
+            if (tier) {
+              yield { role: "strategy_estimate_refined", metadata: { tier: tier.id, budget: tier.budgetCNY, cost: stats.totalCost, toolCalls: totalToolCalls, turnCount } }
+            }
+
+            // ST4: Tier recommendation after tool batch
+            if (tier && turnCount >= 2) {
+              const estimatedTokens = await ctx.estimateTokens()
+              const contextUsagePercent = estimatedTokens / ctx.getContextWindow()
+              const rec = recommendTier({
+                currentTierId: tier.id,
+                stats,
+                turnCount,
+                toolCallsThisSubmit: totalToolCalls,
+                contextUsagePercent,
+                tier,
+              })
+              if (rec.action !== "stay") {
+                yield { role: "tier_recommendation", metadata: { recommendation: rec, currentTier: tier.id, stats: { totalCost: stats.totalCost, promptTokens: stats.promptTokens, completionTokens: stats.completionTokens }, turnCount, toolCallsThisSubmit: totalToolCalls, contextUsagePercent } }
+              }
+            }
 
             // P2: Safe point 1 — consume one pending instruction after tool batch
             const injectedAfterTools = appendPendingInstruction()

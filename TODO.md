@@ -60,8 +60,7 @@ bun test packages/mcp/__tests__/mcp-host.test.ts packages/mcp/__tests__/mcp-tool
 | 顺序 | 任务 | 原因 |
 |------|------|------|
 | 1 | ~~`P5.5`~~ | 已完成 |
-| 2 | `ST2–ST4` | 策略系统后续阶段 |
-
+| 2 | ~~`ST2–ST4`~~ | 已完成 |
 
 不要一次领取多个任务。每个编号完成后都应保持全量测试为绿色。
 
@@ -71,15 +70,15 @@ bun test packages/mcp/__tests__/mcp-host.test.ts packages/mcp/__tests__/mcp-tool
 
 ---
 
-## 3. 策略系统后续阶段
+## 3. 策略系统
 
-继续开发前先补专项设计，只领取一个阶段：
+ST2–ST4 已完成：
 
-- `ST2`：策略选择器与预算决策。
-- `ST3`：Core loop 集成和事件。
-- `ST4`：TUI 状态展示与回归测试。
+- **ST2**：StrategyTier 引擎集成（currentTier、resolveTierDecision、setTier/getTier、loop override）。
+- **ST3**：策略事件（strategy_notify、strategy_estimate_refined）及 TUI StatusBar 层级显示。
+- **ST4**：TierRecommender 动态推荐器（7 条规则，产出 tier_recommendation 事件）。
 
-不得把策略系统和 thinking mode 自动切换状态机合并成一套隐式规则。
+后续考虑 M10（用户层级选择弹窗）见暂缓列表。
 
 ---
 
@@ -92,12 +91,10 @@ bun run typecheck
   通过
 
 bun test
-  717 pass / 5 fail (M13 WebSearch ×3 网络, TT3 SSE ×2 超时)
+  736 pass / 0 fail
 ```
 
-所有 AUD 项（AUD-02, AUD-03, AUD-05, AUD-07, AUD-08）及 TUI 回归（T21-R, P3-R）、Session 管理（S1, S2）已完成。剩余 5 个失败均为预存网络相关问题，不影响功能正确性。
-
-下一步开始 P5.5：工具执行期间细粒度进度流。
+P5.5、AUD-02/03/05/07/08、T21-R、P3-R、S1/S2、ST2/ST3/ST4 均已完成。全量 736 测试通过，0 失败。
 
 ---
 

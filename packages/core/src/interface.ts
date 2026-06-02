@@ -16,6 +16,7 @@ export type LoopEventRole =
   | "done"
   | "strategy_notify"
   | "strategy_estimate_refined"
+  | "tier_recommendation"
   | "tool_progress"
   | "usage"
   | "permission_ask"
@@ -111,6 +112,8 @@ export interface CoreEngine {
   resolveTierDecision(tier: string): void
   respondPermission(allow: boolean, alwaysAllow?: boolean): void
   enqueueInstruction(instruction: string): EnqueueInstructionResult
+  getTier?(): { id: string; label: string; budgetCNY: number }
+  setTier?(tierId: string): void
 }
 
 export interface AgentConfig {
