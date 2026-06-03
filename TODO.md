@@ -1,9 +1,9 @@
 # Deepicode TODO 与开发交接指南
 
-最后更新：2026-06-02
+最后更新：2026-06-03
 
 本文是后续 Agent 的唯一待办入口，只记录**尚未完成**、**待验收**、**明确暂缓**或**已经驳回**的工作。
-已完成能力和历史实施结论见 [DONE.md](DONE.md)。[ADVICE.md](ADVICE.md) 已归档为空壳，不再作为开发输入。
+已完成能力和历史实施结论见 [DONE.md](DONE.md)。LSP 和 Plugin 的专项设计见 [ADVICE.md](ADVICE.md)。
 
 ---
 
@@ -60,9 +60,9 @@ bun test packages/mcp/__tests__/mcp-host.test.ts packages/mcp/__tests__/mcp-tool
 
 | 顺序 | 任务 | 原因 |
 |------|------|------|
-| ~~1~~ | ~~`TEST-STABILITY-01` 全量测试抖动收口~~ | ✅ DONE |
-| ~~2~~ | ~~`OS-17-R` 三平台 CI 结果检查~~ | ✅ DONE |
-| 3 | `OS-12/13-R` macOS/Windows 原生验收 | 代码层面已就绪，需在原生环境验收。 |
+| 1 | `OS-12/13-R` macOS/Windows 原生验收 | 代码层面已就绪，需在原生环境验收。 |
+| 2 | `LSP-20` 协议层和长驻 Client，按 [ADVICE.md](ADVICE.md) 推进 | LSP-10 已完成，需实现 vscode-jsonrpc 协议层和 LspClient 类。 |
+| 3 | `PLG-10` 起步，按 [ADVICE.md](ADVICE.md) 推进 Plugin 兼容实现 | 新增 opencode server plugin 兼容子集，不引入 opencode 前端。 |
 
 不要一次领取多个任务。每个编号完成后都应保持全量测试为绿色。
 
@@ -70,39 +70,9 @@ bun test packages/mcp/__tests__/mcp-host.test.ts packages/mcp/__tests__/mcp-tool
 
 ## 2. 后续任务
 
-### ~~TEST-STABILITY-01：全量测试抖动收口~~ ✅ DONE
-
-已修复并关闭：
-
-- WebSearch 测试：mock `fetch` 替代真实网络调用，消除外部依赖超时。
-- SSE client 测试：`afterEach` 增加 3s 超时保护，防止 server.stop() 挂起阻塞后续测试。
-- Benchmark 测试：同上，`afterEach` 增加超时保护。
-- 连续 3 次 `bun test` 全绿（799 pass / 0 fail），`bun run typecheck` 通过。
-
-### OS-17-R：三平台 CI 结果检查
-
-优先级：`P1`。在 `TEST-STABILITY-01` 完成后执行。
-
-当前状态：
-
-- `.github/workflows/ci.yml` 已加入 `ubuntu-latest`、`macos-latest`、`windows-latest` Matrix。
-- 本地只能确认 workflow 文件存在和 Linux 基线，不能代替 GitHub Actions 三平台运行结果。
-
-执行要求：
-
-1. Push 后保存 Actions run URL 和每个平台的结果。
-2. 三个平台都必须运行 `bun run typecheck` 和 `bun test`。
-3. 检查 shell backend、进程树、Monitor、Scheduler 和 notification smoke 的实际结果。
-4. 失败时按平台记录复现证据，不要把 macOS 或 Windows 失败降级为 Linux 已通过。
-
-关闭条件：
-
-- Linux、macOS、Windows Matrix 均通过，或已有明确 Bug 进入本文新的待办项。
-- 将 Actions run URL 和结果写入 `DONE.md`。
-
 ### OS-12/13-R：macOS 与 Windows 原生验收
 
-优先级：`P1`。在 `OS-17-R` 之后执行。
+优先级：`P1`。三平台 CI 已通过后执行。
 
 当前状态：
 
@@ -121,30 +91,52 @@ bun test packages/mcp/__tests__/mcp-host.test.ts packages/mcp/__tests__/mcp-tool
 - 项目负责人完成目标平台对应的 `H8` 人工验收。
 - 结果写入 `DONE.md`。
 
+### ~~LSP-10：配置、语言识别和返回格式~~ ✅ DONE
+
+优先级：`P2`。专项设计见 [ADVICE.md](ADVICE.md) 的 `LSP-10` 到 `LSP-60`。
+
+当前状态：
+
+- ✅ 已完成（2026-06-03）。
+- 实现：config.ts、language.ts、normalize.ts、lsp.ts 升级、lsp-client.ts 更新。
+- 测试：36 个单元测试 + 17 个集成测试通过。
+
+### LSP-20：协议层和长驻 Client
+
+优先级：`P2`。专项设计见 [ADVICE.md](ADVICE.md) 的 `LSP-20`。
+
+当前状态：
+
+- LSP-10 已完成，基础模块就绪。
+- 需要实现 vscode-jsonrpc 协议层和 LspClient 类。
+
+关闭条件：
+
+- 按 `ADVICE.md` 完成当前领取阶段。
+- 将阶段实现、验证命令和剩余限制写入 `DONE.md`。
+- 从本文更新下一阶段入口。
+
+### PLG-10：Plugin 配置与 spec 解析
+
+优先级：`P2`。专项设计见 [ADVICE.md](ADVICE.md) 的 `PLG-10` 到 `PLG-60`。
+
+当前状态：
+
+- 设计目标是兼容 opencode server plugin 子集。
+- 不引入 opencode 前端、不实现 TUI plugin、不引入 opentui/solid。
+
+关闭条件：
+
+- 按 `ADVICE.md` 完成当前领取阶段。
+- 将阶段实现、验证命令和剩余限制写入 `DONE.md`。
+- 从本文更新下一阶段入口。
+
 ---
 
 ## 3. 当前验证状态
 
-2026-06-03
 
-```text
-bun run typecheck
-  通过
-
-bun test
-  799 pass / 0 fail
-  连续 3 次全绿（TEST-STABILITY-01 已关闭）
-
-GitHub Actions CI
-  ✓ ubuntu-latest (1m4s)
-  ✓ windows-latest (2m8s)
-  ✓ macos-latest (1m22s)
-  OS-17-R 已关闭
-```
-
-P5.5、AUD-02/03/05/07/08、T21-R、P3-R、S1/S2、ST2/ST3/ST4、CL-10/11/12/20/21/30/31/32/40/41/42/50/51/52、OS-00/10/11/14/15/16/17、LIFE-01、LOG-READABILITY-01、TEST-STABILITY-01、OS-17-R 均已完成。
-
-下一步：执行 `OS-12/13-R` macOS/Windows 原生验收（需人工）。
+下一步：优先执行 `OS-12/13-R` macOS/Windows 原生验收（需人工）；开发专项从 `LSP-20` 或 `PLG-10` 开始领取。
 
 ---
 
@@ -159,7 +151,7 @@ P5.5、AUD-02/03/05/07/08、T21-R、P3-R、S1/S2、ST2/ST3/ST4、CL-10/11/12/20/
 - TTSR 规则系统。
 - Universal Config Discovery。
 - Python Kernel。
-- Web、IDE Plugin 等多前端。
+- Web、IDE Plugin、TUI Plugin 等多前端。
 - AskUserQuestion 专用 TUI 选择弹窗。
 - WebBrowser 跨调用持久会话。
 - 完整 OAuth 型 MCP 身份系统。
@@ -170,12 +162,3 @@ P5.5、AUD-02/03/05/07/08、T21-R、P3-R、S1/S2、ST2/ST3/ST4、CL-10/11/12/20/
 
 ---
 
-## 5. 已驳回方案
-
-以下建议已经复核，不要再次作为新任务提交：
-
-- 不把 Session JSONL 改成每条记录 temp file + rename。保持 append-only 和损坏尾行恢复。
-- 不用 Bash 命令白名单替代 deny → allow → ask 权限模型。
-- 不把所有同步文件 I/O 机械改成异步。只处理交互热路径。
-- 不做全仓常量、注释和命名整理。只在所属模块修改时顺手收敛。
-- 不在平台适配中自动翻译 POSIX 命令为 PowerShell。
