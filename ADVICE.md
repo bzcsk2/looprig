@@ -1,8 +1,13 @@
-# Deepicode LSP 完整实现专项设计
+# Deepicode LSP 与 Plugin 专项实现设计
 
 最后更新：2026-06-03
 
-本文只记录 **LSP 从最小可用实现升级为完整工程能力** 的专项方案。当前项目总待办仍以 [TODO.md](TODO.md) 为准；已完成能力和历史结论见 [DONE.md](DONE.md)；验收步骤见 [TEST.md](TEST.md)。
+本文记录两个下一阶段专项方案：
+
+1. **LSP**：从最小可用实现升级为完整工程能力。
+2. **Plugin**：增加与 opencode server plugin 形态兼容的扩展系统。
+
+当前项目总待办仍以 [TODO.md](TODO.md) 为准；已完成能力和历史结论见 [DONE.md](DONE.md)；验收步骤见 [TEST.md](TEST.md)。
 
 ---
 
@@ -657,3 +662,554 @@ textDocument/didChange {
 6. `LSP-60`：日志、进度和验收。
 
 每次只领取一个阶段。阶段完成后，把已实现内容迁移到 `DONE.md`，把剩余阶段或新发现问题写入 `TODO.md`。
+
+---
+
+# Deepicode Plugin 兼容实现专项设计
+
+## 10. 当前结论
+
+Deepicode 目前没有真正的 plugin runtime，但已经具备几个底层接入点：
+
+- `packages/tools/src/registry.ts`：支持注册 `AgentTool`。
+- `packages/security/src/hooks.ts`：已有 `beforeToolCall`、`afterToolCall`、`onLoopEvent`。
+- `packages/cli/src/tui.ts`：CLI 启动时集中创建 engine、注册工具、启动 MCP。
+- `packages/mcp/`：已有外部工具扩展机制，但它是 MCP server，不是本地 plugin。
+- `packages/tools/src/skills/`：已有静态 skill 系统，但不能动态注册工具或 hook。
+
+目标不是复制 opencode 的整个 plugin runtime，而是做一个 **Deepicode 原生 runtime + opencode server plugin 兼容层**。
+
+## 11. opencode Plugin 复用结论
+
+`/vol4/Agent/opencode` 有两类 plugin：
+
+1. Server plugin：用于注册工具、hook、provider/auth 等。
+2. TUI plugin：用于路由、slots、keymap、theme、dialog 等前端扩展。
+
+Deepicode 第一阶段只实现 **server plugin 兼容子集**。不要引入 opencode 的 TUI plugin runtime，也不要引入 opentui/solid 前端体系。
+
+### 11.1 可以参考的 opencode 文件
+
+- `/vol4/Agent/opencode/packages/plugin/src/index.ts`
+- `/vol4/Agent/opencode/packages/plugin/src/tool.ts`
+- `/vol4/Agent/opencode/packages/plugin/src/example.ts`
+- `/vol4/Agent/opencode/packages/opencode/src/config/plugin.ts`
+- `/vol4/Agent/opencode/packages/opencode/src/plugin/loader.ts`
+- `/vol4/Agent/opencode/packages/opencode/src/plugin/shared.ts`
+- `/vol4/Agent/opencode/packages/opencode/src/plugin/index.ts`
+- `/vol4/Agent/opencode/packages/opencode/test/cli/tui/plugin-loader-entrypoint.test.ts`
+- `/vol4/Agent/opencode/packages/opencode/test/cli/tui/plugin-lifecycle.test.ts`
+
+可复用设计：
+
+1. plugin spec 支持 file path、file URL、npm package spec。
+2. 配置项支持字符串或 `[spec, options]`。
+3. file plugin 的相对路径按声明配置文件所在目录解析。
+4. npm plugin 可按 package entrypoint 解析。
+5. `default export { id, server }` 的 v1 plugin 形态。
+6. 插件按配置顺序初始化，hook 执行顺序稳定。
+7. 插件加载失败要隔离，不影响 Deepicode 主流程启动。
+8. plugin id 去重，重复 id 不能覆盖已加载插件。
+
+### 11.2 禁止直接引入的内容
+
+不要引入：
+
+- opencode `Effect` / `Layer` / `Context.Service`
+- opencode `Bus`
+- opencode SDK client 完整对象
+- opencode provider/auth 插件体系
+- opencode workspace adapter
+- opencode TUI route/slot/theme/keymap runtime
+- `@opencode-ai/plugin/tui`
+- opentui/solid 前端依赖
+
+原因：Deepicode 当前是 Bun + TypeScript workspace，核心执行模型是 `ReasonixEngine` + `AgentTool` + `HookManager`。直接移植 opencode runtime 会改变架构重心，收益不如风险。
+
+## 12. Plugin 目标与非目标
+
+### 必须达到
+
+1. 支持从 `.deepicode/plugins.json` 或主配置读取 plugin 列表。
+2. 支持本地 file plugin。
+3. 支持 npm plugin spec 的解析，但第一阶段不自动安装。
+4. 支持 opencode v1 server plugin 的核心子集：
+   - `tool`
+   - `event`
+   - `tool.execute.before`
+   - `tool.execute.after`
+   - `permission.ask` 的只读兼容或映射
+   - `config`
+5. plugin tool 能转换成 Deepicode `AgentTool` 并注册到 engine。
+6. plugin hooks 能接入 Deepicode `HookManager`。
+7. plugin runtime 有明确生命周期：
+   - `load`
+   - `activate`
+   - `deactivate`
+   - `dispose`
+8. plugin 加载、执行、失败都有结构化日志。
+9. plugin 默认关闭危险能力，不允许绕过权限系统。
+10. plugin 失败不导致 Deepicode 主流程崩溃，除非显式设置 strict mode。
+
+### 暂不实现
+
+- TUI plugin route/slot/theme/keymap。
+- provider/auth 插件。
+- workspace adapter。
+- 自动 npm install。
+- remote plugin registry。
+- 插件热更新。
+- 插件沙箱隔离进程。
+- 让 plugin 修改 system prompt。
+- 让 plugin 直接访问模型 client。
+
+## 13. 建议模块边界
+
+新增包：
+
+```text
+packages/plugin/
+  package.json
+  tsconfig.json
+  src/
+    config.ts              # 读取 .deepicode/plugins.json，解析 spec/options/enabled
+    shared.ts              # spec/path/package 解析，参考 opencode plugin/shared.ts
+    loader.ts              # resolve + import plugin module
+    runtime.ts             # PluginRuntime 生命周期和状态
+    opencode-v1.ts         # opencode v1 server plugin 兼容读取和校验
+    tool-adapter.ts        # opencode tool -> Deepicode AgentTool
+    hook-adapter.ts        # opencode hook -> Deepicode HookManager
+    api.ts                 # Deepicode plugin input API
+    types.ts
+    index.ts
+```
+
+CLI 接入点：
+
+```text
+packages/cli/src/tui.ts
+```
+
+启动顺序建议：
+
+1. `loadConfig()`
+2. 创建 `McpHost`
+3. 创建 `ReasonixEngine`
+4. 注册内置工具
+5. 注册 MCP 基础工具
+6. 创建并初始化 `PluginRuntime`
+7. 注册 plugin tools
+8. 注册 plugin hooks
+9. 进入 pipe mode 或 TUI mode
+10. finally 中 `pluginRuntime.dispose()`，再 shutdown engine 和 MCP
+
+如果当前 engine 没有暴露 hook manager 注册入口，先新增窄接口，不要把 plugin runtime 塞进 core loop：
+
+```ts
+engine.addHooks(hooks)
+engine.removeHooks(hooks)
+```
+
+## 14. 配置格式
+
+第一阶段使用 `.deepicode/plugins.json`：
+
+```json
+{
+  "version": 1,
+  "strict": false,
+  "plugins": [
+    "./plugins/demo.ts",
+    ["./plugins/audit.ts", { "level": "debug" }],
+    {
+      "spec": "./plugins/tools.ts",
+      "enabled": true,
+      "options": {}
+    }
+  ]
+}
+```
+
+规则：
+
+- 字符串等价于 `{ "spec": "...", "enabled": true }`。
+- tuple 等价于 `{ "spec": "...", "enabled": true, "options": ... }`。
+- object 是推荐格式。
+- 相对路径按 `.deepicode/plugins.json` 所在目录解析。
+- `file://`、绝对路径、相对路径都允许。
+- npm spec 第一阶段只解析并报 `npm_plugin_not_installed`，不自动安装。
+- `strict: true` 时，plugin 加载失败让 CLI 启动失败；默认 `false` 只记录错误并跳过。
+
+后续可以把 plugin 配置合入主 config，但第一阶段先独立文件，降低和现有 config 的耦合。
+
+## 15. 兼容的 Plugin 形态
+
+支持 opencode v1 server plugin：
+
+```ts
+import { tool } from "@opencode-ai/plugin"
+
+export default {
+  id: "demo.plugin",
+  server: async (ctx, options) => {
+    return {
+      tool: {
+        hello: tool({
+          description: "Say hello",
+          args: {
+            name: tool.schema.string().describe("Name")
+          },
+          async execute(args, context) {
+            return `Hello ${args.name}`
+          }
+        })
+      },
+      async "tool.execute.before"(input, output) {
+        // may mutate output.args
+      },
+      async "tool.execute.after"(input, output) {
+        // may inspect output
+      },
+      async event({ event }) {
+        // observe Deepicode loop events
+      }
+    }
+  }
+}
+```
+
+Deepicode 自有 plugin 也可以使用同样形态，但推荐以后发布 `@deepicode/plugin` 类型包，避免开发者必须依赖 `@opencode-ai/plugin`。
+
+第一阶段为了兼容现有 opencode plugin，可以支持两种导出：
+
+```ts
+export default { id, server }
+```
+
+以及 legacy：
+
+```ts
+export async function MyPlugin(ctx, options) {
+  return {}
+}
+```
+
+legacy 支持优先级低；如果实现复杂，可以只支持 default object。
+
+## 16. Tool 适配
+
+opencode tool 的返回：
+
+```ts
+type ToolResult =
+  | string
+  | {
+      title?: string
+      output: string
+      metadata?: Record<string, any>
+      attachments?: ToolAttachment[]
+    }
+```
+
+Deepicode `AgentTool.execute()` 需要返回当前项目约定的 tool result。适配要求：
+
+1. opencode `description` 映射到 `AgentTool.description`。
+2. opencode `args` 使用 zod schema，Deepicode 当前工具参数是 JSON Schema；需要实现 `zodToJsonSchema` 或只支持可转换基础类型。
+3. plugin tool name 必须加命名空间，避免覆盖内置工具：
+
+```text
+plugin__<pluginIdSanitized>__<toolName>
+```
+
+4. 对模型展示时可以把 title 保留为原始工具名：
+
+```text
+demo.plugin/hello
+```
+
+5. plugin tool 的权限 tier 默认是 `exec`，除非插件显式声明只读。
+6. plugin tool 永远走 Deepicode `PermissionEngine` 和 `HookManager`，不能因为来自 plugin 就跳过权限。
+7. plugin tool 参数和结果必须走 `safeStringify()` 截断。
+8. attachment 第一阶段可以忽略或转换成 metadata，不进入上下文正文。
+
+如果 zod schema 转 JSON Schema 工作量过大，第一阶段限制 schema 能力：
+
+- `string`
+- `number`
+- `boolean`
+- `array`
+- `object`
+- `enum`
+- `optional`
+- `describe`
+
+遇到无法转换的 schema，plugin tool 加载失败，但不影响其他 plugin。
+
+## 17. Hook 适配
+
+Deepicode 已有：
+
+```ts
+beforeToolCall(context): Promise<"allow" | "deny" | void>
+afterToolCall(toolName, result): Promise<void>
+onLoopEvent(event): Promise<void>
+```
+
+映射：
+
+| opencode hook | Deepicode 映射 | 第一阶段行为 |
+| --- | --- | --- |
+| `event` | `onLoopEvent` | 传入 Deepicode LoopEvent 的兼容对象 |
+| `tool.execute.before` | `beforeToolCall` | 允许修改 args；返回 deny/allow 映射权限 |
+| `tool.execute.after` | `afterToolCall` | 可观察结果；是否允许修改结果需单独设计 |
+| `permission.ask` | `beforeToolCall` 附加阶段 | 只允许把 ask 改为 deny/allow，不允许直接弹自定义 UI |
+| `config` | plugin 初始化后调用 | 传 Deepicode config 的兼容子集 |
+| `chat.params` | 暂不支持 | 记录 unsupported hook |
+| `chat.headers` | 暂不支持 | 记录 unsupported hook |
+| `command.execute.before` | 暂不支持 | 等 slash command 架构稳定后再做 |
+| `shell.env` | 暂不支持 | 后续可接入 shell backend |
+
+关键要求：
+
+- before hook 抛错时 fail-safe：拒绝该工具调用。
+- after/event hook 抛错时只记录日志，不中断主流程。
+- hook 执行必须有超时，默认 3s。
+- hook 顺序按 plugin 配置顺序稳定执行。
+- plugin deactivate 后必须移除对应 hooks。
+
+## 18. Plugin API
+
+传给 plugin 的 `ctx` 不要模拟完整 opencode SDK，只提供兼容子集：
+
+```ts
+interface DeepicodePluginInput {
+  directory: string;
+  worktree: string;
+  project: {
+    id: string;
+    directory: string;
+  };
+  client: {
+    // 第一阶段只提供最小只读能力，避免插件控制 session
+  };
+  serverUrl: URL;
+  experimental_workspace: {
+    register(): void; // 第一阶段 no-op + warning
+  };
+  $?: unknown; // 第一阶段不提供 Bun.$，避免任意 shell 便利入口
+}
+```
+
+原则：
+
+- 不给 plugin 直接访问 engine 内部对象。
+- 不给 plugin 直接注册 system prompt。
+- 不给 plugin 直接改模型请求。
+- 需要能力时通过明确 API 逐个开放。
+
+## 19. 安全边界
+
+1. 默认只加载 workspace 明确配置的 plugin。
+2. 不扫描任意目录自动加载 plugin。
+3. npm plugin 第一阶段不自动安装。
+4. file plugin 必须 resolve 到 workspace 内，除非用户显式设置 `allowExternalPluginPaths: true`。
+5. plugin tool 默认按 exec 权限处理。
+6. plugin 不能覆盖内置工具名。
+7. plugin 不能注册以 `mcp__`、`system__`、`deepicode__` 开头的保留工具名。
+8. plugin import 失败、shape 错误、schema 转换失败都要隔离。
+9. plugin hook timeout 必须可配置且有上限。
+10. 日志中不要打印 plugin options 的敏感字段。
+
+## 20. 可观测性
+
+RuntimeLogger 增加事件：
+
+- `plugin.config.load`
+- `plugin.resolve.start`
+- `plugin.resolve.done`
+- `plugin.resolve.error`
+- `plugin.load.start`
+- `plugin.load.done`
+- `plugin.load.error`
+- `plugin.activate.done`
+- `plugin.deactivate.done`
+- `plugin.dispose.done`
+- `plugin.tool.register`
+- `plugin.tool.execute.start`
+- `plugin.tool.execute.done`
+- `plugin.hook.start`
+- `plugin.hook.done`
+- `plugin.hook.error`
+- `plugin.hook.timeout`
+
+字段：
+
+- `pluginId`
+- `pluginSpec`
+- `pluginSource`
+- `pluginPath`
+- `hookName`
+- `toolName`
+- `durationMs`
+- `errorClass`
+- `strict`
+
+`DEEPICODE_LOG_LEVEL=off` 时不能产生 plugin 日志文件，也不能明显拖慢工具执行。
+
+## 21. 实施阶段
+
+### PLG-10：配置与 spec 解析
+
+目标：
+
+- 新建 `packages/plugin`。
+- 实现 `.deepicode/plugins.json` 读取。
+- 支持 string、tuple、object 三种配置项。
+- 支持相对路径、绝对路径、file URL。
+- npm spec 只解析，不安装。
+- 实现 duplicate spec 和 duplicate id 的错误分类。
+
+测试：
+
+- 相对路径按配置文件目录解析。
+- disabled plugin 不加载。
+- malformed config 返回结构化错误。
+- npm spec 返回 `npm_plugin_not_installed`。
+- strict false 跳过错误，strict true 抛错。
+
+### PLG-20：loader 与 v1 server plugin shape
+
+目标：
+
+- 实现 dynamic import。
+- 识别 `default export { id, server }`。
+- 校验 id、server 函数、返回 hooks 对象。
+- 加载顺序稳定。
+- 加载失败隔离。
+
+测试：
+
+- 成功加载本地 plugin。
+- 缺 id 的 file plugin 失败。
+- server 不是函数失败。
+- plugin 抛错被隔离。
+- 两个 plugin id 重复时后者失败。
+
+### PLG-30：tool adapter
+
+目标：
+
+- 支持 opencode `tool()` 定义。
+- 转换 zod schema 到 JSON Schema 基础子集。
+- 注册 plugin tools 到 `ReasonixEngine`。
+- 工具名命名空间化。
+- 执行结果转换为 Deepicode tool result。
+
+测试：
+
+- plugin tool 出现在 tool specs。
+- string/number/boolean/object/enum schema 转换正确。
+- plugin tool execute 返回 string。
+- plugin tool execute 返回 `{ title, output, metadata }`。
+- 无法转换 schema 的 tool 被跳过并记录错误。
+- plugin tool 不能覆盖内置工具。
+
+### PLG-40：hook adapter
+
+目标：
+
+- 映射 `event` 到 `HookManager.onLoopEvent`。
+- 映射 `tool.execute.before` 到 before hook。
+- 映射 `tool.execute.after` 到 after hook。
+- 支持 hook timeout。
+- deactivate/dispose 时移除 hooks。
+
+测试：
+
+- before hook 可 deny。
+- before hook 可修改 args。
+- before hook 抛错时 deny。
+- after hook 抛错不影响主流程。
+- event hook 收到 LoopEvent。
+- dispose 后 hook 不再触发。
+
+### PLG-50：CLI 集成和生命周期
+
+目标：
+
+- 在 CLI 启动时初始化 `PluginRuntime`。
+- pipe mode 和 TUI mode 共用 plugin runtime。
+- finally 中 dispose。
+- `--help` 不加载 plugin。
+- `DEEPICODE_PURE=1` 或 `--pure` 跳过 plugin。
+
+测试：
+
+- pipe mode 可以调用 plugin tool。
+- TUI mode 启动不因 plugin 加载失败崩溃。
+- `--pure` 不加载 plugin。
+- dispose 被调用。
+- plugin runtime 不造成 pipe mode 不退出。
+
+### PLG-60：文档和验收
+
+目标：
+
+- 更新 README plugin 配置说明。
+- 增加 `examples/plugins/hello.ts`。
+- 增加 `examples/plugins/audit.ts`。
+- 更新 TEST.md 的 plugin 验收项。
+
+测试：
+
+- 示例 plugin 可被测试加载。
+- 用户能按文档写出一个 hello tool。
+
+## 22. 测试矩阵
+
+单元测试：
+
+- `plugin-config.test.ts`
+- `plugin-shared.test.ts`
+- `plugin-loader.test.ts`
+- `plugin-tool-adapter.test.ts`
+- `plugin-hook-adapter.test.ts`
+- `plugin-runtime.test.ts`
+
+集成测试：
+
+- `plugin-cli-pipe.acceptance.test.ts`
+- `plugin-runtime-lifecycle.acceptance.test.ts`
+
+必须覆盖：
+
+- 正常加载。
+- 加载失败。
+- duplicate id。
+- disabled plugin。
+- strict mode。
+- tool schema 转换。
+- before/after/event hook。
+- dispose 无残留。
+- `DEEPICODE_LOG_LEVEL=off` 不产生 plugin 日志。
+
+## 23. 开发注意事项
+
+- 第一阶段不要实现 TUI plugin。
+- 第一阶段不要自动 npm install。
+- 第一阶段不要 provider/auth。
+- 不要为了兼容 opencode plugin 而引入 opencode runtime。
+- 不要把 plugin runtime 放进 core loop；它应该在 CLI/应用层装配。
+- 所有 plugin tool 和 hook 都必须走 Deepicode 权限、日志和错误隔离。
+- 每个阶段完成后更新 `DONE.md`；未完成或新发现问题更新 `TODO.md`。
+
+## 24. Plugin 建议领取顺序
+
+1. `PLG-10`：配置与 spec 解析。
+2. `PLG-20`：loader 与 v1 server plugin shape。
+3. `PLG-30`：tool adapter。
+4. `PLG-40`：hook adapter。
+5. `PLG-50`：CLI 集成和生命周期。
+6. `PLG-60`：文档、示例和验收。
+
+每次只领取一个阶段。优先保证 typecheck 和 plugin 单测通过，再跑全量 `bun test`。

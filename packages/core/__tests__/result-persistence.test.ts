@@ -61,7 +61,8 @@ describe("P4: Result Overflow Persistence", () => {
     // Key: no path traversal (..) in the final path
     expect(r.persisted!.persistedPath).not.toContain("..")
     // The path should be under .deepicode/results/
-    expect(r.persisted!.persistedPath).toContain(".deepicode/results/")
+    const normalizedPath = r.persisted!.persistedPath.replace(/\\/g, "/")
+    expect(normalizedPath).toContain(".deepicode/results/")
   })
 
   it("sanitizes tool name in filename", async () => {

@@ -101,9 +101,10 @@ describe("NotebookEdit", () => {
   it("S6: should handle path traversal attempt (no explicit protection)", async () => {
     const tool = createNotebookEditTool()
     // Path traversal to /etc/passwd with valid action — fails because file doesn't exist
+    // or because the content is not valid JSON
     const r = await tool.execute({ path: "../../../etc/passwd", action: "create_cell", cell_type: "code" }, ctx(tmpDir))
     expect(r.isError).toBe(true)
     const p = JSON.parse(r.content as string)
-    expect(p.error).toMatch(/File not found/)
+    expect(p.error).toMatch(/(File not found|Invalid JSON)/)
   })
 })

@@ -219,16 +219,19 @@ describe("todowrite tool (C1: new tool)", () => {
 // ============================================================
 describe("bash tool security baseline (D2: deny patterns)", () => {
   const ctx = { cwd: process.cwd(), signal: new AbortController().signal } as any
+  const isWin = process.platform === "win32"
 
   it("should deny rm -rf / command", async () => {
     const { createBashTool } = await import("@deepicode/tools")
     const tool = createBashTool()
-    const result = await tool.execute({ command: "rm -rf /" }, ctx)
+    const cmd = isWin ? "rm -Recurse -Force /" : "rm -rf /"
+    const result = await tool.execute({ command: cmd }, ctx)
     expect(result.isError).toBe(true)
     expect(JSON.parse(result.content as string).error).toContain("denied")
   })
 
   it("should deny sudo commands", async () => {
+    if (isWin) return // sudo does not exist on Windows
     const { createBashTool } = await import("@deepicode/tools")
     const tool = createBashTool()
     const result = await tool.execute({ command: "sudo whoami" }, ctx)
@@ -237,6 +240,7 @@ describe("bash tool security baseline (D2: deny patterns)", () => {
   })
 
   it("should deny mkfs commands", async () => {
+    if (isWin) return // mkfs does not exist on Windows
     const { createBashTool } = await import("@deepicode/tools")
     const tool = createBashTool()
     const result = await tool.execute({ command: "mkfs.ext4 /dev/sda1" }, ctx)
@@ -245,6 +249,7 @@ describe("bash tool security baseline (D2: deny patterns)", () => {
   })
 
   it("should deny chmod -R 777 /", async () => {
+    if (isWin) return // chmod does not exist on Windows
     const { createBashTool } = await import("@deepicode/tools")
     const tool = createBashTool()
     const result = await tool.execute({ command: "chmod -R 777 /" }, ctx)

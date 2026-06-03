@@ -21,7 +21,8 @@ const POSIX_DENY_PATTERNS = [
 ]
 
 const POWERSHELL_DENY_PATTERNS = [
-  /\bRemove-Item\b[^;\n]*(?:-Recurse\b[^;\n]*)?(?:[A-Za-z]:\\|\/)\s*(?:-\w+\s*)*$/i,
+  /\b(?:Remove-Item|rm)\b[^;\n]*(?:-Recurse\b[^;\n]*)?(?:[A-Za-z]:\\|\/)\s*(?:-\w+\s*)*$/i,
+  /\b(?:Remove-Item|rm)\b[^;\n]*-[FRS]\b/i,
   /\bFormat-Volume\b/i,
   /\bClear-Disk\b/i,
   /\bInitialize-Disk\b/i,

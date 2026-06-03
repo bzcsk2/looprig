@@ -25,7 +25,7 @@ describe("McpHost", () => {
     expect(host).toBeDefined()
   })
 
-  it("should discover and call tools from a connected MCP server", async () => {
+  it("should discover and call tools from a connected MCP server", { timeout: process.platform === "win32" ? 15000 : 5000 }, async () => {
     const host = new McpHost()
     await host.connect("fake", { command: process.execPath, args: [join(import.meta.dir, "fixtures", "fake-mcp.mjs")] })
     expect(host.allTools.map(entry => entry.tool.name)).toEqual(["echo"])
@@ -60,7 +60,7 @@ describe("CL-10: MCP client lifecycle", () => {
     await client.disconnect()
   })
 
-  it("rejects pending on disconnect before request completes", async () => {
+  it("rejects pending on disconnect before request completes", { timeout: process.platform === "win32" ? 15000 : 5000 }, async () => {
     // Create a server that only responds to initialize, not tools/list
     const script = join(tmpdir(), `mcp-hang-${Date.now()}.mjs`)
     writeFileSync(script, `process.stdin.on("data", (d) => {
@@ -86,7 +86,7 @@ describe("CL-10: MCP client lifecycle", () => {
     }
   })
 
-  it("disconnect is safe to call multiple times", async () => {
+  it("disconnect is safe to call multiple times", { timeout: process.platform === "win32" ? 15000 : 5000 }, async () => {
     const client = new McpClient("test")
     await client.connect(process.execPath, [fixture])
     await client.disconnect()
@@ -111,7 +111,7 @@ describe("CL-10: MCP client lifecycle", () => {
     expect(true).toBe(true)
   })
 
-  it("malformed JSON line does not break subsequent responses", async () => {
+  it("malformed JSON line does not break subsequent responses", { timeout: process.platform === "win32" ? 15000 : 5000 }, async () => {
     // Create a server that sends an invalid JSON line before a valid one
     const script = join(tmpdir(), `mcp-junk-${Date.now()}.mjs`)
     writeFileSync(script, `
