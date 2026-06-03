@@ -2,8 +2,27 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { ReasonixEngine } from "../src/engine.js"
 import { ContextManager } from "../src/context/manager.js"
 import { FakeSummarizer, MechanicalSummarizer } from "../src/context/summarizer.js"
+import { MockSseServer } from "../src/test-utils/mock-sse-server.js"
 import type { DeepicodeConfig } from "../src/config.js"
 import type { ContextPolicy } from "../src/context/policy.js"
+import { mkdtempSync } from "node:fs"
+import { rm } from "node:fs/promises"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
+
+let originalCwd: string
+let testCwd: string
+
+beforeEach(() => {
+  originalCwd = process.cwd()
+  testCwd = mkdtempSync(join(tmpdir(), "deepicode-context-policy-"))
+  process.chdir(testCwd)
+})
+
+afterEach(async () => {
+  process.chdir(originalCwd)
+  await rm(testCwd, { recursive: true, force: true })
+})
 
 // Mock TokenizerPool to use deterministic fallback
 vi.mock("../src/context/tokenizer-pool.js", () => ({
@@ -20,12 +39,20 @@ vi.mock("../src/context/tokenizer-pool.js", () => ({
         this.fallbackCount += 1
         this.lastFallbackReason = "unhealthy"
       }
-      return Promise.resolve(messages.length * 10)
+      const reasoningTokens = messages.reduce(
+        (sum, message) => sum + (message.reasoning_content ? 10 : 0),
+        0,
+      )
+      return Promise.resolve(messages.length * 10 + reasoningTokens)
     }
 
     resolvePendingWithFallback(reason: string) {
       for (const [, task] of this.tasks) {
-        task.resolve(task.messages.length * 10)
+        const reasoningTokens = task.messages.reduce(
+          (sum, message) => sum + (message.reasoning_content ? 10 : 0),
+          0,
+        )
+        task.resolve(task.messages.length * 10 + reasoningTokens)
       }
       this.tasks.clear()
       this.fallbackCount += 1
@@ -77,26 +104,6 @@ vi.mock("../src/runtime-logger.js", () => ({
   }),
 }))
 
-// Mock DeepSeekClient
-vi.mock("../src/client.js", () => ({
-  DeepSeekClient: class {
-    async *chatCompletionsStream() {
-      yield { type: "text", content: "test" }
-      yield { type: "done" }
-    }
-  },
-}))
-
-// Mock ContextPolicyStore
-vi.mock("../src/context/policy-store.js", () => ({
-  ContextPolicyStore: class {
-    private policy = { mode: "trim", triggerRatio: 0.7, targetRatio: 0.3 }
-    async load() { return this.policy }
-    async save(policy: any) { this.policy = policy; return true }
-    getCurrentPolicy() { return this.policy }
-  },
-}))
-
 describe("ReasonixEngine context policy", () => {
   let engine: ReasonixEngine
   const defaultConfig: DeepicodeConfig = {
@@ -110,8 +117,9 @@ describe("ReasonixEngine context policy", () => {
     maxContextRounds: 20,
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     engine = new ReasonixEngine(defaultConfig)
+    await new Promise(resolve => setTimeout(resolve, 0))
   })
 
   afterEach(async () => {
@@ -181,23 +189,28 @@ describe("ReasonixEngine context policy", () => {
 
 describe("ReasonixEngine submit with context policy", () => {
   let engine: ReasonixEngine
+  let server: MockSseServer
   const smallContextConfig: DeepicodeConfig = {
     provider: "deepseek",
     model: "deepseek-chat",
     apiKey: "test-key",
-    baseUrl: "https://api.deepseek.com",
+    baseUrl: "http://localhost",
     maxTokens: 4096,
     temperature: 0.7,
     contextWindow: 100,
     maxContextRounds: 20,
   }
 
-  beforeEach(() => {
-    engine = new ReasonixEngine(smallContextConfig)
+  beforeEach(async () => {
+    server = new MockSseServer()
+    await server.start()
+    engine = new ReasonixEngine({ ...smallContextConfig, baseUrl: server.baseUrl })
+    await new Promise(resolve => setTimeout(resolve, 0))
   })
 
   afterEach(async () => {
     await engine.shutdown()
+    await server.stop()
   })
 
   it("should not trigger reduction below threshold", async () => {

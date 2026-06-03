@@ -27,12 +27,20 @@ vi.mock("../src/context/tokenizer-pool.js", () => ({
         this.fallbackCount += 1
         this.lastFallbackReason = "unhealthy"
       }
-      return Promise.resolve(messages.length * 10)
+      const reasoningTokens = messages.reduce(
+        (sum, message) => sum + (message.reasoning_content ? 10 : 0),
+        0,
+      )
+      return Promise.resolve(messages.length * 10 + reasoningTokens)
     }
 
     resolvePendingWithFallback(reason: string) {
       for (const [, task] of this.tasks) {
-        task.resolve(task.messages.length * 10)
+        const reasoningTokens = task.messages.reduce(
+          (sum, message) => sum + (message.reasoning_content ? 10 : 0),
+          0,
+        )
+        task.resolve(task.messages.length * 10 + reasoningTokens)
       }
       this.tasks.clear()
       this.fallbackCount += 1
