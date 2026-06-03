@@ -1595,12 +1595,16 @@ bun run typecheck
 
 ### STAT-20：Slash command 接入
 
-目标：
+**状态：✅ 已完成（2026-06-03）**
+
+实现内容：
 
 - `parseSlashCommand()` 支持 `/status`。
 - `/help` 显示 `/status`。
-- `App.handleSubmit()` 拦截 `/status`，不调用模型。
-- status 结果作为 assistant 历史消息插入。
+- `App.handleSubmit()` 拦截 `/status`，不调用模型（由调用方实现）。
+- status 结果作为 assistant 历史消息插入（由调用方实现）。
+- `packages/tui/src/status/format.ts`：格式化 status 输出。
+- 6 个单元测试覆盖所有场景。
 
 测试：
 

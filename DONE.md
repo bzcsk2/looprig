@@ -21,7 +21,7 @@ bun test
 | 检查项 | 状态 |
 |--------|------|
 | TypeScript | `bun run typecheck` 通过 |
-| 测试 | `953 pass / 0 fail / 18 skip`，共 `73` 个测试文件 |
+| 测试 | `959 pass / 0 fail / 18 skip`，共 `74` 个测试文件 |
 | 稳定性 | 连续 3 次全绿（TEST-STABILITY-01 已关闭） |
 | CI | ✓ ubuntu-latest ✓ windows-latest ✓ macos-latest（OS-17-R 已关闭） |
 
@@ -818,6 +818,7 @@ DEEPICODE_TRACE=1
 | 阶段 | 状态 | 说明 |
 |------|------|------|
 | STAT-10：Core 状态快照 | ✅ 已完成 | EngineStatusSnapshot、getStatusSnapshot()、8 个测试 |
+| STAT-20：Slash command 接入 | ✅ 已完成 | /status 命令、format.ts、6 个测试 |
 
 ---
 

@@ -14,6 +14,7 @@ export type SlashCommand =
   | { name: "agent" }
   | { name: "thinking"; mode: string }
   | { name: "lang" }
+  | { name: "status" }
 
 const THINKING_MODES = ["off", "low", "medium", "high", "max"]
 
@@ -32,6 +33,7 @@ export function parseSlashCommand(text: string): SlashCommand | null {
   if (trimmed === "/skill") return { name: "skill" }
   if (trimmed === "/agent") return { name: "agent" }
   if (trimmed === "/lang") return { name: "lang" }
+  if (trimmed === "/status") return { name: "status" }
 
   if (trimmed.startsWith("/thinking")) {
     const parts = trimmed.split(/\s+/)
@@ -81,6 +83,7 @@ interface HelpCommandStrings {
   cmdAgent: string
   cmdSkill: string
   cmdLang: string
+  cmdStatus: string
 }
 
 export function buildHelpText(activeAgent: string, cmdStrings: HelpCommandStrings): string {
@@ -98,6 +101,7 @@ export function buildHelpText(activeAgent: string, cmdStrings: HelpCommandString
     `  /agent       — ${cmdStrings.cmdAgent}`,
     `  /skill       — ${cmdStrings.cmdSkill}`,
     `  /lang        — ${cmdStrings.cmdLang}`,
+    `  /status      — ${cmdStrings.cmdStatus}`,
     `  /thinking    — set thinking mode`,
     "",
     "Agents:",
