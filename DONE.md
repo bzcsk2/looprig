@@ -3,7 +3,7 @@
 最后更新：2026-06-03
 
 本文只记录当前代码中仍然成立的已完成功能和已验证修复。
-未完成、待验收、明确暂缓和已驳回方案统一见 [TODO.md](TODO.md)。LSP 和 Plugin 的专项设计见 [ADVICE.md](ADVICE.md)。
+未完成、待验收、明确暂缓和已驳回方案统一见 [TODO.md](TODO.md)。当前后续专项交接见 [ADVICE.md](ADVICE.md)。
 
 ---
 
@@ -496,6 +496,17 @@ bun test
 - `App.tsx` 将 `ref` 和 `suppressHistory` 传递给 `DeepiPromptInput`，并在 `CommandAutocomplete` 的 `onSelect` 中通过 ref 写入文本。
 - 验收：菜单打开时 ↑↓ 只改变选中项；Enter/Tab 回写命令；Esc 只关闭菜单；菜单关闭后 ↑↓ 恢复历史导航。
 
+### T21-R2：reset 后 slash menu 恢复
+
+- `/status`、`/context` 已重新加入 `parseSlashCommand()`、`CommandRegistry` 和 i18n 文案。
+- `CommandAutocomplete` 行为恢复为：Enter 直接执行命令进入二级菜单或输出 status；Tab 只补全到输入框；Esc 关闭。
+- `DeepiPromptInput` 支持外部 `history`、`injectedText` 和 `suppressSubmit`，避免 autocomplete 打开时输入框抢 Enter/Tab。
+- `/skill` 二级菜单恢复为 52 个 skill 的可选择列表；Space 启用/禁用，Enter 插入 `#skill-name ` 到输入框。
+- `/context` 二级菜单恢复为真实 policy 菜单；支持 `trim/compact`、trigger/target 调整、当前用量显示和 `Run now`。
+- 为 context reduction 补回 `AppendOnlyLog.replaceAll()`；为 loop/plugin 恢复后遗留类型缺口补齐类型。
+- 本轮验收：`bun run typecheck` 通过；`bun test packages/tui` 38/38 通过。
+- 本轮完整 `bun test` 按用户要求中断，不作为本轮验收结论。
+
 ### P3-R：中途指令 TUI 路由回归
 
 - `bridge.tsx` `full` fallback 后同步更新 `pendingInstructionCount`，修复 P3-2 断言失败。
@@ -881,12 +892,7 @@ bun test
 
 `TEST-STABILITY-01` 和 `OS-17-R` 已完成并记录在本文。仍未完成的原生平台人工验收见 `TODO.md`。
 
-2026-06-03 后，`ADVICE.md` 重新用于承载后续专项设计：
-
-- LSP 完整实现：参考 opencode LSP 设计，按 Deepicode 架构移植。
-- Plugin 兼容实现：兼容 opencode server plugin 子集，不引入 opencode 前端 runtime。
-- Status 状态卡片：类似 Codex `/status` 的运行状态卡片。
-- Context 压缩与持久化：`/context` 菜单已完成，剩余真实 LLM compact、策略持久化和验收仍见 `ADVICE.md`。
+2026-06-03 后，`ADVICE.md` 只保留仍需交接执行的专项。当前只剩 Context 的 `CTX-70` 文档和验收。
 
 ### 6.1 LSP 专项进度
 
@@ -944,9 +950,8 @@ bun test
 
 保留限制：
 
-- 当前 `compress` 仍是本地机械 summary，不是真实 LLM compact。
-- `.deepicode/context.json` 策略持久化未完成。
-- 真实 compact、fallback 和完整验收仍按 `ADVICE.md` 推进。
+- `/context` 的代码链路已完成；完整长会话人工验收仍按 `ADVICE.md` 的 `CTX-70` 执行。
+- 本轮完整 `bun test` 未作为最新结论记录，因用户要求中断。
 
 ---
 

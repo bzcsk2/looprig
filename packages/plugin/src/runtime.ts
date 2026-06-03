@@ -1,6 +1,6 @@
-import { readPluginConfig, type PluginConfigItem } from "./config.js"
+import { readPluginConfig, type PluginConfigError } from "./config.js"
 import { loadPlugins, type PluginLoaded, type PluginLoadError } from "./loader.js"
-import { extractToolsFromPlugins, pluginToolsToToolSpecs, type PluginTool, type PluginToolResult } from "./tool-adapter.js"
+import { extractToolsFromPlugins, pluginToolsToToolSpecs, type PluginTool, type PluginToolError } from "./tool-adapter.js"
 import { PluginHookRegistry } from "./hook-adapter.js"
 import type { HookManager } from "@deepicode/security"
 import type { ToolSpec } from "@deepicode/core"
@@ -18,15 +18,17 @@ export interface PluginRuntimeStatus {
   loadedPlugins: string[]
   tools: string[]
   hooks: string[]
-  errors: PluginLoadError[]
+  errors: PluginRuntimeError[]
 }
+
+export type PluginRuntimeError = PluginConfigError | PluginLoadError | PluginToolError
 
 export class PluginRuntime {
   private initialized = false
   private loadedPlugins: PluginLoaded[] = []
   private pluginTools: PluginTool[] = []
   private hookRegistry = new PluginHookRegistry()
-  private errors: PluginLoadError[] = []
+  private errors: PluginRuntimeError[] = []
   private options: PluginRuntimeOptions
 
   constructor(options: PluginRuntimeOptions = {}) {

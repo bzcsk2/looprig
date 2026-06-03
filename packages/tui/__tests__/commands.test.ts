@@ -17,6 +17,8 @@ describe("CL-52: slash command routing helpers", () => {
     expect(parseSlashCommand("/skill")).toEqual({ name: "skill" })
     expect(parseSlashCommand("/agent")).toEqual({ name: "agent" })
     expect(parseSlashCommand("/lang")).toEqual({ name: "lang" })
+    expect(parseSlashCommand("/status")).toEqual({ name: "status" })
+    expect(parseSlashCommand("/context")).toEqual({ name: "context" })
   })
 
   it("keeps normal and unknown input outside slash routing", () => {
@@ -46,9 +48,13 @@ describe("CL-52: slash command routing helpers", () => {
       cmdAgent: "agent",
       cmdSkill: "skill",
       cmdLang: "lang",
+      cmdStatus: "status",
+      cmdContext: "context",
     })
 
     expect(help).toContain("/exit, /bye")
+    expect(help).toContain("/status")
+    expect(help).toContain("/context")
     expect(help).toContain("Agents:")
     expect(help).toContain("Current:")
   })

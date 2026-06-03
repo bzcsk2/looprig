@@ -45,8 +45,10 @@ export const zhCN: Strings = {
   cmdModel: '切换服务商/模型',
   cmdSessions: '浏览历史会话',
   cmdAgent: '切换 Agent',
-  cmdSkill: '列出已加载技能',
+  cmdSkill: '管理技能',
   cmdLang: '切换语言',
+  cmdStatus: '显示运行状态',
+  cmdContext: '配置上下文裁剪/compact',
   // App
   pressCtrlC: '再次按 Ctrl+C 退出',
   shuttingDown: '正在关闭...',
@@ -66,7 +68,7 @@ export const zhCN: Strings = {
   rejected: '已拒绝',
   exitCode: (code) => `退出码 ${code}`,
   // CommandAutocomplete
-  cmdAutocompleteHint: '↑↓ 选择 · Enter/Tab 补全 · Esc 关闭',
+  cmdAutocompleteHint: '↑↓ 选择 · Enter 执行 · Tab 补全 · Esc 关闭',
   // Search
   searchHint: 'Enter 下一个 · ↑ 上一个 · Esc 关闭',
   // Bridge

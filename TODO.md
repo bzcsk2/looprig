@@ -60,7 +60,7 @@ bun test packages/mcp/__tests__/mcp-host.test.ts packages/mcp/__tests__/mcp-tool
 
 | 顺序 | 任务 | 原因 |
 |------|------|------|
-| 1 | `CTX-70` 文档和验收 | CTX-50 已完成，按 ADVICE.md 顺序继续。 |
+| 1 | `CTX-70` 文档和验收 | CTX-10/30/40/50 已完成，只剩交付验收。 |
 | 2 | `OS-12/13-R` macOS/Windows 原生验收 | 代码层面已就绪，需在原生环境验收。 |
 
 不要一次领取多个任务。每个编号完成后都应保持全量测试为绿色。
@@ -71,12 +71,15 @@ bun test packages/mcp/__tests__/mcp-host.test.ts packages/mcp/__tests__/mcp-tool
 
 ### CTX-70：文档和验收
 
-优先级：`P1`。CTX-50 已完成后执行。
+优先级：`P1`。
 
 当前状态：
 
 - CTX-10/30/40/50 代码已完成。
-- 所有测试通过。
+- `/context` 菜单已接入真实 engine policy，可切换 `trim/compact`、调整 `70% -> 30%`、显示当前用量并执行 `Run now`。
+- 本轮已修复 reset 后 slash menu 相关 TUI 文件恢复不完整导致的类型错误。
+- 本轮已实际验证：`bun run typecheck`、`bun test packages/tui` 通过。
+- 本轮完整 `bun test` 按用户要求中断，不作为本轮结论。
 
 目标：
 
@@ -99,100 +102,14 @@ bun test packages/mcp/__tests__/mcp-host.test.ts packages/mcp/__tests__/mcp-tool
 6. 模拟 summarizer 失败，确认 fallback trim。
 7. 退出并重启，确认配置仍然生效。
 
-### CTX-50：真实 LLM summarizer
-
-优先级：`P1`。CTX-40 已完成后执行。
-
-当前状态：
-
-- `ContextSummarizer` 接口已定义。
-- `FakeSummarizer` 和 `MechanicalSummarizer` 已实现。
-- `ReasonixEngine.setSummarizer()` 已暴露。
-
-目标：
-
-- 把 `compact` 从"机械摘要"改成"调用模型做上下文压缩"。
-
-执行要求：
-
-1. 在 `packages/core/src/context/summarizer.ts` 实现真实 summarizer。
-   - 复用现有 provider client。
-   - 低温度，不带 tools。
-   - 只让模型做"摘要"，不要让它执行任务。
-2. 控制输入范围：只传入可压缩的旧消息，保留必要的 summary 作为上下文输入，不把当前轮 input 放进去。
-3. 控制输出长度：`maxTokens` 受 `targetRatio` 约束，输出过长时截断。
-4. 做错误处理：HTTP 错误回退、超时回退、空摘要回退、AbortSignal 生效。
-5. 编写 `packages/core/__tests__/context-summarizer.test.ts` 测试文件。
-
 验收命令：
 
 ```bash
-bun test packages/core/__tests__/context-summarizer.test.ts
-bun run typecheck
-bun test
-```
-
-### CTX-40：Engine 自动 trim/compact 触发
-
-优先级：`P1`。CTX-30 已完成后执行。
-
-当前状态：
-
-- `getContextPolicy()` / `setContextPolicy()` / `getContextStatus()` 已存在。
-- `submit()` 前会检查 budget。
-- `trim` 时会自动裁剪。
-- 会产生状态事件和 runtime logs。
-- `ContextSummarizer` 接口和 `FakeSummarizer` 已就绪。
-
-目标：
-
-- `compact` 时调用真实 summarizer。
-- summarizer 失败后的真实 fallback 链路。
-
-执行要求：
-
-1. 在 `ReasonixEngine.submit()` 里，保留"用户输入前检查"的入口。
-2. `trim` 模式：到阈值就裁剪，裁剪成功后继续 submit。
-3. `compact` 模式：调用 summarizer，成功后安装 summary，再删除旧历史，失败时 fallback trim。
-4. 记录日志：记录前后 token、删除消息数、是否 fallback，不记录原始消息正文。
-5. 编写 `packages/core/__tests__/engine-context-policy.test.ts` 测试文件。
-
-验收命令：
-
-```bash
-bun test packages/core/__tests__/engine-context-policy.test.ts
-bun run typecheck
-bun test
-```
-
-### CTX-30：摘要区和 summarizer 接口
-
-优先级：`P1`。CTX-10 已完成后执行。
-
-当前状态：
-
-- `buildMessages()` 已包含 summary 区域。
-- `summaryTokens` 已计入 budget。
-- `ContextManager.createSummaryMessage()` 已存在，但只是机械字符串拼接。
-
-目标：
-
-- 独立 `ContextSummary` 模块。
-- `ContextSummarizer` 接口。
-- fake summarizer 用于单测。
-
-执行要求：
-
-1. 新增 `packages/core/src/context/summary.ts`：维护 summary message，支持 replace / clear / read，summary 必须有明显标记。
-2. 新增 `ContextSummarizer` 接口：输入旧消息、旧 summary、目标 token 预算、workspace 信息；输出新的 summary 文本和可选 usage 数据。
-3. 先做 fake summarizer 用于单测，返回固定摘要。
-4. 保证 summary 的插入顺序稳定：prefix → summary → log → scratch。
-5. 编写 `packages/core/__tests__/context-summary.test.ts` 测试文件。
-
-验收命令：
-
-```bash
+bun test packages/core/__tests__/context-policy.test.ts
 bun test packages/core/__tests__/context-summary.test.ts
+bun test packages/core/__tests__/engine-context-policy.test.ts
+bun test packages/core/__tests__/context-summarizer.test.ts
+bun test packages/tui/__tests__/commands.test.ts
 bun run typecheck
 bun test
 ```
@@ -255,4 +172,3 @@ bun test
 - README 全面重写、配置指南和发布包。
 
 ---
-

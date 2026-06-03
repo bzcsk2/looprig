@@ -24,6 +24,10 @@ export class AppendOnlyLog {
     this.entries.push(...cloneChatMessages(messages))
   }
 
+  replaceAll(messages: ChatMessage[]): void {
+    this.entries = cloneChatMessages(messages)
+  }
+
   // 获取日志消息的只读视图
   get messages(): readonly ChatMessage[] {
     return cloneChatMessages(this.entries)

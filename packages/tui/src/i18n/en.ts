@@ -45,8 +45,10 @@ export const en: Strings = {
   cmdModel: 'switch provider/model',
   cmdSessions: 'browse past sessions',
   cmdAgent: 'switch agent',
-  cmdSkill: 'list loaded skills',
+  cmdSkill: 'manage skills',
   cmdLang: 'switch language',
+  cmdStatus: 'show runtime status',
+  cmdContext: 'configure context trim/compact',
   // App
   pressCtrlC: 'Press Ctrl+C again to exit',
   shuttingDown: 'Shutting down...',
@@ -66,7 +68,7 @@ export const en: Strings = {
   rejected: 'rejected',
   exitCode: (code) => `exit ${code}`,
   // CommandAutocomplete
-  cmdAutocompleteHint: '↑↓ select · Enter/Tab complete · Esc close',
+  cmdAutocompleteHint: '↑↓ select · Enter execute · Tab complete · Esc close',
   // Search
   searchHint: 'Enter next · ↑ previous · Esc close',
   // Bridge

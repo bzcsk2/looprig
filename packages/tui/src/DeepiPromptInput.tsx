@@ -10,15 +10,17 @@ interface DeepiPromptInputProps {
   disabled?: boolean;
   queueCount?: number;
   onCancel: () => void;
+  history?: string[];
+  injectedText?: { id: number; text: string };
   /** When true, disable history navigation to let autocomplete handle keys */
   suppressHistory?: boolean;
+  /** When true, disable Enter/Tab handling to let autocomplete handle keys */
+  suppressSubmit?: boolean;
 }
 
 export interface DeepiPromptInputHandle {
   writeText: (text: string) => void;
 }
-
-const MAX_HISTORY = 100;
 
 /** Classify a character into a word class for boundary detection. */
 function charClass(ch: string): number {
@@ -56,14 +58,26 @@ function findWordRight(text: string, pos: number): number {
 }
 
 export const DeepiPromptInput = forwardRef<DeepiPromptInputHandle, DeepiPromptInputProps>(function DeepiPromptInput(
-  { onSubmit, onChange, isLoading, disabled, queueCount = 0, onCancel, suppressHistory = false },
+  {
+    onSubmit,
+    onChange,
+    isLoading,
+    disabled,
+    queueCount = 0,
+    onCancel,
+    history = [],
+    injectedText,
+    suppressHistory = false,
+    suppressSubmit = false,
+  },
   ref
 ) {
   const [input, setInput] = useState('');
-  const [history, setHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState(-1);
+  const [draftBeforeHistory, setDraftBeforeHistory] = useState('');
   const [cursor, setCursor] = useState(0);
   const escRef = useRef(0);
+  const lastInjectionIdRef = useRef<number | null>(null);
 
   useImperativeHandle(ref, () => ({
     writeText: (text: string) => {
@@ -74,11 +88,20 @@ export const DeepiPromptInput = forwardRef<DeepiPromptInputHandle, DeepiPromptIn
 
   useEffect(() => { onChange?.(input); }, [input, onChange]);
 
+  useEffect(() => {
+    if (!injectedText || lastInjectionIdRef.current === injectedText.id) return;
+    lastInjectionIdRef.current = injectedText.id;
+    setInput(injectedText.text);
+    setCursor(injectedText.text.length);
+    setHistoryIdx(-1);
+    setDraftBeforeHistory('');
+  }, [injectedText]);
+
   const submitLine = useCallback(() => {
     const text = input.trim();
     if (!text) return;
-    setHistory(prev => [text, ...prev].slice(0, MAX_HISTORY));
     setHistoryIdx(-1);
+    setDraftBeforeHistory('');
     setInput('');
     setCursor(0);
     onSubmit(text);
@@ -122,7 +145,12 @@ export const DeepiPromptInput = forwardRef<DeepiPromptInputHandle, DeepiPromptIn
 
     // Enter — submit
     if (key.return) {
+      if (suppressSubmit) return;
       submitLine();
+      return;
+    }
+
+    if (key.tab && suppressSubmit) {
       return;
     }
 
@@ -131,6 +159,7 @@ export const DeepiPromptInput = forwardRef<DeepiPromptInputHandle, DeepiPromptIn
         setHistoryIdx(prev => {
           const next = Math.min(prev + 1, history.length - 1);
           if (next >= 0) {
+            if (prev < 0) setDraftBeforeHistory(input);
             setInput(history[next] ?? '');
             setCursor((history[next] ?? '').length);
           }
@@ -145,8 +174,8 @@ export const DeepiPromptInput = forwardRef<DeepiPromptInputHandle, DeepiPromptIn
         setHistoryIdx(prev => {
           const next = prev - 1;
           if (next < 0) {
-            setInput('');
-            setCursor(0);
+            setInput(draftBeforeHistory);
+            setCursor(draftBeforeHistory.length);
             return -1;
           }
           setInput(history[next] ?? '');

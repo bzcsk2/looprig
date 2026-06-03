@@ -6,25 +6,30 @@ import { t } from './i18n/index.js';
 
 interface CommandAutocompleteProps {
   query: string;
-  onSelect: (command: string) => void;
+  onSubmit: (command: string) => void;
+  onComplete: (command: string) => void;
   onClose: () => void;
 }
 
-export function CommandAutocomplete({ query, onSelect, onClose }: CommandAutocompleteProps): React.ReactElement | null {
+export function CommandAutocomplete({ query, onSubmit, onComplete, onClose }: CommandAutocompleteProps): React.ReactElement | null {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const matches = useMemo(() => filterCommands(query), [query]);
 
   useInput((_input, key) => {
+    if (matches.length === 0) {
+      if (key.escape) onClose();
+      return;
+    }
     if (key.upArrow) {
       setSelectedIdx(prev => (prev - 1 + matches.length) % matches.length);
     } else if (key.downArrow) {
       setSelectedIdx(prev => (prev + 1) % matches.length);
     } else if (key.return) {
       const cmd = matches[selectedIdx];
-      if (cmd) onSelect(cmd.name);
+      if (cmd) onSubmit(cmd.name);
     } else if (key.tab) {
       const cmd = matches[selectedIdx];
-      if (cmd) onSelect(cmd.name);
+      if (cmd) onComplete(cmd.name);
     } else if (key.escape) {
       onClose();
     }

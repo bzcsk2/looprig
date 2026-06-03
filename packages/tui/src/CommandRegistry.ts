@@ -14,6 +14,8 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: '/agent', description: 'switch agent' },
   { name: '/skill', description: 'list loaded skills' },
   { name: '/lang', description: 'switch language' },
+  { name: '/status', description: 'show runtime status' },
+  { name: '/context', description: 'configure context trimming/compact' },
   { name: '/thinking', description: 'set thinking mode (off/low/medium/high/max)' },
 ];
 

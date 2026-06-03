@@ -38,6 +38,7 @@ export interface LoopOptions {
     model: string
     maxTokens: number
     temperature: number
+    provider?: string
   }
   signal: AbortSignal
   sessionWriter?: AsyncSessionWriter
