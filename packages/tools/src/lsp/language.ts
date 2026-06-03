@@ -1,0 +1,83 @@
+import { extname } from "node:path"
+
+export const LANGUAGE_EXTENSIONS: Record<string, string> = {
+  ".ts": "typescript",
+  ".tsx": "typescriptreact",
+  ".mts": "typescript",
+  ".cts": "typescript",
+  ".mtsx": "typescriptreact",
+  ".ctsx": "typescriptreact",
+  ".js": "javascript",
+  ".jsx": "javascriptreact",
+  ".mjs": "javascript",
+  ".cjs": "javascript",
+  ".ets": "typescript",
+  ".py": "python",
+  ".pyi": "python",
+  ".go": "go",
+  ".rs": "rust",
+  ".json": "json",
+  ".jsonc": "json",
+  ".css": "css",
+  ".scss": "scss",
+  ".less": "less",
+  ".html": "html",
+  ".htm": "html",
+  ".xml": "xml",
+  ".yaml": "yaml",
+  ".yml": "yaml",
+  ".md": "markdown",
+  ".markdown": "markdown",
+  ".java": "java",
+  ".kt": "kotlin",
+  ".kts": "kotlin",
+  ".rb": "ruby",
+  ".php": "php",
+  ".c": "c",
+  ".cpp": "cpp",
+  ".cxx": "cpp",
+  ".cc": "cpp",
+  ".c++": "cpp",
+  ".h": "c",
+  ".hpp": "cpp",
+  ".cs": "csharp",
+  ".swift": "swift",
+  ".scala": "scala",
+  ".ex": "elixir",
+  ".exs": "elixir",
+  ".erl": "erlang",
+  ".hs": "haskell",
+  ".lua": "lua",
+  ".r": "r",
+  ".dart": "dart",
+  ".vue": "vue",
+  ".svelte": "svelte",
+  ".astro": "astro",
+  ".tf": "terraform",
+  ".tfvars": "terraform",
+  ".sh": "shellscript",
+  ".bash": "shellscript",
+  ".zsh": "shellscript",
+  ".sql": "sql",
+  ".zig": "zig",
+  ".ml": "ocaml",
+  ".mli": "ocaml",
+  ".fs": "fsharp",
+  ".fsi": "fsharp",
+  ".fsx": "fsharp",
+  ".groovy": "groovy",
+  ".gradle": "groovy",
+  ".ps1": "powershell",
+  ".psm1": "powershell",
+}
+
+export function inferLanguage(filePath: string): string {
+  const ext = extname(filePath).toLowerCase()
+  return LANGUAGE_EXTENSIONS[ext] ?? ""
+}
+
+export function getFileExtensions(language: string): string[] {
+  return Object.entries(LANGUAGE_EXTENSIONS)
+    .filter(([, lang]) => lang === language)
+    .map(([ext]) => ext)
+}

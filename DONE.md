@@ -1,9 +1,9 @@
 # Deepicode 完成记录
 
-最后更新：2026-06-02
+最后更新：2026-06-03
 
 本文只记录当前代码中仍然成立的已完成功能和已验证修复。
-未完成、待验收、明确暂缓和已驳回方案统一见 [TODO.md](TODO.md)。[ADVICE.md](ADVICE.md) 已归档为空壳。
+未完成、待验收、明确暂缓和已驳回方案统一见 [TODO.md](TODO.md)。LSP 和 Plugin 的专项设计见 [ADVICE.md](ADVICE.md)。
 
 ---
 
@@ -21,7 +21,7 @@ bun test
 | 检查项 | 状态 |
 |--------|------|
 | TypeScript | `bun run typecheck` 通过 |
-| 测试 | `799 pass / 0 fail`，共 `62` 个测试文件 |
+| 测试 | `835 pass / 0 fail`，共 `63` 个测试文件 |
 | 稳定性 | 连续 3 次全绿（TEST-STABILITY-01 已关闭） |
 | CI | ✓ ubuntu-latest ✓ windows-latest ✓ macos-latest（OS-17-R 已关闭） |
 
@@ -718,6 +718,10 @@ DEEPICODE_TRACE=1
 - WebSearch 测试：mock `fetch`（`vi.spyOn(globalThis, "fetch")`）替代真实 Google 网络调用，返回可控 HTML fixture，消除外部依赖超时。
 - SSE client 测试：`afterEach` 增加 `Promise.race` 3s 超时保护，防止 `server.stop()` 挂起阻塞后续测试。
 - Benchmark 测试：同上，`afterEach` 增加超时保护。
+- 修改文件：
+  - `packages/tools/__tests__/web-search.test.ts`
+  - `packages/core/__tests__/sse-client.test.ts`
+  - `packages/core/__tests__/benchmark.test.ts`
 - 验收：连续 3 次 `bun test` 全绿（799 pass / 0 fail），`bun run typecheck` 通过。
 
 ### OS-17-R：三平台 CI 结果检查
@@ -735,13 +739,24 @@ DEEPICODE_TRACE=1
   - MCP 测试增加 Windows 超时保护
 - 修复的 macOS 问题：
   - `process-tree.test.ts` 增加 `wait || true` 防止 SIGTERM 退出码导致 `-e` 终止
+- 修改文件：
+  - `packages/tools/src/shell-exec.ts`
+  - `packages/tools/src/push-notification.ts`
+  - `packages/tools/__tests__/bash.test.ts`
+  - `packages/tools/__tests__/security-e2e.test.ts`
+  - `packages/tools/__tests__/glob-read-file.test.ts`
+  - `packages/core/__tests__/result-persistence.test.ts`
+  - `packages/core/__tests__/tools-regression.test.ts`
+  - `packages/mcp/__tests__/mcp-host.test.ts`
+  - `.github/workflows/ci.yml`
+  - `DONE.md`
 - 验收：typecheck 通过 + 799/799 测试通过 + 三平台 CI 全绿。
 
 ---
 
-## 6. ADVICE.md 迁移归档
+## 6. ADVICE.md 状态
 
-`ADVICE.md` 原先用于复核 Code Clean 报告和安排阶段路线。其可执行内容已经拆分完成：
+`ADVICE.md` 原先用于复核 Code Clean 报告和安排阶段路线。历史可执行内容已经拆分完成：
 
 | 原路线 | 归档状态 | 对应专项 |
 |--------|----------|----------|
@@ -753,9 +768,26 @@ DEEPICODE_TRACE=1
 | Phase 5：渐进式边界清理 | 已完成 | `CL-40`、`CL-41`、`CL-42` |
 | Phase 6：受测试保护的提取 | 已完成 | `CL-50`、`CL-51`、`CL-52` |
 
-仍未完成的测试稳定性、CI 结果检查和原生平台验收已移入 `TODO.md`。`LIFE-01` 生命周期闭环和 `LOG-READABILITY-01` 日志可读性修复已完成并记录在本文。
+`TEST-STABILITY-01` 和 `OS-17-R` 已完成并记录在本文。仍未完成的原生平台人工验收见 `TODO.md`。
 
-### 6.1 仍然有效的设计决策
+2026-06-03 后，`ADVICE.md` 重新用于承载三个新专项设计：
+
+- LSP 完整实现：参考 opencode LSP 设计，按 Deepicode 架构移植。
+- Plugin 兼容实现：兼容 opencode server plugin 子集，不引入 opencode 前端 runtime。
+- Status 状态卡片：类似 Codex `/status` 的运行状态卡片。
+
+### 6.1 LSP 专项进度
+
+| 阶段 | 状态 | 说明 |
+|------|------|------|
+| LSP-10：配置、语言识别、返回格式 | ✅ 已完成 | config.ts、language.ts、normalize.ts、lsp.ts 升级 |
+| LSP-20：协议层和长驻 Client | 待领取 | |
+| LSP-30：Manager 和文档同步 | 待领取 | |
+| LSP-40：完整动作集 | 待领取 | |
+| LSP-50：真实语言服务器 smoke | 待领取 | |
+| LSP-60：工具链集成和可观测性 | 待领取 | |
+
+### 6.2 仍然有效的设计决策
 
 - 保持 `ImmutablePrefix + AppendOnlyLog + VolatileScratch` 三区域上下文布局。
 - 保持 `ReasonixEngine.submit()` 和 `runLoop()` 的 `AsyncGenerator<LoopEvent>` 外部语义。

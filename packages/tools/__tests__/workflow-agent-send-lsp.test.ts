@@ -122,7 +122,7 @@ describe("LSP", () => {
     const r = await tool.execute({ action: "diagnostics", file_path: "test.json" }, ctx)
     expect(r.isError).toBe(true)
     const p = JSON.parse(r.content as string)
-    expect(p.error).toContain("No LSP server configured")
+    expect(p.message).toContain("No LSP server configured")
   })
 
   it("should execute a configured LSP hover request", async () => {
@@ -135,7 +135,10 @@ describe("LSP", () => {
     const r = await tool.execute({ action: "hover", file_path: "test.ts" }, ctx)
     expect(r.isError).toBe(false)
     const p = JSON.parse(r.content as string)
-    expect(p.result.contents).toBe("fake hover")
+    expect(p.status).toBe("ok")
+    expect(p.action).toBe("hover")
+    expect(p.items).toBeDefined()
+    expect(p.items[0].contents).toBe("fake hover")
   })
 })
 

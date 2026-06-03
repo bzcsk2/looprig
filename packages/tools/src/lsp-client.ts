@@ -14,6 +14,8 @@ interface LspRequestOptions {
   method?: string
   line: number
   column: number
+  query?: string
+  new_name?: string
   timeoutMs: number
   signal?: AbortSignal
 }
@@ -67,6 +69,18 @@ export async function runLspRequest(options: LspRequestOptions): Promise<unknown
     if (options.action === "diagnostics") {
       await delay(Math.min(options.timeoutMs, 750), options.signal)
       return diagnostics
+    }
+
+    if (options.action === "workspace_symbols") {
+      return await request(options.method!, { query: options.query ?? "" })
+    }
+
+    if (options.action === "signature_help") {
+      return await request(options.method!, { textDocument: { uri }, position: { line: options.line, character: options.column } })
+    }
+
+    if (options.action === "rename_preview") {
+      return await request(options.method!, { textDocument: { uri }, position: { line: options.line, character: options.column }, newName: options.new_name })
     }
 
     const params: Record<string, unknown> = { textDocument: { uri }, position: { line: options.line, character: options.column } }

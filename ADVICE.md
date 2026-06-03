@@ -1,4 +1,4 @@
-# Deepicode LSP 与 Plugin 专项实现设计
+# Deepicode LSP、Plugin 与 Status 专项实现设计
 
 最后更新：2026-06-03
 
@@ -6,6 +6,7 @@
 
 1. **LSP**：从最小可用实现升级为完整工程能力。
 2. **Plugin**：增加与 opencode server plugin 形态兼容的扩展系统。
+3. **Status**：增加类似 Codex `/status` 的运行状态卡片。
 
 当前项目总待办仍以 [TODO.md](TODO.md) 为准；已完成能力和历史结论见 [DONE.md](DONE.md)；验收步骤见 [TEST.md](TEST.md)。
 
@@ -407,6 +408,18 @@ textDocument/didChange {
 
 - `bun test packages/tools/__tests__/lsp*.test.ts`
 - `bun run typecheck`
+
+**状态：✅ 已完成（2026-06-03）**
+
+实现内容：
+
+- `packages/tools/src/lsp/config.ts`：配置读取、合并和校验，支持旧格式兼容
+- `packages/tools/src/lsp/language.ts`：语言识别，支持 80+ 文件扩展名
+- `packages/tools/src/lsp/normalize.ts`：返回格式标准化，支持 Location/Hover/Diagnostic/Completion/Symbol/SignatureHelp/RenameEdit
+- `packages/tools/src/lsp/index.ts`：模块导出
+- `packages/tools/src/lsp.ts`：升级为使用新模块，支持 14 个 actions
+- `packages/tools/src/lsp-client.ts`：支持 query、new_name 参数
+- `packages/tools/__tests__/lsp-modules.test.ts`：36 个单元测试覆盖 config、language、normalize
 
 ### LSP-20：协议层和长驻 Client
 
@@ -1213,3 +1226,401 @@ RuntimeLogger 增加事件：
 6. `PLG-60`：文档、示例和验收。
 
 每次只领取一个阶段。优先保证 typecheck 和 plugin 单测通过，再跑全量 `bun test`。
+
+---
+
+# Deepicode /status 状态卡片专项设计
+
+## 25. 当前结论
+
+Deepicode 目前没有 `/status` slash command。现有状态信息分散在多个位置：
+
+- `packages/tui/src/StatusBar.tsx`：底部状态栏已有 model、provider、agent、token、context、cwd。
+- `packages/tui/src/App.tsx`：掌握当前 provider/model/agent/thinkingMode/tier 和 slash command 路由。
+- `packages/tui/src/commands.ts`：纯 slash command 解析。
+- `packages/core/src/engine.ts`：掌握 sessionId、stats、ContextManager、PermissionEngine、currentAgent、tier。
+- `packages/core/src/context/manager.ts`：已有 `getBudget()` 和 `getContextWindow()`。
+
+因此 `/status` 不应该只在 TUI 拼字符串。正确做法是先让 Core 暴露一个稳定的运行状态快照，再由 TUI 渲染成 Codex 风格卡片。
+
+## 26. Codex 参考实现结论
+
+Codex 的 `/status` 主要参考：
+
+- `/vol4/Agent/codex/codex-rs/tui/src/status/card.rs`
+- `/vol4/Agent/codex/codex-rs/tui/src/chatwidget/slash_dispatch.rs`
+- `/vol4/Agent/codex/codex-rs/tui/src/chatwidget/tests/status_command_tests.rs`
+- `/vol4/Agent/codex/codex-rs/tui/src/chatwidget/tests/status_and_layout.rs`
+
+可借鉴设计：
+
+1. `/status` 先把用户命令作为历史项显示，再插入一个状态卡片。
+2. 卡片用统一字段 formatter，左侧 label 对齐，右侧 value 自适应宽度。
+3. 字段按数据是否存在动态显示。
+4. context window 使用运行时上下文窗口，不使用配置原始值。
+5. 状态卡片是历史消息的一部分，不是临时 overlay。
+6. rate limit 可异步刷新；Deepicode 第一阶段不做远程刷新，只显示本地可得信息。
+
+不直接复用 Codex Rust 代码，只复刻信息结构和视觉风格。
+
+## 27. 目标效果
+
+用户输入：
+
+```text
+/status
+```
+
+Deepicode 应在消息历史中插入类似：
+
+```text
+╭────────────────────────────────────────────────────────────────────────────────╮
+│  >_ Deepicode (v0.1.0)                                                        │
+│                                                                                │
+│  Model:                deepseek-chat (provider DeepSeek, thinking off)          │
+│  Directory:            /vol4/Agent/deepicode                                   │
+│  Permissions:          ask exec / allow read-write                             │
+│  Agents.md:            <none>                                                  │
+│  Account:              API key configured                                      │
+│  Agent:                Build Agent                                             │
+│  Strategy tier:         <current tier label>                                    │
+│  Session:              019e7de2-2432-7631-beae-a0af482bfe14                    │
+│                                                                                │
+│  Context window:       30% left (184K used / 258K)                              │
+│  Token usage:          input 12K / output 3K / cache hit 64%                    │
+╰────────────────────────────────────────────────────────────────────────────────╯
+```
+
+字段名和颜色可按 Deepicode 风格调整，但布局必须接近 Codex：边框、标题、空行、label 对齐、context window 总结。
+
+## 28. 必须显示的字段
+
+第一阶段字段：
+
+| 字段 | 来源 | 说明 |
+| --- | --- | --- |
+| App title/version | package version 或常量 | `Deepicode (v0.1.0)` |
+| Model | 当前 `activeModel` + provider label | 包含 thinking mode |
+| Directory | `process.cwd()` | 需要压缩长路径 |
+| Permissions | Core 状态快照 | 初期可显示 `deny → allow → ask; exec asks` |
+| Agents.md | workspace 探测 | 找不到显示 `<none>` |
+| Account | config/env 状态 | 不显示 API key，只显示 `API key configured` 或 `<not configured>` |
+| Agent | 当前 agent label | Build / Plan |
+| Strategy tier | engine `getTier()` | 有则显示 |
+| Session | engine sessionId | 必须从 Core 暴露 |
+| Context window | `ContextManager.getBudget()` | 显示 left%、used、total |
+| Token usage | engine stats + bridge tokens | 至少 prompt/output/cache hit |
+
+第二阶段可选字段：
+
+- MCP 状态
+- Plugin 状态
+- LSP server 状态
+- Git branch / dirty summary
+- Runtime log path
+- Config path
+- OS platform / shell backend
+
+不要第一阶段塞太多字段，先把 Codex 核心状态卡片做稳。
+
+## 29. 架构方案
+
+### 29.1 Core 状态快照
+
+新增类型：
+
+```ts
+export interface EngineStatusSnapshot {
+  app: {
+    name: "Deepicode";
+    version: string;
+  };
+  model: {
+    provider: string;
+    providerLabel: string;
+    model: string;
+    thinkingMode: string;
+    tier?: { id: string; label: string };
+  };
+  workspace: {
+    cwd: string;
+    agentsMd: string[];
+  };
+  permissions: {
+    summary: string;
+  };
+  session: {
+    id: string;
+  };
+  context: {
+    usedTokens: number;
+    totalTokens: number;
+    leftRatio: number;
+  };
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    cacheHitTokens: number;
+    cacheMissTokens: number;
+    apiCalls: number;
+    toolCalls: number;
+    totalCost: number;
+  };
+}
+```
+
+在 `ReasonixEngine` 新增：
+
+```ts
+async getStatusSnapshot(input?: {
+  providerLabel?: string;
+  thinkingMode?: string;
+  cwd?: string;
+}): Promise<EngineStatusSnapshot>
+```
+
+实现要求：
+
+- `session.id` 来自私有 `sessionId`，不要让 TUI 读 private 字段。
+- `context` 来自 `ctx.getBudget()`，不是 `config.contextWindow`。
+- `usage` 来自 `this.stats`。
+- `agentsMd` 扫描顺序：
+  1. `<cwd>/AGENTS.md`
+  2. `<cwd>/CLAUDE.md` 可选显示为 `CLAUDE.md`
+  3. 没有则 `<none>`
+- `account` 不放入 Core 第一版；由 TUI 根据 config/env 组装，避免 Core 接触 UI 文案。
+
+如果 `getBudget()` 需要 tokenizer，`/status` 可以是 async command。TUI 里追加一个 “loading status...” 临时消息不是必须；优先直接 await 后插入卡片。
+
+### 29.2 TUI command 路由
+
+修改 `packages/tui/src/commands.ts`：
+
+- `SlashCommand` 增加 `{ name: "status" }`。
+- `parseSlashCommand()` 支持 `/status`。
+- `buildHelpText()` 增加 `/status` 说明。
+- `commands.test.ts` 增加解析和 help 覆盖。
+
+修改 `packages/tui/src/App.tsx`：
+
+- 在 `handleSubmit()` 中处理 `command?.name === "status"`。
+- 调用 `engineRef.current.getStatusSnapshot(...)`。
+- 通过 `appendMessage({ role: "assistant", content })` 插入状态卡片。
+- `/status` 不应调用 `bridge.submit()`，不能向模型发请求。
+- `/status` 执行期间不应改变 `isLoading`，不应进入 messageQueue。
+
+### 29.3 状态卡片渲染
+
+新增：
+
+```text
+packages/tui/src/status/
+  format.ts        # 纯格式化：字段对齐、数字缩写、路径压缩
+  StatusCard.tsx   # Ink 组件，可选
+```
+
+第一阶段建议先用纯文本输出，减少 Ink 历史消息渲染复杂度：
+
+```ts
+export function formatStatusCard(snapshot: StatusCardInput, width = 80): string
+```
+
+原因：当前 `appendMessage()` 走 Markdown/消息渲染路径，纯文本卡片最容易保持为历史消息，不需要新增 timeline item 类型。
+
+卡片格式要求：
+
+- 默认宽度 80。
+- 使用 Unicode box drawing：`╭─╮│╰─╯`。
+- label 宽度由最长 label 计算，但设置上限，避免极长 label 破坏布局。
+- value 超长时截断，末尾使用 `…`。
+- Windows 终端若出现显示问题，提供 ASCII fallback：
+
+```ts
+DEEPICODE_STATUS_ASCII=1
+```
+
+格式 helper：
+
+- `formatTokenCount(184000) -> "184K"`
+- `formatPercentLeft(used, total) -> "30% left"`
+- `formatContextWindow(used, total)`
+- `formatPath(path, maxWidth)`
+- `formatCacheRate(hit, miss)`
+- `formatStatusRows(rows, width)`
+
+## 30. 数据来源细节
+
+### 30.1 Model
+
+优先使用 TUI 当前状态：
+
+- `activeProvider`
+- `providerLabel`
+- `activeModel`
+- `bridgeState.thinkingMode`
+- `engine.getTier?.()?.label`
+
+原因：用户可能刚用 `/model` 切换，TUI state 最接近当前显示状态。
+
+### 30.2 Permissions
+
+第一阶段不要展开完整 permission rules。显示稳定摘要：
+
+```text
+deny rules active; read/write allowed by tier; exec asks
+```
+
+如果后续 `PermissionEngine` 暴露 `getSummary()`，再显示：
+
+```text
+2 deny / 1 allow / exec asks
+```
+
+### 30.3 Account
+
+不泄漏 API key。根据当前 provider config：
+
+- env 或 config 存在 key：`API key configured`
+- 使用默认 key：`default key`
+- 无 key：`<not configured>`
+
+不要显示邮箱，Deepicode 当前没有账号系统。
+
+### 30.4 Context window
+
+必须使用：
+
+```ts
+const budget = await engine.getContextManager().getBudget()
+```
+
+或者封装后的 `engine.getStatusSnapshot()`。
+
+计算：
+
+```ts
+used = budget.totalTokens
+total = budget.window
+left = Math.max(0, 1 - used / total)
+```
+
+显示：
+
+```text
+30% left (184K used / 258K)
+```
+
+### 30.5 Session
+
+当前 `ReasonixEngine.getState()` 已包含 `sessionId`，但 `/status` 不应为了获取 session 构造完整 messages。推荐新增轻量：
+
+```ts
+getSessionId(): string
+```
+
+或者只通过 `getStatusSnapshot()` 返回。
+
+## 31. 实施阶段
+
+### STAT-10：Core 状态快照
+
+目标：
+
+- 新增 `EngineStatusSnapshot` 类型。
+- `ReasonixEngine` 新增 `getStatusSnapshot()`。
+- 从 `ContextManager.getBudget()` 读取真实 context。
+- 不改变现有 `submit()` 行为。
+
+测试：
+
+- sessionId 返回当前 session。
+- context 使用 runtime window。
+- stats 从 engine stats 复制，不暴露引用。
+- loadSession 后 status sessionId 更新。
+
+目标测试：
+
+```bash
+bun test packages/core/__tests__/engine-status.test.ts
+bun run typecheck
+```
+
+### STAT-20：Slash command 接入
+
+目标：
+
+- `parseSlashCommand()` 支持 `/status`。
+- `/help` 显示 `/status`。
+- `App.handleSubmit()` 拦截 `/status`，不调用模型。
+- status 结果作为 assistant 历史消息插入。
+
+测试：
+
+- commands test 覆盖 `/status`。
+- App/bridge 级测试确认 `/status` 不调用 `engine.submit()`。
+- `/status` 不受 loading queue 影响；若正在生成中，建议仍显示当前快照，但不打断生成。
+
+目标测试：
+
+```bash
+bun test packages/tui/__tests__/commands.test.ts
+bun test packages/tui/__tests__/status-command.test.ts
+```
+
+### STAT-30：Codex 风格格式化
+
+目标：
+
+- 新增 `packages/tui/src/status/format.ts`。
+- 生成 Codex 风格 box card。
+- 宽度可配置，默认 80。
+- 支持 Unicode 和 ASCII fallback。
+- 格式化 context、tokens、path、cache rate。
+
+测试：
+
+- snapshot fixture 生成稳定快照。
+- 宽度 80 下包含所有核心字段。
+- 窄宽度下长路径被截断。
+- ASCII fallback 不含 Unicode box drawing。
+- context window 使用 `left% (used / total)` 形式。
+
+目标测试：
+
+```bash
+bun test packages/tui/__tests__/status-format.test.ts
+```
+
+### STAT-40：文档和验收
+
+目标：
+
+- README 或 TEST.md 增加 `/status` 说明和验收步骤。
+- `TODO.md` 增加/推进 `STAT-*` 当前阶段，完成后移入 `DONE.md`。
+
+手工验收：
+
+1. 启动 TUI。
+2. 输入 `/status`。
+3. 确认没有 API 请求。
+4. 确认显示 model、cwd、permissions、session、context window。
+5. 切换 `/model` 后再次 `/status`，确认 model 更新。
+6. 恢复 `/sessions` 后再次 `/status`，确认 session 更新。
+
+## 32. 安全与边界
+
+- `/status` 只读，不应触发模型请求、工具执行或权限弹窗。
+- 不显示 API key、auth token、环境变量值。
+- 不读取大文件；`AGENTS.md` 只检测存在和路径，不读取全文。
+- 不阻塞 TUI 超过 200ms；context budget 若慢，应显示可用字段并把 context 标记为 `calculating unavailable`，但第一阶段可直接 await。
+- 不引入 Codex Rust 依赖，不复用 Codex 代码。
+- 不把 `/status` 做成工具；它是本地 slash command。
+
+## 33. 建议领取顺序
+
+1. `STAT-10`：Core 状态快照。
+2. `STAT-20`：Slash command 接入。
+3. `STAT-30`：Codex 风格格式化。
+4. `STAT-40`：文档和验收。
+
+每次只领取一个阶段。完成后更新 `DONE.md` 和 `TODO.md`，并至少运行对应目标测试、`bun run typecheck`、`git diff --check`。
