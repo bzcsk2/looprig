@@ -107,14 +107,9 @@ export function StreamingCard({ text, done = false, aborted = false, startTs, ex
       {visible.map((line, i) => (
         <Box key={i} flexDirection="row">
           <Text color={aborted ? FG.meta : FG.body}>{clipToCells(line, lineCells)}</Text>
+          {!aborted && i === visible.length - 1 && <Text color={TONE.ok}>{'\u258A'}</Text>}
         </Box>
       ))}
-      {!aborted && (
-        <Box flexDirection="row">
-          <Text wrap="wrap">{text}</Text>
-          <Text color={TONE.ok}>{'\u258A'}</Text>
-        </Box>
-      )}
       {aborted && <Text color={FG.faint}>{t().truncatedByEsc}</Text>}
     </Card>
   );

@@ -72,11 +72,15 @@ export class TokenizerPool {
     })
   }
 
-  shutdown(): void {
+  async shutdown(): Promise<void> {
     for (const [, entry] of this.tasks) {
       entry.reject(new Error("Tokenizer pool shut down"))
     }
     this.tasks.clear()
-    this.worker?.terminate().catch(() => {})
+    if (this.worker) {
+      try { await this.worker.terminate() } catch {}
+      this.worker = undefined
+    }
+    this.healthy = false
   }
 }

@@ -73,6 +73,9 @@ export class ReasonixEngine implements CoreEngine {
   /** exec 工具权限确认：pending Promise 由 TUI 响应 resolve */
   private pendingPermission: { resolve: (v: boolean) => void; toolName: string; args: Record<string, unknown> } | null = null
 
+  /** LIFE-01: shutdown flag for idempotent cleanup */
+  private _shutDown = false
+
   /** AS3: Thinking mode selector state */
   private modeSelectorState: ModeSelectorState = createModeSelectorState()
 
@@ -242,6 +245,39 @@ export class ReasonixEngine implements CoreEngine {
     this.activeAbortController?.abort()
   }
 
+  /** LIFE-01: 幂等的显式关闭入口。重复调用安全，部分初始化失败也安全。 */
+  async shutdown(): Promise<void> {
+    if (this._shutDown) return
+    this._shutDown = true
+    if (this.logger.isEnabled("info")) this.logger.info("engine.shutdown.start", { sessionId: this.sessionId })
+
+    try {
+      this.interrupt()
+    } catch {
+      // ignore
+    }
+
+    try {
+      await this.ctx.shutdown()
+    } catch {
+      // ignore
+    }
+
+    try {
+      await this.sessionWriter?.drain()
+    } catch {
+      // best-effort: don't let session flush block exit
+    }
+
+    if (this.logger.isEnabled("info")) this.logger.info("engine.shutdown.done", { sessionId: this.sessionId })
+
+    try {
+      await this.logger.flush()
+    } catch {
+      // best-effort: don't let log flush block exit
+    }
+  }
+
   /** 运行时更新引擎配置（用于 /model 命令切换 Provider） */
   updateConfig(partial: Partial<DeepicodeConfig>): void {
     Object.assign(this.config, partial)
@@ -405,27 +441,31 @@ export class ReasonixEngine implements CoreEngine {
   }
 
   private async delegateTask(task: string, agentType: "build" | "plan", files: string[]): Promise<string> {
-    const child = new ReasonixEngine(this.config)
-    for (const tool of this.tools.values()) {
-      if (tool.name === "AgentTool") continue
-      child.registerTool(tool)
-      if (tool.approval === "exec") {
-        child.permissionEngine.addDenyRule({
-          toolName: tool.name,
-          reason: `Background sub-agent cannot run exec tool without an interactive confirmation channel: ${tool.name}`,
-        })
+    const child = new ReasonixEngine(this.config, undefined, undefined, this.client, this.logger.child({ delegate: true }))
+    try {
+      for (const tool of this.tools.values()) {
+        if (tool.name === "AgentTool") continue
+        child.registerTool(tool)
+        if (tool.approval === "exec") {
+          child.permissionEngine.addDenyRule({
+            toolName: tool.name,
+            reason: `Background sub-agent cannot run exec tool without an interactive confirmation channel: ${tool.name}`,
+          })
+        }
       }
-    }
 
-    const fileContext = files.length > 0
-      ? `\nRelevant files:\n${files.map(file => `- ${file}`).join("\n")}`
-      : ""
-    let output = ""
-    for await (const event of child.submit(`${task}${fileContext}`, agentConfigFor(agentType))) {
-      if (event.role === "assistant_delta") output += event.content ?? ""
-      if (event.role === "error") output += `\n[error] ${event.content ?? "unknown error"}`
+      const fileContext = files.length > 0
+        ? `\nRelevant files:\n${files.map(file => `- ${file}`).join("\n")}`
+        : ""
+      let output = ""
+      for await (const event of child.submit(`${task}${fileContext}`, agentConfigFor(agentType))) {
+        if (event.role === "assistant_delta") output += event.content ?? ""
+        if (event.role === "error") output += `\n[error] ${event.content ?? "unknown error"}`
+      }
+      return output.trim()
+    } finally {
+      await child.shutdown()
     }
-    return output.trim()
   }
 }
 

@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Box, Text, useInput } from '@deepicode/ink';
 import { t } from './i18n/index.js';
+import { FG, SURFACE, TONE } from './reasonix/tokens.js';
 
 interface DeepiPromptInputProps {
   onSubmit: (text: string) => void;
@@ -261,8 +262,9 @@ export const DeepiPromptInput = forwardRef<DeepiPromptInputHandle, DeepiPromptIn
     : `${input.slice(0, cursor)}▊${input.slice(cursor)}${queueHint}${loadingHint}`;
 
   return (
-    <Box flexDirection="column" width="100%" borderStyle="round" paddingX={1}>
-      <Text wrap="wrap" dimColor={isPlaceholder}>{displayText}</Text>
+    <Box flexDirection="row" width="100%" borderStyle="round" borderColor={TONE.accent} backgroundColor={SURFACE.bgInput} paddingX={1}>
+      <Text bold color={TONE.brand}>{'\u276F '}</Text>
+      <Text wrap="wrap" color={isPlaceholder ? FG.sub : FG.strong}>{displayText}</Text>
     </Box>
   );
 });

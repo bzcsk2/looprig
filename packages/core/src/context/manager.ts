@@ -57,8 +57,8 @@ export class ContextManager {
     return getFoldDecision(used, this.contextWindow)
   }
 
-  shutdown(): void {
-    this.tokenizer.shutdown()
+  async shutdown(): Promise<void> {
+    await this.tokenizer.shutdown()
   }
 
   private prepareLog(): ChatMessage[] {

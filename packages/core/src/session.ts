@@ -189,6 +189,27 @@ export class AsyncSessionWriter {
     return this.droppedCount
   }
 
+  /** Best-effort drain: wait until the queue is empty and no flush in progress.
+   *  Idempotent; does not throw. */
+  async drain(): Promise<void> {
+    try {
+      // Wait for any active flush to finish
+      while (this.flushing) {
+        await new Promise(r => setTimeout(r, 5))
+      }
+      // Trigger one more flush if there's anything left
+      if (this.queue.length > 0) {
+        await this.flushSoon()
+      }
+      // Wait until queue is fully drained
+      while (this.flushing || this.queue.length > 0) {
+        await new Promise(r => setTimeout(r, 5))
+      }
+    } catch {
+      // best-effort: swallow errors so shutdown never hangs
+    }
+  }
+
   private async flushSoon(): Promise<void> {
     if (this.flushing) return
     this.flushing = true

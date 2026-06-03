@@ -81,6 +81,23 @@ async function waitFor(check: () => boolean): Promise<void> {
 }
 
 describe('TUI bridge turn state', () => {
+  it('keeps final reasoning metadata when a provider emits no reasoning deltas', async () => {
+    const engine = mockEngine([
+      async function* () {
+        yield { role: 'assistant_final', content: 'answer', metadata: { reasoning: 'hidden chain summary' } };
+        yield { role: 'done' };
+      },
+    ]);
+    const harness = stateHarness();
+    const bridge = createBridge(engine as unknown as ReasonixEngine, harness.setState);
+
+    await bridge.submit('think first');
+
+    const item = harness.state.timeline[0];
+    if (item?.kind !== 'turn') throw new Error('Expected turn');
+    expect(item.turn.reasoningText).toBe('hidden chain summary');
+  });
+
   it('keeps a pure tool turn visible and associates arguments by toolCallIndex', async () => {
     const engine = mockEngine([
       async function* () {

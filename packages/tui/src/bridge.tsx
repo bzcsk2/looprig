@@ -22,6 +22,7 @@ export interface TurnView {
   isLoading: boolean;
   cancelled?: boolean;
   startTs: number;
+  elapsedMs?: number;
 }
 
 export type TimelineItem =
@@ -159,10 +160,14 @@ export function createBridge(
 
           case 'assistant_final':
             assistantContent = event.content ?? assistantContent;
+            if (typeof event.metadata?.reasoning === 'string') {
+              reasoningContent = event.metadata.reasoning;
+            }
             updateTurn(turnId, turn => ({
               ...turn,
               assistantText: assistantContent,
               streamingText: null,
+              reasoningText: reasoningContent || turn.reasoningText,
             }));
             break;
 
@@ -347,6 +352,7 @@ export function createBridge(
           assistantText: turn.assistantText || assistantContent,
           streamingText: null,
           isLoading: false,
+          elapsedMs: Date.now() - turn.startTs,
         }));
         setState(prev => ({ ...prev, isLoading: false, permissionPrompt: null }));
       }

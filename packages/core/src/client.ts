@@ -135,7 +135,7 @@ export class DeepSeekClient implements ChatClient {
     while (true) {
       attempt++
       try {
-        resp = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal: opts.signal })
+        resp = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal: opts.signal, keepalive: false })
         if (resp.ok) break
         const status = resp.status
         if (!retryableStatuses.has(status) || attempt > maxRetries) {
@@ -340,6 +340,8 @@ export class DeepSeekClient implements ChatClient {
       if (diagnosticsEnabled) requestLogger.info("api.stream.done", { finishReason: null, durationMs: Date.now() - startedAt, ttftMs })
     } finally {
       reader.releaseLock()
+      // LIFE-01: explicitly cancel the response body to close the underlying HTTP connection
+      await resp.body?.cancel().catch(() => {})
     }
   }
 }

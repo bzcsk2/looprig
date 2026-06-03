@@ -87,7 +87,7 @@ const MemoizedToolUseSection = memo(function ToolUseSection({ tools, isOpen }: {
               id: tool.key,
               name: tool.name,
               args: tool.args,
-              output: tool.status === 'error' ? formatToolOutput(tool) : '',
+              output: formatToolOutput(tool),
               exitCode: tool.status === 'error' ? 1 : tool.status === 'done' ? 0 : undefined,
               done: tool.status !== 'running',
               elapsedMs: tool.elapsedMs,
@@ -100,25 +100,30 @@ const MemoizedToolUseSection = memo(function ToolUseSection({ tools, isOpen }: {
   );
 });
 
-const MemoizedPlainMessage = memo(function PlainMessage({ message }: { message: ChatMessage }) {
+const MemoizedPlainMessage = memo(function PlainMessage({ message, detailsOpen = false }: { message: ChatMessage; detailsOpen?: boolean }) {
   if (message.role === 'user') {
     return (
       <Card>
-        <Box flexDirection="column" backgroundColor={SURFACE.bgElev} paddingX={1} paddingY={1}>
-          <CardHeader glyph="\u25C7" tone={TONE.brand} title={t().you} />
-          <Box paddingLeft={1}><MessageContent text={message.content ?? ''} /></Box>
+        <Box flexDirection="row" backgroundColor={SURFACE.bgInput} paddingX={1} paddingY={1}>
+          <Text bold color={TONE.brand}>{'\u276F '}</Text>
+          <Box flexGrow={1}><MessageContent text={message.content ?? ''} /></Box>
         </Box>
       </Card>
     );
   }
   if (message.role === 'assistant') {
     return (
-      <Card>
-        <Box flexDirection="column" paddingX={1} paddingY={1}>
-          <CardHeader glyph="\u25CF" tone={TONE.ok} title={t().assistant} />
-          <Box paddingLeft={1}><MessageContent text={message.content ?? ''} /></Box>
-        </Box>
-      </Card>
+      <>
+        {message.reasoning_content && (
+          <MemoizedReasoningCard text={message.reasoning_content} isOpen={detailsOpen} />
+        )}
+        <Card>
+          <Box flexDirection="column" paddingX={1} paddingY={1}>
+            <CardHeader glyph="\u2022" tone={TONE.ok} title={t().assistant} />
+            <Box paddingLeft={2}><MessageContent text={message.content ?? ''} /></Box>
+          </Box>
+        </Card>
+      </>
     );
   }
   return null;
@@ -151,6 +156,12 @@ const MemoizedTurn = memo(function Turn({ turn, detailsOpen }: { turn: TurnView;
             </Card>
           )
       )}
+      {!turn.isLoading && turn.elapsedMs !== undefined && (
+        <Box paddingLeft={1}>
+          <Text color={FG.faint}>{`- Worked for ${(turn.elapsedMs / 1000).toFixed(1)}s `}</Text>
+          <Text color={FG.faint}>{'\u2500'.repeat(12)}</Text>
+        </Box>
+      )}
       {turn.isLoading && turn.streamingText === null && !turn.reasoningText && turn.tools.length === 0 && (
         <Box>
           <Spinner kind="braille" color={TONE.brand} bold />
@@ -173,7 +184,7 @@ export function DeepiMessages({ timeline }: DeepiMessagesProps) {
   const renderedItems = useMemo(() =>
     timeline.map(item =>
       item.kind === 'message'
-        ? <MemoizedPlainMessage key={item.id} message={item.message} />
+        ? <MemoizedPlainMessage key={item.id} message={item.message} detailsOpen={detailsOpen} />
         : <MemoizedTurn key={item.id} turn={item.turn} detailsOpen={detailsOpen} />
     ),
     [timeline, detailsOpen]

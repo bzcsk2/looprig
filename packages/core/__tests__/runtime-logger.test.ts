@@ -47,19 +47,61 @@ describe("RuntimeLogger", () => {
     expect(record.inputLength).toBe(4)
   })
 
+  it("LOG-READABILITY-01: preserves correlation IDs across child loggers", async () => {
+    const logger = new RuntimeLogger({ filePath: logPath, bindings: { sessionId: "session-1" } })
+    logger
+      .child({ submitId: "submit-1" })
+      .child({ requestId: "request-1" })
+      .child({ toolCallId: "tool-call-1" })
+      .info("tool.execute.done")
+    await logger.flush()
+
+    const record = JSON.parse((await readFile(logPath, "utf-8")).trim()) as Record<string, unknown>
+    expect(record.sessionId).toBe("session-1")
+    expect(record.submitId).toBe("submit-1")
+    expect(record.requestId).toBe("request-1")
+    expect(record.toolCallId).toBe("tool-call-1")
+  })
+
   it("redacts sensitive keys recursively", async () => {
     const logger = new RuntimeLogger({ filePath: logPath })
     logger.info("redaction", {
       apiKey: "secret-key",
-      nested: { Authorization: "Bearer secret", password: "hidden", safe: "visible" },
+      token: "generic-token",
+      accessToken: "access-token",
+      refresh_token: "refresh-token",
+      nested: { Authorization: "Bearer secret", password: "hidden", authToken: "auth-token", safe: "visible" },
     })
     await logger.flush()
 
     const record = JSON.parse((await readFile(logPath, "utf-8")).trim()) as Record<string, any>
     expect(record.apiKey).toBe("[REDACTED]")
+    expect(record.token).toBe("[REDACTED]")
+    expect(record.accessToken).toBe("[REDACTED]")
+    expect(record.refresh_token).toBe("[REDACTED]")
     expect(record.nested.Authorization).toBe("[REDACTED]")
     expect(record.nested.password).toBe("[REDACTED]")
+    expect(record.nested.authToken).toBe("[REDACTED]")
     expect(record.nested.safe).toBe("visible")
+  })
+
+  it("LOG-READABILITY-01: preserves non-sensitive token statistics", async () => {
+    const logger = new RuntimeLogger({ filePath: logPath })
+    logger.info("api.usage", {
+      promptTokens: 100,
+      completionTokens: 50,
+      cacheHitTokens: 25,
+      cacheMissTokens: 5,
+      totalTokens: 150,
+    })
+    await logger.flush()
+
+    const record = JSON.parse((await readFile(logPath, "utf-8")).trim()) as Record<string, unknown>
+    expect(record.promptTokens).toBe(100)
+    expect(record.completionTokens).toBe(50)
+    expect(record.cacheHitTokens).toBe(25)
+    expect(record.cacheMissTokens).toBe(5)
+    expect(record.totalTokens).toBe(150)
   })
 
   it("respects the configured minimum level", async () => {

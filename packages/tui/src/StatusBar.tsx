@@ -1,5 +1,6 @@
 import { Box, Text } from '@deepicode/ink';
 import { t } from './i18n/index.js';
+import { FG, SURFACE, TONE } from './reasonix/tokens.js';
 
 interface StatusBarProps {
   model: string;
@@ -15,6 +16,7 @@ interface StatusBarProps {
   statusMessage?: string | null;
   thinkingMode?: string;
   tier?: string;
+  cwd?: string;
 }
 
 function fmt(n: number): string {
@@ -29,35 +31,35 @@ function cacheRate(hit: number, miss: number): string {
   return `${Math.round((hit / total) * 100)}%`;
 }
 
-export function StatusBar({ model, provider, agent, inputTokens, outputTokens, cacheHitTokens, cacheMissTokens, contextUsed, contextTotal, pendingInstructionCount, statusMessage, thinkingMode, tier }: StatusBarProps) {
+export function StatusBar({ model, provider, agent, inputTokens, outputTokens, cacheHitTokens, cacheMissTokens, contextUsed, contextTotal, pendingInstructionCount, statusMessage, thinkingMode, tier, cwd }: StatusBarProps) {
   const rate = cacheRate(cacheHitTokens, cacheMissTokens);
   return (
     <Box width="100%" flexDirection="column">
       {statusMessage && (
         <Box>
-          <Text inverse color="warning">{` \u26a0 ${statusMessage} `}</Text>
+          <Text color={TONE.warn}>{` \u26a0 ${statusMessage} `}</Text>
         </Box>
       )}
       {pendingInstructionCount ? (
         <Box>
-          <Text inverse color="success">{` \u{1F4E5} ${t().pendingTasks}${pendingInstructionCount} `}</Text>
+          <Text color={TONE.ok}>{` \u{1F4E5} ${t().pendingTasks}${pendingInstructionCount} `}</Text>
         </Box>
       ) : null}
       {thinkingMode && thinkingMode !== 'off' ? (
         <Box>
-          <Text inverse color="success">{` \u{1F9E0} Thinking: ${thinkingMode} `}</Text>
+          <Text color={TONE.accent}>{` \u{1F9E0} Thinking: ${thinkingMode} `}</Text>
         </Box>
       ) : null}
-      <Box width="100%" flexDirection="row">
-        <Text inverse>{` ${provider}`}</Text>
-        <Text inverse>{` ${model} `}</Text>
-        <Text inverse>{` [${agent}] `}</Text>
-        {tier ? <Text inverse>{` [${tier}] `}</Text> : null}
+      <Box width="100%" flexDirection="row" backgroundColor={SURFACE.bgCode} paddingX={1}>
+        <Text color={FG.meta}>{`${provider} ${model}`}</Text>
+        <Text color={TONE.accent}>{` [${agent}]`}</Text>
+        {tier ? <Text color={FG.sub}>{` [${tier}]`}</Text> : null}
         <Box flexGrow={1} />
-        <Text inverse>{` ${t().inputTokens}${fmt(inputTokens)}`}</Text>
-        <Text inverse>{` ${t().cacheHit}${rate}`}</Text>
-        <Text inverse>{` ${t().outputTokens}${fmt(outputTokens)} `}</Text>
-        <Text inverse>{` ${fmt(contextUsed)}/${fmt(contextTotal)} `}</Text>
+        <Text color={FG.faint}>{`${t().inputTokens}${fmt(inputTokens)} `}</Text>
+        <Text color={FG.faint}>{`${t().cacheHit}${rate} `}</Text>
+        <Text color={FG.faint}>{`${t().outputTokens}${fmt(outputTokens)} `}</Text>
+        <Text color={FG.sub}>{`${fmt(contextUsed)}/${fmt(contextTotal)}`}</Text>
+        {cwd ? <Text color={TONE.ok}>{`  ${cwd}`}</Text> : null}
       </Box>
     </Box>
   );

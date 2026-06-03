@@ -92,6 +92,11 @@ class RuntimeLogSink {
 
   async flush(): Promise<void> {
     if (!this.enabled) return
+    // Cancel any scheduled timer so the event loop can exit after this flush
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer)
+      this.flushTimer = null
+    }
     this.flushSync()
     while (this.flushing) {
       await new Promise(resolve => setTimeout(resolve, 1))
@@ -349,7 +354,7 @@ function sanitizeValue(value: unknown, key = "", depth = 0): unknown {
 }
 
 function isSensitiveKey(key: string): boolean {
-  return /api[-_]?key|authorization|password|passwd|secret|token|credential|cookie|private[-_]?key|access[-_]?key|auth[-_]?token/i.test(key)
+  return /api[-_]?key|authorization|password|passwd|secret|credential|cookie|private[-_]?key|access[-_]?key|(?:^|[-_])token$|(?:access|refresh|auth|bearer|id|session)[-_]?token/i.test(key)
 }
 
 function serializeError(error: unknown): Record<string, unknown> | undefined {

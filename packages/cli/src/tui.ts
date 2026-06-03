@@ -35,7 +35,7 @@ async function main(): Promise<void> {
   // Initialize MCP host in background — don't block startup
   const mcpHost = new McpHost()
   setMcpHost(mcpHost)
-  mcpHost.loadConfig().catch(() => { /* no mcp.json or connection failure */ })
+  const mcpLoadPromise = mcpHost.loadConfig().catch(() => { /* no mcp.json or connection failure */ })
 
   const engine = sessionId
     ? await ReasonixEngine.recover(config, sessionId)
@@ -56,12 +56,20 @@ async function main(): Promise<void> {
   engine.registerTool(createListMcpToolsTool())
   engine.registerTool(createCallMcpToolTool())
 
-  if (!input.isTTY) {
-    await runPipeMode(engine)
-    return
-  }
+  try {
+    if (!input.isTTY) {
+      await runPipeMode(engine)
+      return
+    }
 
-  await runTUIMode(engine, config)
+    await runTUIMode(engine, config)
+  } finally {
+    // LIFE-01: close engine (tokenizer worker, logger, session writer)
+    await engine.shutdown()
+    // Wait for background MCP load to settle before disconnecting (best-effort, 2s cap)
+    await Promise.race([mcpLoadPromise, new Promise<void>(r => setTimeout(r, 2000))])
+    await mcpHost.disconnectAll()
+  }
 }
 
 async function runPipeMode(engine: ReasonixEngine): Promise<void> {
@@ -123,7 +131,13 @@ async function runTUIMode(engine: ReasonixEngine, config: ReturnType<typeof load
   }
 }
 
-main().catch((e) => {
-  console.error(e)
-  process.exit(1)
-})
+main()
+  .then(() => {
+    // LIFE-01: Bun's fetch() keep-alive connections prevent natural process exit.
+    // All resources are already closed in the finally block above.
+    process.exit(0)
+  })
+  .catch((e) => {
+    console.error(e)
+    process.exit(1)
+  })

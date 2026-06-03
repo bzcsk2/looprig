@@ -68,6 +68,22 @@ describe("AsyncSessionWriter", () => {
     )
     expect(exists).toBe(true)
   })
+
+  it("drain waits for queue to empty", async () => {
+    const writer = new AsyncSessionWriter(sessionPath)
+    await writer.init()
+    writer.enqueue({ ts: 1, type: "event", payload: { n: 1 } })
+    writer.enqueue({ ts: 2, type: "event", payload: { n: 2 } })
+    await writer.drain()
+    const content = await readFile(sessionPath, "utf-8")
+    const lines = content.trim().split("\n")
+    expect(lines).toHaveLength(2)
+  })
+
+  it("drain does not throw when writer is uninitialized", async () => {
+    const writer = new AsyncSessionWriter(sessionPath)
+    await expect(writer.drain()).resolves.toBeUndefined()
+  })
 })
 
 describe("SessionLoader.read", () => {

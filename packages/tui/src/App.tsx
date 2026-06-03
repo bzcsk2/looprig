@@ -8,7 +8,7 @@ import { createBridge, timelineFromMessages, type BridgeState } from './bridge.j
 import { DeepiMessages } from './DeepiMessages.js';
 import { DeepiPromptInput, type DeepiPromptInputHandle } from './DeepiPromptInput.js';
 import { StatusBar } from './StatusBar.js';
-import { FullscreenLayout } from './FullscreenLayout.js';
+import { FullscreenLayout, TerminalHeader } from './FullscreenLayout.js';
 import { isFullscreenEnvEnabled } from './fullscreen.js';
 import { ModelPicker } from './ModelPicker.js';
 import { SessionPicker } from './SessionPicker.js';
@@ -372,6 +372,7 @@ export function App({ engine, config }: AppProps) {
         statusMessage={statusMessage}
         thinkingMode={bridgeState.thinkingMode}
         tier={engine.getTier?.()?.label}
+        cwd={process.cwd()}
       />
     </Box>
   );
@@ -390,6 +391,7 @@ export function App({ engine, config }: AppProps) {
 
   return (
     <>
+      <TerminalHeader />
       {scrollableContent}
       {bottomContent}
     </>

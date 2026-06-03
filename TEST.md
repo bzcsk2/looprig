@@ -4,7 +4,7 @@
 >
 > 目标：指导后续 Agent 和项目负责人验证 Deepicode 的真实系统行为。本文只列出尚未被现有自动化测试充分覆盖的验收项，不重复编写或逐条重跑已经覆盖的模块级测试。
 >
-> 适用版本：当前主线，以及 `ADVICE.md` 中 Windows/macOS 平台适配完成后的候选版本。
+> 适用版本：当前主线，以及 `TODO.md` 中剩余修复和平台验收完成后的候选版本。
 
 ## 1. 使用方式
 
@@ -17,12 +17,14 @@
 
 测试 Agent 必须：
 
-1. 先读取 `ADVICE.md`、`TODO.md`、`DONE.md` 和本文件。
+1. 先读取 `TODO.md`、`DONE.md` 和本文件。`ADVICE.md` 仅为归档入口，不再提供任务。
 2. 执行 `git status --short`，记录已有未提交修改，不覆盖其他 Agent 的工作。
 3. 在隔离临时目录中运行验收，不使用真实项目目录、不读取真实凭证、不修改用户现有 crontab 或计划任务。
-4. 每个用例记录 `PASS`、`FAIL`、`BLOCKED` 或 `NOT_IMPLEMENTED`。
+4. 每个用例记录 `PASS`、`FAIL`、`BLOCKED`、`NOT_IMPLEMENTED` 或 `NOT_RUN`。
 5. 发现问题时保存复现命令、终端输出、诊断日志、平台信息和最小复现步骤。
 6. 测试 Agent 只提交测试脚本、测试报告和必要 fixture。除非用户明确要求，不在验收阶段顺手修改生产代码。
+7. 报告中引用的每个证据文件必须真实存在于 `artifacts/`。只在终端中观察过、未保存证据的结果不得标记为 `PASS`。
+8. 不得把失败直接降级成“已知问题”或“与本次无关”。若怀疑为抖动，必须保存失败输出、独立复现目标测试，并记录至少一次完整重跑结果。
 
 项目负责人执行人工验收时只需填写 `H` 轨结果，不需要重复执行 Agent 已完成的故障注入、性能压测和隔离 Scheduler 测试。
 
@@ -33,7 +35,8 @@
 | `PASS` | 已执行，满足通过标准。 |
 | `FAIL` | 已执行，行为不符合通过标准。必须建立 Bug 记录。 |
 | `BLOCKED` | 环境缺少依赖、权限或运行条件。记录阻断原因。 |
-| `NOT_IMPLEMENTED` | `ADVICE.md` 中规划的功能尚未实现。不是测试环境问题，但属于发布阻断项。 |
+| `NOT_IMPLEMENTED` | `TODO.md` 中规划的功能尚未实现。不是测试环境问题，但属于发布阻断项。 |
+| `NOT_RUN` | 尚未执行，或证据不足以判定结果。不得计入通过数。 |
 
 ## 2. 已验证基线：不要重复展开
 
@@ -100,6 +103,17 @@ Windows 建议额外抽查：
 - API key 使用测试值或专用测试密钥。
 - MCP 配置写入临时 workspace 的 `.deepicode/mcp.json`。
 - 所有 Scheduler 创建项使用唯一前缀：`deepicode-acceptance-<timestamp>-`。
+- CLI 的 `cwd` 必须指向临时 `workspace/`。Runtime logger 默认写入 `<cwd>/.deepicode/logs/`，不是 `<HOME>/.deepicode/logs/`。
+- 日志专项测试建议显式设置 `DEEPICODE_LOG_FILE=<artifacts>/logs/runtime.jsonl`，避免路径判断错误。
+
+从临时 workspace 启动 CLI 时，使用仓库入口的绝对路径：
+
+```bash
+cd <tmp>/deepicode-system-acceptance-<timestamp>/workspace
+bun run <repo>/packages/cli/src/index.ts
+```
+
+不得为了使用相对路径而把 CLI 的 `cwd` 改回仓库根目录。
 
 ### 3.3 每次运行必须保存
 
@@ -128,6 +142,17 @@ process.platform
 shell backend
 terminal name
 ```
+
+任何标记为 `PASS` 的自动化用例还必须保存：
+
+```text
+<case-id>-command.txt
+<case-id>-stdout.txt
+<case-id>-stderr.txt
+<case-id>-result.json
+```
+
+`<case-id>-result.json` 至少记录退出码、是否超时、用例断言和残留进程检查结果。
 
 ### 3.4 测试辅助设施
 
@@ -164,6 +189,31 @@ e2e/system/
 | `G4` | 性能与长时间稳定性 | 是 | 是 |
 | `G5` | 可选真实外部服务 smoke | 有专用凭证时执行 | 否，但上线前建议执行 |
 | `H1` - `H8` | 人工体验验收 | 对应平台功能落地后执行 | 是，需要项目负责人确认 |
+
+### 4.1 当前接力状态与复测顺序
+
+截至 2026-06-02，已独立确认以下问题：
+
+| ID | 状态 | 说明 |
+| --- | --- | --- |
+| `BUG-01` | 已复现，待修复 | Pipe mode 已输出完整响应但不会正常退出。根因是生命周期清理缺失：`ContextManager.shutdown()` 未在 CLI 正常退出路径调用，tokenizer worker 保持事件循环存活。不要用 `process.exit(0)` 掩盖资源未释放。 |
+| `LOG-READABILITY-01` | 已复现，待评估 | Runtime log 脱敏规则会把 `promptTokens`、`completionTokens` 等非敏感统计字段误写成 `[REDACTED]`，降低诊断价值。 |
+| `TEST-STABILITY-01` | 待持续观察 | 曾出现 WebSearch、SSE 和 benchmark 超时，但独立重跑总门禁得到 `787 pass / 0 fail`，目标文件单独运行也全部通过。暂不能认定为稳定产品 Bug。 |
+
+后续测试 Agent 必须按以下顺序工作：
+
+1. 先确认生产代码已经修复 `BUG-01`，然后执行 `G0-01`。
+2. 连续执行 `bun test` 至少 3 次并分别保存输出；任意一次失败都记录为 `TEST-STABILITY-01`，不得删除失败证据。
+3. 复测 `G1-01`。Pipe mode 必须自然退出，不能由测试脚本主动 kill 后伪装成通过。
+4. 依次执行 `G1-09`、`G2-05`、`G4-01`。这些用例此前受 `BUG-01` 阻断。
+5. 在 Linux 环境继续执行不依赖 PTY 的 `G2-02`、`G2-04`。不要因为缺少 PTY 而跳过。
+6. 有 PTY 后执行剩余 Linux TUI 用例。有 macOS、Windows runner 后执行 `G3`。
+
+如果 `BUG-01` 尚未修复：
+
+- `G1-01` 标记 `FAIL`。
+- 依赖 CLI 正常退出和日志 flush 的 `G1-09`、`G2-05`、`G4-01` 标记 `BLOCKED`，备注 `BLOCKED_BY_BUG-01`。
+- 其他不依赖 CLI 退出的测试继续执行，不能整体停止。
 
 ## 5. G0：总门禁
 
@@ -214,15 +264,23 @@ bun run packages/cli/src/index.ts --help
 执行：
 
 ```bash
-printf 'hi\n' | bun run packages/cli/src/index.ts
+cd <tmp>/deepicode-system-acceptance-<timestamp>/workspace
+printf 'hi\n' | bun run <repo>/packages/cli/src/index.ts
 ```
 
 通过标准：
 
 - stdout 最终包含 `hello world`。
-- 退出码为 `0`。
+- 进程在响应完成后 3 秒内自然退出，退出码为 `0`。
+- 不允许测试脚本调用 `kill`、`process.exit()` 或超时终止后仍将结果记为通过。
 - SSE server 收到一次请求，body 中包含用户消息。
 - stderr 无未处理异常。
+- 退出后不存在 tokenizer worker、MCP 子进程或其他 Deepicode 残留子进程。
+
+证据：
+
+- 保存 `g1-01-command.txt`、`g1-01-stdout.txt`、`g1-01-stderr.txt` 和 `g1-01-result.json`。
+- `g1-01-result.json` 必须包含 `code`、`timedOut`、`durationMs` 和残留进程检查。
 
 ### G1-02 TUI 启动、退出和终端恢复
 
@@ -346,11 +404,16 @@ printf 'hi\n' | bun run packages/cli/src/index.ts
 
 ### G1-09 运行时日志开关
 
-分别启动：
+在临时 workspace 中分别启动。显式指定日志文件，避免误查 `<HOME>/.deepicode/logs`：
 
 ```bash
-DEEPICODE_LOG_LEVEL=off bun run packages/cli/src/index.ts
-DEEPICODE_LOG_LEVEL=debug bun run packages/cli/src/index.ts
+DEEPICODE_LOG_LEVEL=off \
+DEEPICODE_LOG_FILE=<artifacts>/logs/runtime-off.jsonl \
+bun run <repo>/packages/cli/src/index.ts
+
+DEEPICODE_LOG_LEVEL=debug \
+DEEPICODE_LOG_FILE=<artifacts>/logs/runtime-debug.jsonl \
+bun run <repo>/packages/cli/src/index.ts
 ```
 
 通过标准：
@@ -359,6 +422,19 @@ DEEPICODE_LOG_LEVEL=debug bun run packages/cli/src/index.ts
 - `debug` 时生成 JSONL。
 - 可按 `submitId → requestId → toolCallId` 关联一次请求。
 - 日志不包含 API key、完整敏感文件内容或完整超长 payload。
+- `promptTokens`、`completionTokens`、`cacheHitTokens`、`cacheMissTokens` 等非敏感统计字段保留数值，不得被误脱敏。
+- CLI 正常退出后日志已经 flush，不依赖测试脚本等待后台定时器碰巧写盘。
+
+步骤：
+
+1. 先运行纯文本请求，检查 `sessionId → submitId → requestId`。
+2. 再让脚本化 SSE server 返回一个安全工具调用，检查 `toolCallId` 可关联到对应工具执行事件。
+3. API key 使用固定测试值 `test-key-must-not-appear`，结束后对日志执行全文搜索。
+
+证据：
+
+- 保存 `g1-09-off-result.json`、`g1-09-debug-result.json` 和脱敏检查结果。
+- 将生成的 JSONL 复制到 `artifacts/logs/`。
 
 ### G1-10 MCP 完整 CLI 链路
 
@@ -432,6 +508,13 @@ DEEPICODE_LOG_LEVEL=debug bun run packages/cli/src/index.ts
 - 父进程和子进程都不存在。
 - TUI 可继续提交消息。
 
+执行要求：
+
+- Linux 自动化阶段至少直接导入并调用项目真实 `createBashTool()` 或 `terminateProcessTree()`。
+- 只演示“杀死父进程后子进程仍存活”不能算通过。
+- 保存父 PID、子 PID、调用前后存活状态和实际调用的项目函数。
+- “TUI 可继续提交消息”留到有 PTY 后补验；进程树回收本身不得因缺少 PTY 而跳过。
+
 ### G2-03 Bash interrupt 回收完整进程树
 
 与 `G2-02` 相同，但在 TUI 中主动 Ctrl+C。
@@ -456,12 +539,19 @@ DEEPICODE_LOG_LEVEL=debug bun run packages/cli/src/index.ts
 - 无残留 MCP 子进程。
 - 第二次 CLI 启动可重新发现 MCP server。
 
+执行要求：
+
+- 使用测试目录中的最小 MCP fixture，不依赖真实外部 MCP endpoint。
+- Linux 自动化阶段必须先完成非 TUI 路径：创建 fixture、连接、让子进程退出、确认 pending request 失败、调用清理、检查残留 PID。
+- TUI 错误展示可在有 PTY 后补验；不能因为缺少 PTY 而跳过整个用例。
+
 ### G2-05 Session 和 runtime log 磁盘不可写
 
 前置：
 
 - 在隔离目录中将 `.deepicode/sessions` 或 `.deepicode/logs` 设为不可写。
 - Windows 使用 ACL 等价方式。
+- Runtime log 测试可显式设置 `DEEPICODE_LOG_FILE` 指向不可写目录。
 
 步骤：
 
@@ -474,6 +564,12 @@ DEEPICODE_LOG_LEVEL=debug bun run packages/cli/src/index.ts
 - 主流程继续运行。
 - 不出现未处理异常。
 - 开启 debug 时，在仍可写的诊断目标中可观察到 append failure；若整个目录不可写，至少 stderr 不应持续刷屏。
+
+执行要求：
+
+- 必须执行至少一次真实文本请求和一次安全工具请求。
+- `--help` 不会写 session 或 runtime log，不能用它代替本用例。
+- 以高权限账户运行时，`chmod 444` 可能无法制造失败；必须验证写入确实失败，否则标记 `BLOCKED` 并记录原因。
 
 ### G2-06 Ctrl+C 时机矩阵
 
@@ -489,7 +585,13 @@ DEEPICODE_LOG_LEVEL=debug bun run packages/cli/src/index.ts
 
 ## 8. G3：Windows 与 macOS 平台适配验收
 
-本阶段与 `ADVICE.md` 的 OS-00 至 OS-17 对应。某项生产代码尚未实现时标记 `NOT_IMPLEMENTED`。
+本阶段与 `DONE.md` 的 OS-00 至 OS-17 代码实现和 `TODO.md` 的原生平台验收项对应。某项生产代码尚未实现时标记 `NOT_IMPLEMENTED`。
+
+执行边界：
+
+- GitHub Actions Matrix 可执行三平台 `bun run typecheck`、`bun test` 和无交互 smoke，结果必须保存 Actions run URL 或 artifact。
+- Matrix 不能替代真实终端中的 PTY/ConPTY、桌面通知观感和剪贴板体验；这些由 `G3-08` 与 `H8` 补验。
+- 当前平台代码已经存在。仅因缺少 macOS 或 Windows runner 时应标记 `BLOCKED`，不能标记 `NOT_IMPLEMENTED`。
 
 ### G3-01 Shell backend 探测
 
@@ -655,6 +757,12 @@ fallbackReason（发生降级时）
 - 返回输出被截断并带 dropped/truncated 提示。
 - RSS 不随总输出量线性增长。
 - TUI 仍能响应 Ctrl+C。
+
+执行要求：
+
+- 自动化阶段必须通过项目真实 `bash` 工具执行大输出命令，不能只运行裸 `/bin/bash`。
+- 记录工具返回长度、截断标记、累计输出量和 CLI 或测试进程 RSS 峰值。
+- Ctrl+C 响应可在有 PTY 后补验；有界输出与 RSS 检查不得因缺少 PTY 而跳过。
 
 ### G4-02 长会话 TUI 响应
 
@@ -902,6 +1010,10 @@ MANUAL-ACCEPTANCE-REPORT-<platform>-<date>.md
 - 无法运行 PTY/ConPTY 时，TUI 用例必须标记 `BLOCKED`。
 - Scheduler 没有隔离测试账户时，不得在用户机器上创建任务。
 - 只跑 mock 单元测试不能替代系统验收。
+- 只运行裸系统命令不能替代对 Deepicode 工具实现的验收。
+- 测试脚本主动 kill 挂起进程后，不得把对应 CLI 退出行为标记为 `PASS`。
+- 报告引用但 `artifacts/` 中不存在的证据，视为没有执行。
+- GitHub Actions Matrix 通过不能替代 `H` 轨人工原生终端验收。
 
 ## 13. Agent 测试报告模板
 
@@ -934,20 +1046,32 @@ SYSTEM-ACCEPTANCE-REPORT-<platform>-<date>.md
 | FAIL | |
 | BLOCKED | |
 | NOT_IMPLEMENTED | |
+| NOT_RUN | |
 
 ## Cases
-| ID | Status | Duration | Evidence | Notes |
-| --- | --- | --- | --- | --- |
-| G0-01 | | | | |
+| ID | Status | Duration | Evidence | Blocker | Notes |
+| --- | --- | --- | --- | --- | --- |
+| G0-01 | | | | | |
 
 ## Bugs
 | Severity | Case | Symptom | Reproduction | Artifact |
+| --- | --- | --- | --- | --- |
+
+## Test Stability Observations
+| Test | Full-suite Runs | Isolated Run | Classification | Artifact |
 | --- | --- | --- | --- | --- |
 
 ## Residual Processes And Tasks
 - Child processes:
 - Scheduler entries:
 - Temp files:
+- Runtime logs:
+
+## Evidence Audit
+- Referenced evidence files checked:
+- Missing evidence files:
+- Runtime log path:
+- GitHub Actions run URL:
 
 ## Conclusion
 - Release decision:
@@ -962,3 +1086,29 @@ SYSTEM-ACCEPTANCE-REPORT-<platform>-<date>.md
 | `P1` | 核心流程不可用或跨平台主路径失败 | Windows 无法启动 shell；TUI slash 菜单无法操作。 |
 | `P2` | 有 fallback，但体验或诊断明显受损 | 桌面通知只能 fallback；日志缺少关联字段。 |
 | `P3` | 低风险维护问题 | 错误文案不清晰；次要性能波动。 |
+
+## 15. 下一位测试 Agent 的执行指令
+
+将以下指令原样交给负责补验收的 Agent：
+
+```text
+读取 TEST.md、TODO.md、DONE.md。ADVICE.md 仅为归档入口，不再提供任务。
+你只负责测试、fixture、证据和报告，不修改生产代码。
+
+先检查 BUG-01 是否已经由开发 Agent 修复。若未修复：
+- 重现并记录 G1-01 FAIL；
+- 将 G1-09、G2-05、G4-01 标记 BLOCKED_BY_BUG-01；
+- 继续执行不依赖 CLI 正常退出的测试，不要整体停止。
+
+若 BUG-01 已修复：
+1. 执行 G0-01：typecheck 一次，bun test 连续三次，分别保存完整输出。
+2. 复测 G1-01，确认 pipe mode 自然退出且无残留 worker 或子进程。
+3. 执行 G1-09：显式设置 DEEPICODE_LOG_FILE，验证 off/debug、JSONL、脱敏、统计字段和 submitId → requestId → toolCallId。
+4. 执行 G2-02、G2-04、G2-05。必须调用项目真实实现并保存证据，不能用裸系统命令或 --help 代替。
+5. 执行 G4-01：通过 Deepicode bash 工具生成至少 50 MiB 输出，验证截断与 RSS。
+6. 有 PTY 后执行剩余 Linux TUI 用例；有 macOS/Windows runner 后执行 G3。
+
+所有 PASS 项必须在 artifacts/ 中保存 command、stdout、stderr 和 result.json。
+报告引用但不存在的证据视为 NOT_RUN。
+不要把失败直接降级成“已知问题”；疑似抖动必须保留失败输出并单独复现。
+```

@@ -9,10 +9,10 @@ export interface ThemeTokens {
 }
 
 const dark: ThemeTokens = {
-  // Cool refined palette — cold white, blue-grey neutrals, muted tones for production terminal UI
-  fg: { strong: '#e8eaf0', body: '#cfd3dc', sub: '#9ca3af', meta: '#7b8493', faint: '#535b68' },
-  tone: { brand: '#7dd3fc', accent: '#d38adf', ok: '#7ee787', warn: '#e5c07b', err: '#ff6b7a', info: '#61afef' },
-  surface: { bg: '#111318', bgInput: '#161922', bgCode: '#0b0d12', bgElev: '#1b1f2a' },
+  // Terminal dashboard palette: black canvas, blue command surfaces, green activity.
+  fg: { strong: '#ffffff', body: '#E1D3DC', sub: '#8D7B88', meta: '#8D7B88', faint: '#5D5159' },
+  tone: { brand: '#00FF66', accent: '#4A90E2', ok: '#00FF66', warn: '#FFBD2E', err: '#FF5F56', info: '#4A90E2' },
+  surface: { bg: '#000000', bgInput: '#1D3B5C', bgCode: '#0C0C0C', bgElev: '#13283F' },
 };
 
 let activeTheme: ThemeTokens = dark;

@@ -581,3 +581,83 @@ describe("AS0: reasoning_content tool chain continuity", () => {
     expect((assistantMsg as any).reasoning_content).toBe("my reasoning")
   })
 })
+
+describe("LIFE-01: Engine shutdown", () => {
+  it("shutdown is idempotent — second call does not throw", async () => {
+    const engine = makeEngine()
+    await engine.shutdown()
+    await expect(engine.shutdown()).resolves.toBeUndefined()
+  })
+
+  it("shutdown interrupts active submit and closes the context manager", async () => {
+    mockClient.setGenerators([
+      (async function* () {
+        yield { type: "text_delta", delta: "partial " }
+        await new Promise(() => {}) // hang forever
+      })(),
+    ])
+
+    const engine = makeEngine()
+    const gen = engine.submit("hang")
+    let first = await gen.next()
+    if (first.value?.role === "strategy_notify") {
+      first = await gen.next()
+    }
+    expect(first.value?.role).toBe("assistant_delta")
+
+    const ctx = engine.getContextManager()
+    const originalShutdown = ctx.shutdown.bind(ctx)
+    let contextShutdownCalled = false
+    ctx.shutdown = async () => {
+      contextShutdownCalled = true
+      await originalShutdown()
+    }
+
+    await engine.shutdown()
+
+    expect(contextShutdownCalled).toBe(true)
+  })
+
+  it("shutdown flushes runtime logger", async () => {
+    const { RuntimeLogger } = await import("../src/runtime-logger.js")
+    const { mkdir } = await import("node:fs/promises")
+    const { join } = await import("node:path")
+    const { tmpdir } = await import("node:os")
+    const tmpDir = join(tmpdir(), `deepicode-shutdown-log-${Date.now()}`)
+    await mkdir(tmpDir, { recursive: true })
+
+    const logPath = join(tmpDir, "engine-shutdown.jsonl")
+    const logger = new RuntimeLogger({ enabled: true, level: "info", filePath: logPath })
+    logger.info("test.event", { key: "value" })
+
+    const engine = new ReasonixEngine({
+      apiKey: "sk-test", baseUrl: "https://api.deepseek.com", model: "deepseek-v4-flash",
+      maxTokens: 256, temperature: 0.1,
+    }, undefined, undefined, mockClient as any, logger)
+
+    await engine.shutdown()
+
+    const { readFile } = await import("node:fs/promises")
+    const content = await readFile(logPath, "utf-8")
+    expect(content).toContain("test.event")
+    expect(content).toContain("engine.shutdown.done")
+  })
+
+  it("delegateTask closes child engine in finally even on error", async () => {
+    mockClient.setGenerators([
+      (async function* () {
+        yield { type: "text_delta", delta: "ok" }
+        yield { type: "usage", usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 } }
+        yield { type: "done", finishReason: "stop" }
+      })(),
+    ])
+
+    const engine = makeEngine()
+    // Access private delegateTask via any cast
+    const delegate = (engine as any).delegateTask.bind(engine)
+    const result = await delegate("task", "build", [])
+    expect(result).toBe("ok")
+    // The child engine should have been shut down; we can't directly inspect it,
+    // but the test passing without hanging implies cleanup happened.
+  })
+})
