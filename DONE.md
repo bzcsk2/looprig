@@ -719,6 +719,23 @@ DEEPICODE_TRACE=1
 - Benchmark 测试：同上，`afterEach` 增加超时保护。
 - 验收：连续 3 次 `bun test` 全绿（799 pass / 0 fail），`bun run typecheck` 通过。
 
+### OS-17-R：三平台 CI 结果检查
+
+- GitHub Actions Matrix 推送后三平台全部通过：
+  - ✓ `ubuntu-latest` (1m4s)
+  - ✓ `windows-latest` (2m8s)
+  - ✓ `macos-latest` (1m22s)
+- 修复的 Windows 问题：
+  - PowerShell deny patterns 增加 `rm` 别名匹配
+  - `result-persistence.test.ts` 路径分隔符兼容
+  - `bash.test.ts` PowerShell 语法兼容（stderr、PATH、循环）
+  - `security-e2e.test.ts` / `glob-read-file.test.ts` 错误消息兼容
+  - `PushNotification` 改用非阻塞 `BalloonTip` 替代阻塞 `WScript.Shell.Popup`
+  - MCP 测试增加 Windows 超时保护
+- 修复的 macOS 问题：
+  - `process-tree.test.ts` 增加 `wait || true` 防止 SIGTERM 退出码导致 `-e` 终止
+- 验收：typecheck 通过 + 799/799 测试通过 + 三平台 CI 全绿。
+
 ---
 
 ## 6. ADVICE.md 迁移归档

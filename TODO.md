@@ -61,7 +61,7 @@ bun test packages/mcp/__tests__/mcp-host.test.ts packages/mcp/__tests__/mcp-tool
 | 顺序 | 任务 | 原因 |
 |------|------|------|
 | ~~1~~ | ~~`TEST-STABILITY-01` 全量测试抖动收口~~ | ✅ DONE |
-| 2 | `OS-17-R` 三平台 CI 结果检查 | CI scaffold 已加入，需 push 后检查 GitHub Actions Matrix 结果。 |
+| ~~2~~ | ~~`OS-17-R` 三平台 CI 结果检查~~ | ✅ DONE |
 | 3 | `OS-12/13-R` macOS/Windows 原生验收 | 代码层面已就绪，需在原生环境验收。 |
 
 不要一次领取多个任务。每个编号完成后都应保持全量测试为绿色。
@@ -134,11 +134,17 @@ bun run typecheck
 bun test
   799 pass / 0 fail
   连续 3 次全绿（TEST-STABILITY-01 已关闭）
+
+GitHub Actions CI
+  ✓ ubuntu-latest (1m4s)
+  ✓ windows-latest (2m8s)
+  ✓ macos-latest (1m22s)
+  OS-17-R 已关闭
 ```
 
-P5.5、AUD-02/03/05/07/08、T21-R、P3-R、S1/S2、ST2/ST3/ST4、CL-10/11/12/20/21/30/31/32/40/41/42/50/51/52、OS-00/10/11/14/15/16、LIFE-01、LOG-READABILITY-01、TEST-STABILITY-01 均已完成。OS-17 三平台 CI scaffold 已加入。
+P5.5、AUD-02/03/05/07/08、T21-R、P3-R、S1/S2、ST2/ST3/ST4、CL-10/11/12/20/21/30/31/32/40/41/42/50/51/52、OS-00/10/11/14/15/16/17、LIFE-01、LOG-READABILITY-01、TEST-STABILITY-01、OS-17-R 均已完成。
 
-下一步：执行 `OS-17-R` push 后检查 GitHub Actions 三平台 Matrix。
+下一步：执行 `OS-12/13-R` macOS/Windows 原生验收（需人工）。
 
 ---
 
