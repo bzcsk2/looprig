@@ -75,7 +75,9 @@ describe("bash tool", () => {
   it("should capture stderr separately from stdout", async () => {
     const { createBashTool } = await import("../src/shell-exec.js")
     const tool = createBashTool()
-    const r = await tool.execute({ command: "echo stdout_msg && echo stderr_msg >&2" }, ctx)
+    const isWin = process.platform === "win32"
+    const cmd = isWin ? 'Write-Output "stdout_msg"; Write-Error "stderr_msg"' : "echo stdout_msg && echo stderr_msg >&2"
+    const r = await tool.execute({ command: cmd }, ctx)
     expect(r.isError).toBe(false)
     const p = JSON.parse(r.content as string)
     // stdout should contain "stdout_msg" and stderr should contain "stderr_msg"
@@ -105,7 +107,9 @@ describe("bash tool", () => {
   it("should preserve PATH and other env variables", async () => {
     const { createBashTool } = await import("../src/shell-exec.js")
     const tool = createBashTool()
-    const r = await tool.execute({ command: "echo $PATH" }, ctx)
+    const isWin = process.platform === "win32"
+    const cmd = isWin ? "Write-Output $env:PATH" : "echo $PATH"
+    const r = await tool.execute({ command: cmd }, ctx)
     expect(r.isError).toBe(false)
     const p = JSON.parse(r.content as string)
     expect(p.stdout.trim().length).toBeGreaterThan(0)
@@ -114,7 +118,11 @@ describe("bash tool", () => {
   it("should truncate stdout exceeding max_chars with notice", async () => {
     const { createBashTool } = await import("../src/shell-exec.js")
     const tool = createBashTool()
-    const r = await tool.execute({ command: "for i in $(seq 1 1000); do echo 'line ' $i; done", max_chars: 100 }, ctx)
+    const isWin = process.platform === "win32"
+    const cmd = isWin
+      ? "1..1000 | ForEach-Object { Write-Output \"line $_\" }"
+      : "for i in $(seq 1 1000); do echo 'line ' $i; done"
+    const r = await tool.execute({ command: cmd, max_chars: 100 }, ctx)
     expect(r.isError).toBe(false)
     const p = JSON.parse(r.content as string)
     expect(p.stdout).toMatch(/\.\.\. \[(truncated|dropped)/)
@@ -146,7 +154,11 @@ describe("CL-21: Bash bounded output", () => {
     const { createBashTool } = await import("../src/shell-exec.js")
     const tool = createBashTool()
     const ctx = { cwd: dir, signal: new AbortController().signal } as any
-    const r = await tool.execute({ command: "for i in $(seq 1 1000); do echo \"line $i\"; done", max_chars: 5000 }, ctx)
+    const isWin = process.platform === "win32"
+    const cmd = isWin
+      ? "1..1000 | ForEach-Object { Write-Output \"line $_\" }"
+      : 'for i in $(seq 1 1000); do echo "line $i"; done'
+    const r = await tool.execute({ command: cmd, max_chars: 5000 }, ctx)
     const p = JSON.parse(r.content as string)
     expect(p.stdout).toMatch(/\.\.\. \[(dropped|truncated)/)
     expect(p.stdout.length).toBeLessThan(6000)

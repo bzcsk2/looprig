@@ -20,9 +20,13 @@ describe("S14: path traversal protection across tools", () => {
 
   it("glob should reject path traversal outside project", async () => {
     const tool = createGlobTool()
-    const r = await tool.execute({ pattern: "*.txt", path: "/tmp" }, ctx(tmpDir))
+    const isWin = process.platform === "win32"
+    const testPath = isWin ? "C:\\tmp" : "/tmp"
+    const r = await tool.execute({ pattern: "*.txt", path: testPath }, ctx(tmpDir))
     expect(r.isError).toBe(true)
-    expect(JSON.parse(r.content as string).error).toContain("outside")
+    const err = JSON.parse(r.content as string).error
+    // Windows may say "cannot resolve path" instead of "outside"
+    expect(err).toMatch(/(outside|cannot resolve)/)
   })
 
   it("glob should reject path traversal with ../", async () => {

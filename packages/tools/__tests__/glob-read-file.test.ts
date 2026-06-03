@@ -227,9 +227,13 @@ describe("glob", () => {
   it("should reject path traversal outside project directory", async () => {
     const tool = createGlobTool()
     // /tmp is outside tmpDir, so traversal should be denied
-    const r = await tool.execute({ pattern: "*.txt", path: "/tmp" }, { cwd: tmpDir, signal: new AbortController().signal } as any)
+    const isWin = process.platform === "win32"
+    const testPath = isWin ? "C:\\tmp" : "/tmp"
+    const r = await tool.execute({ pattern: "*.txt", path: testPath }, { cwd: tmpDir, signal: new AbortController().signal } as any)
     expect(r.isError).toBe(true)
-    expect(JSON.parse(r.content as string).error).toContain("outside")
+    const err = JSON.parse(r.content as string).error
+    // Windows may say "cannot resolve path" instead of "outside"
+    expect(err).toMatch(/(outside|cannot resolve)/)
   })
 
   it("should reject path traversal with ../", async () => {

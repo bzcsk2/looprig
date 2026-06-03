@@ -78,8 +78,13 @@ jobs:
           kill $CHILD 2>/dev/null
           # SIGTERM was ignored, use SIGKILL
           sleep 0.5
-          kill -0 $CHILD 2>/dev/null && { echo "SIGKILL needed"; kill -9 $CHILD 2>/dev/null; } || echo "SIGTERM succeeded"
-          wait $CHILD 2>/dev/null
+          if kill -0 $CHILD 2>/dev/null; then
+            echo "SIGKILL needed"
+            kill -9 $CHILD 2>/dev/null
+          else
+            echo "SIGTERM succeeded"
+          fi
+          wait $CHILD 2>/dev/null || true
           echo "Process tree test passed"
 
       - name: Glob directory boundary test
