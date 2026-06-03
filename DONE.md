@@ -23,6 +23,7 @@ bun test
 | TypeScript | `bun run typecheck` 通过 |
 | 测试 | `799 pass / 0 fail`，共 `62` 个测试文件 |
 | 稳定性 | 连续 3 次全绿（TEST-STABILITY-01 已关闭） |
+| CI | ✓ ubuntu-latest ✓ windows-latest ✓ macos-latest（OS-17-R 已关闭） |
 
 ---
 
