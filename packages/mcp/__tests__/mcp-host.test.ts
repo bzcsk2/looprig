@@ -32,6 +32,27 @@ describe("McpHost", () => {
     expect(await host.callTool("fake", "echo", { text: "hello" })).toEqual({ content: [{ type: "text", text: "hello" }] })
     await host.disconnectAll()
   })
+
+  it("should return load summary when some configured servers fail", { timeout: process.platform === "win32" ? 15000 : 5000 }, async () => {
+    const dir = mkdtempSync(join(tmpdir(), "deepicode-mcp-config-"))
+    const configPath = join(dir, "mcp.json")
+    writeFileSync(configPath, JSON.stringify({
+      mcpServers: {
+        good: { command: process.execPath, args: [join(import.meta.dir, "fixtures", "fake-mcp.mjs")] },
+        bad: { command: process.execPath, args: ["-e", "process.exit(1)"] },
+      },
+    }))
+    const host = new McpHost()
+    try {
+      const summary = await host.loadConfig(configPath)
+      expect(summary.serverCount).toBe(2)
+      expect(summary.connected).toBe(1)
+      expect(summary.failed.map(f => f.name)).toEqual(["bad"])
+      expect(host.getStatus().failed).toHaveLength(1)
+    } finally {
+      await host.disconnectAll()
+    }
+  })
 })
 
 describe("getMcpHost / setMcpHost", () => {

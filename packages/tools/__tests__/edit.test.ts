@@ -242,6 +242,7 @@ describe("edit tool stale-read integration", () => {
     expect(r.isError).toBe(false)
     const p = JSON.parse(r.content as string)
     expect(p.method).toBe("flexible_whitespace")
+    expect(p.warning).toBe("exact_match_failed_used_fuzzy")
     expect(readFileSync(filePath, "utf-8")).toBe("hi world")
   })
 

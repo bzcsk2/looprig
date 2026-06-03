@@ -15,11 +15,18 @@ interface McpConfig {
   mcpServers?: Record<string, McpServerConfig>
 }
 
+export interface McpLoadSummary {
+  serverCount: number
+  connected: number
+  failed: Array<{ name: string; error: string }>
+}
+
 export class McpHost {
   private clients = new Map<string, McpClient>()
   private tools = new Map<string, { client: McpClient; tool: McpTool }>()
   private resources = new Map<string, { client: McpClient; resource: McpResource }>()
   private logger: DiagnosticLogger
+  private lastLoadSummary: McpLoadSummary = { serverCount: 0, connected: 0, failed: [] }
 
   constructor(logger: DiagnosticLogger = noopDiagnosticLogger) {
     this.logger = logger
@@ -33,7 +40,15 @@ export class McpHost {
     return Array.from(this.resources.values()).map(({ client, resource }) => ({ client: client.serverName, resource }))
   }
 
-  async loadConfig(configPath?: string): Promise<void> {
+  getStatus(): McpLoadSummary {
+    return {
+      serverCount: this.lastLoadSummary.serverCount,
+      connected: this.clients.size,
+      failed: [...this.lastLoadSummary.failed],
+    }
+  }
+
+  async loadConfig(configPath?: string): Promise<McpLoadSummary> {
     const paths = configPath ? [configPath] : [
       resolve(process.cwd(), ".deepicode/mcp.json"),
     ]
@@ -52,9 +67,17 @@ export class McpHost {
     if (this.logger.isEnabled("info")) {
       this.logger.info("mcp.host.start", { serverCount: entries.length })
     }
+    const failed: McpLoadSummary["failed"] = []
     await Promise.all(entries.map(([name, serverConfig]) =>
-      this.connect(name, withCredential(serverConfig, auth[name]?.apiKey)).catch(() => { /* individual failure doesn't block others */ })
+      this.connect(name, withCredential(serverConfig, auth[name]?.apiKey)).catch((error) => {
+        failed.push({ name, error: error instanceof Error ? error.message : String(error) })
+      })
     ))
+    this.lastLoadSummary = { serverCount: entries.length, connected: entries.length - failed.length, failed }
+    if (failed.length > 0 && this.logger.isEnabled("warn")) {
+      this.logger.warn("mcp.load.warning", { serverCount: entries.length, failedCount: failed.length, failedServers: failed.map(f => f.name) })
+    }
+    return this.getStatus()
   }
 
   async connect(name: string, config: McpServerConfig): Promise<void> {

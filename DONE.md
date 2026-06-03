@@ -452,6 +452,45 @@ bun test
 - 输入消息截断是机械的，不分析语义。
 - 超时和错误处理是 best-effort，不保证 100% 覆盖所有网络异常。
 
+### 4.12 Find_ground 隐性兜底治理（FG-20/30/40/50/70）
+
+**实现边界：**
+
+- `TokenizerPool`：
+  - 新增 `getDiagnostics()`，暴露 `healthy`、`pendingTasks`、`fallbackCount`、`timeoutCount`、`workerErrorCount`、`lastFallbackReason`。
+  - Worker 初始化失败、error/exit、timeout fallback 记录 `fallback.tokenizer`。
+  - 修复 worker error/exit 时 pending task 使用 `fallbackEstimate([])` 的问题，改为按每个 task 的原始 messages fallback。
+- `SessionLoader`：
+  - 保留 `read(sessionId): Promise<ChatMessage[]>` 兼容行为。
+  - 新增 `readDetailed(sessionId)`，区分 `ok/missing/empty/corrupt/unreadable`，并返回 `skippedLines` 和可选 `error`。
+- `AsyncSessionWriter`：
+  - 新增 `getStatus()`，返回 `queueSize`、`droppedCount`、`flushing`、`lastError`、`lastFlushAt`。
+- `StreamingToolExecutor`：
+  - 新增 `parseToolCallArgs()` 统一解析/修复工具参数。
+  - unsafe invalid JSON 参数不再退化为 `{}`；直接生成 error tool result，不进入 permission prompt，不执行工具。
+  - 保留已有安全 repair 路径；partial repair 仍拒绝。
+- `edit`：
+  - fuzzy fallback 保持兼容，但返回 JSON 增加 `warning: "exact_match_failed_used_fuzzy"`。
+- `McpHost` / CLI：
+  - `loadConfig()` 返回 `{ serverCount, connected, failed }` summary。
+  - 新增 `getStatus()`。
+  - CLI 后台加载 MCP 时，如果部分 server 失败，会向 stderr 输出简短提示；单个 server 失败仍不阻断启动。
+
+**验收命令：**
+
+```bash
+bun run typecheck
+bun test packages/core/__tests__/tokenizer-pool.test.ts packages/core/__tests__/session.test.ts packages/core/__tests__/streaming-executor.test.ts packages/core/__tests__/engine-tools.test.ts
+bun test packages/tools/__tests__/edit.test.ts packages/tools/__tests__/edit-integration.test.ts
+bun test packages/mcp/__tests__/mcp-host.test.ts
+```
+
+**保留限制：**
+
+- 没有把所有 fallback 改为 throw；session、MCP、writer 仍保留 best-effort 语义。
+- `edit` strict mode 尚未引入；当前只显式返回 warning。
+- 临时文件 `chmod/unlink` 失败的日志收尾仍见 `TODO.md` 的 `FG-60-R`。
+
 ---
 
 ## 5. 重要历史修复摘要

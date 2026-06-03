@@ -119,6 +119,14 @@ describe("SessionLoader.read", () => {
     expect(msgs).toEqual([])
   })
 
+  it("readDetailed should distinguish missing sessions", async () => {
+    await mkdir(sessDir, { recursive: true })
+    const result = await SessionLoader.readDetailed("nonexistent")
+    expect(result.status).toBe("missing")
+    expect(result.messages).toEqual([])
+    expect(result.skippedLines).toBe(0)
+  })
+
   it("should skip damaged lines", async () => {
     await mkdir(sessDir, { recursive: true })
     const lines = [
@@ -130,6 +138,20 @@ describe("SessionLoader.read", () => {
     const msgs = await SessionLoader.read("s2")
     expect(msgs).toHaveLength(1)
     expect(msgs[0].content).toBe("ok")
+  })
+
+  it("readDetailed should report skipped damaged lines", async () => {
+    await mkdir(sessDir, { recursive: true })
+    const lines = [
+      JSON.stringify({ ts: 1, type: "messages", payload: [{ role: "user", content: "hi" }] }),
+      JSON.stringify({ ts: 3, type: "messages", payload: [{ role: "assistant", content: "ok" }] }),
+      "not json at all",
+    ]
+    await writeFile(join(sessDir, "s2-detail.jsonl"), lines.join("\n") + "\n")
+    const result = await SessionLoader.readDetailed("s2-detail")
+    expect(result.status).toBe("ok")
+    expect(result.skippedLines).toBe(1)
+    expect(result.messages[0].content).toBe("ok")
   })
 
   it("should return empty for empty file", async () => {
@@ -165,6 +187,15 @@ describe("SessionLoader.read", () => {
     await writeFile(join(sessDir, "s5.jsonl"), `{"ts":1,"type":"messages","payload":[{"role":"user","content":"hi"`)
     const msgs = await SessionLoader.read("s5")
     expect(msgs).toEqual([])
+  })
+
+  it("readDetailed should distinguish corrupt sessions", async () => {
+    await mkdir(sessDir, { recursive: true })
+    await writeFile(join(sessDir, "bad.jsonl"), `{"ts":1,"type":"messages","payload":[{"role":"user"`)
+    const result = await SessionLoader.readDetailed("bad")
+    expect(result.status).toBe("corrupt")
+    expect(result.skippedLines).toBe(1)
+    expect(result.messages).toEqual([])
   })
 })
 

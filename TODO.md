@@ -60,14 +60,42 @@ bun test packages/mcp/__tests__/mcp-host.test.ts packages/mcp/__tests__/mcp-tool
 
 | 顺序 | 任务 | 原因 |
 |------|------|------|
-| 1 | `CTX-70` 文档和验收 | CTX-10/30/40/50 已完成，只剩交付验收。 |
-| 2 | `OS-12/13-R` macOS/Windows 原生验收 | 代码层面已就绪，需在原生环境验收。 |
+| 1 | `FG-60-R` best-effort 日志收尾 | Find_ground 已完成高风险项，剩余低风险日志和状态接入。 |
+| 2 | `CTX-70` 文档和验收 | CTX-10/30/40/50 已完成，只剩交付验收。 |
+| 3 | `OS-12/13-R` macOS/Windows 原生验收 | 代码层面已就绪，需在原生环境验收。 |
 
 不要一次领取多个任务。每个编号完成后都应保持全量测试为绿色。
 
 ---
 
 ## 2. 后续任务
+
+### FG-60-R：best-effort 日志收尾
+
+优先级：`P2`。
+
+当前状态：
+
+- FG-20 TokenizerPool diagnostics/fallback 修复已完成。
+- FG-30 SessionLoader `readDetailed()` 已完成。
+- FG-40 工具参数 invalid JSON fail-fast 已完成。
+- FG-50 edit fuzzy fallback warning 已完成。
+- FG-70 MCP load summary/CLI 提示已完成。
+
+剩余目标：
+
+1. 将 `AsyncSessionWriter.getStatus()` 接入 `/status` 或 engine status snapshot。
+2. 为 `hash-edit.ts` 和 `notebook-edit.ts` 的 `chmod(tmpPath)` / `unlink(tmpPath)` 失败补低噪音日志或可测试状态，不覆盖原始错误。
+3. 为 runtime logger 清理失败保留 debug 级可观测性，不升级为阻断错误。
+4. 可选：为 `edit.fuzzy_fallback` 增加 runtime log，仍不记录文件正文。
+
+验收命令：
+
+```bash
+bun run typecheck
+bun test packages/core/__tests__/session.test.ts
+bun test packages/tools/__tests__/edit.test.ts packages/tools/__tests__/edit-integration.test.ts
+```
 
 ### CTX-70：文档和验收
 
@@ -146,8 +174,10 @@ bun test
 - CTX-40：Engine 自动 trim/compact 触发 ✅ 已完成
 - CTX-50：真实 LLM summarizer ✅ 已完成
 - CTX-70：文档和验收 ⬜ 待开始
+- FG-20/30/40/50/70：隐性兜底高风险项 ✅ 已完成
+- FG-60-R：best-effort 日志收尾 ⬜ 待开始
 
-下一步：执行 `CTX-70` 文档和验收。
+下一步：执行 `FG-60-R` 或 `CTX-70`。
 
 ---
 

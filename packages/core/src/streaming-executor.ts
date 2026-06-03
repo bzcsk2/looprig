@@ -1,10 +1,9 @@
 import type { AgentTool, LoopEvent, ToolContext, ToolResult, ToolProgressUpdate } from "./interface.js"
 import type { ToolCall } from "./types.js"
-import { repairToolArguments } from "./context/repair.js"
 import type { PermissionEngine, HookManager } from "@deepicode/security"
 import { type ResultPersistenceConfig } from "./result-persistence.js"
 import { noopRuntimeLogger, type RuntimeLogger } from "./runtime-logger.js"
-import { evaluatePermission, createSettleLedger, createProgressQueue, applyResultPersistence } from "./executor-helpers.js"
+import { evaluatePermission, createSettleLedger, createProgressQueue, applyResultPersistence, parseToolCallArgs } from "./executor-helpers.js"
 
 export class StreamingToolExecutor {
   private tools: Map<string, AgentTool>
@@ -70,7 +69,16 @@ export class StreamingToolExecutor {
       // Permission check for all tools in batch (must run before dispatching)
       const allowedBatch: Array<{ tc: ToolCall; index: number }> = []
       for (const { tc, index } of batch) {
-        const permResult = await evaluatePermission(tc, exec.tools, exec.permissionEngine, exec.hookManager, exec.requestPermission)
+        const argsResult = parseToolCallArgs(tc.function.arguments, tc.function.name)
+        if (!argsResult.ok) {
+          const result = makeToolError(argsResult.error)
+          settle(tc, index, result)
+          if (diagnosticsEnabled) logger.warn("tool.args.invalid_json", { toolName: tc.function.name, toolCallIndex: index, argumentLength: tc.function.arguments.length })
+          yield { role: "error", content: result.content, toolName: tc.function.name, toolCallIndex: index, severity: "error" }
+          continue
+        }
+
+        const permResult = await evaluatePermission(tc, exec.tools, exec.permissionEngine, exec.hookManager, exec.requestPermission, argsResult.args)
         if (permResult === "deny") {
           const result = makeToolError(`Tool call denied: ${tc.function.name} requires manual approval`)
           settle(tc, index, result)
@@ -78,10 +86,8 @@ export class StreamingToolExecutor {
           continue
         }
         if (permResult === "ask") {
-          let args: Record<string, unknown>
-          try { args = JSON.parse(tc.function.arguments) } catch { args = {} }
-          const permPromise = exec.requestPermission!(tc.function.name, args)
-          yield { role: "permission_ask", toolName: tc.function.name, content: JSON.stringify(args) }
+          const permPromise = exec.requestPermission!(tc.function.name, argsResult.args)
+          yield { role: "permission_ask", toolName: tc.function.name, content: JSON.stringify(argsResult.args) }
           const allowed = await permPromise
           if (!allowed) {
             const result = makeToolError(`Tool call denied by user: ${tc.function.name}`)
@@ -180,8 +186,8 @@ export class StreamingToolExecutor {
   }
 
   // CL-50: Permission check delegated to evaluatePermission helper
-  private async checkAskPermission(tc: ToolCall, _index: number): Promise<"allow" | "deny" | "ask"> {
-    return evaluatePermission(tc, this.tools, this.permissionEngine, this.hookManager, this.requestPermission)
+  private async checkAskPermission(tc: ToolCall, _index: number, args: Record<string, unknown>): Promise<"allow" | "deny" | "ask" | "invalid"> {
+    return evaluatePermission(tc, this.tools, this.permissionEngine, this.hookManager, this.requestPermission, args)
   }
 
   // Execute tool and return result without appending to context
@@ -201,25 +207,14 @@ export class StreamingToolExecutor {
     }
     if (diagnosticsEnabled) logger.info("tool.execute.start", { concurrency: handler.concurrency, approval: handler.approval })
 
-    let args: Record<string, unknown>
-    try {
-      args = parseToolArguments(tc.function.arguments)
-    } catch {
-      const repaired = repairToolArguments(tc.function.arguments)
-      if (!repaired.success) {
-        const result = makeToolError(`Invalid arguments for ${tc.function.name}: failed all repair stages`)
-        if (diagnosticsEnabled) logger.warn("tool.arguments.invalid", { durationMs: Date.now() - startedAt })
-        return { event: makeErrorEvent(result, tc.function.name, index), result }
-      }
-      if (repaired.partial) {
-        // AUD-08: Reject partial repairs — storm() with >1 KV pair is unreliable
-        const result = makeToolError(`Partial argument repair for ${tc.function.name}: ${JSON.stringify(repaired.args)} — cannot determine complete arguments, skipping`)
-        if (diagnosticsEnabled) logger.warn("tool.arguments.partial", { durationMs: Date.now() - startedAt })
-        return { event: makeErrorEvent(result, tc.function.name, index), result }
-      }
-      args = repaired.args
-      if (diagnosticsEnabled) logger.warn("tool.arguments.repaired")
+    const argsResult = parseToolCallArgs(tc.function.arguments, tc.function.name)
+    if (!argsResult.ok) {
+      const result = makeToolError(argsResult.error)
+      if (diagnosticsEnabled) logger.warn("tool.args.invalid_json", { durationMs: Date.now() - startedAt, argumentLength: tc.function.arguments.length })
+      return { event: makeErrorEvent(result, tc.function.name, index), result }
     }
+    const args = argsResult.args
+    if (argsResult.repaired && diagnosticsEnabled) logger.warn("tool.arguments.repaired")
 
     try {
       const check = this.permissionEngine?.decide(tc.function.name, args, handler.approval)
@@ -311,7 +306,14 @@ export class StreamingToolExecutor {
     // CL-50: Progress queue — tools push updates via reportProgress, flushed after execution
     const progressQueue = createProgressQueue()
 
-    const permResult = await this.checkAskPermission(tc, index)
+    const argsResult = parseToolCallArgs(tc.function.arguments, tc.function.name)
+    if (!argsResult.ok) {
+      const result = makeToolError(argsResult.error)
+      settle(tc, index, result)
+      yield { role: "error", content: result.content, toolName: tc.function.name, toolCallIndex: index, severity: "error" }
+      return
+    }
+    const permResult = await this.checkAskPermission(tc, index, argsResult.args)
     if (permResult === "deny") {
       const result = makeToolError(`Tool call denied: ${tc.function.name} requires manual approval`)
       settle(tc, index, result)
@@ -319,10 +321,8 @@ export class StreamingToolExecutor {
       return
     }
     if (permResult === "ask") {
-      let args: Record<string, unknown>
-      try { args = parseToolArguments(tc.function.arguments) } catch { args = {} }
-      const permPromise = this.requestPermission!(tc.function.name, args) // create Promise before yielding
-      yield { role: "permission_ask", toolName: tc.function.name, content: JSON.stringify(args) }
+      const permPromise = this.requestPermission!(tc.function.name, argsResult.args) // create Promise before yielding
+      yield { role: "permission_ask", toolName: tc.function.name, content: JSON.stringify(argsResult.args) }
       const allowed = await permPromise
       if (!allowed) {
         const result = makeToolError(`Tool call denied by user: ${tc.function.name}`)
@@ -368,14 +368,6 @@ function makeToolError(message: string): ToolResult {
     isError: true,
     metadata: { error: message },
   }
-}
-
-function parseToolArguments(raw: string): Record<string, unknown> {
-  const parsed = JSON.parse(raw) as unknown
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("arguments must be a JSON object")
-  }
-  return parsed as Record<string, unknown>
 }
 
 function errorMessage(error: unknown): string {

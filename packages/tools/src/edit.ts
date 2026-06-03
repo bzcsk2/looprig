@@ -119,8 +119,16 @@ export function createEditTool(): AgentTool {
         return { content: safeStringify({ error: "old_string not found", path: args.path }), isError: true }
       }
       await writeFile(path, restoreLineEndings(fuzzy.edited, lineEnding), "utf-8")
-      return { content: safeStringify({ path: args.path, replaced: fuzzy.replacedCount, method: fuzzy.method, cwd: ctx.cwd }), isError: false }
+      return {
+        content: safeStringify({
+          path: args.path,
+          replaced: fuzzy.replacedCount,
+          method: fuzzy.method,
+          warning: "exact_match_failed_used_fuzzy",
+          cwd: ctx.cwd,
+        }),
+        isError: false,
+      }
     },
   }
 }
-

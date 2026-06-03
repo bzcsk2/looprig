@@ -18,6 +18,23 @@ export interface SessionSummary {
   outputTokens: number
 }
 
+export type SessionReadStatus = "ok" | "missing" | "empty" | "corrupt" | "unreadable"
+
+export interface SessionReadResult {
+  status: SessionReadStatus
+  messages: ChatMessage[]
+  skippedLines: number
+  error?: string
+}
+
+export interface SessionWriterStatus {
+  queueSize: number
+  droppedCount: number
+  flushing: boolean
+  lastError?: string
+  lastFlushAt?: number
+}
+
 export class SessionLoader {
   static sessionDir = resolve(process.cwd(), ".deepicode", "sessions")
 
@@ -38,26 +55,43 @@ export class SessionLoader {
   }
 
   static async read(sessionId: string): Promise<ChatMessage[]> {
+    return (await this.readDetailed(sessionId)).messages
+  }
+
+  static async readDetailed(sessionId: string): Promise<SessionReadResult> {
     const path = this.safePath(sessionId)
     let raw: string
     try {
       raw = await readFile(path, "utf-8")
-    } catch {
-      return []
+    } catch (error) {
+      const code = typeof error === "object" && error !== null && "code" in error ? String((error as { code?: unknown }).code) : undefined
+      if (code === "ENOENT") {
+        return { status: "missing", messages: [], skippedLines: 0 }
+      }
+      return {
+        status: "unreadable",
+        messages: [],
+        skippedLines: 0,
+        error: error instanceof Error ? error.message : String(error),
+      }
+    }
+    if (!raw.trim()) {
+      return { status: "empty", messages: [], skippedLines: 0 }
     }
     const lines = raw.trim().split("\n")
+    let skippedLines = 0
     // Scan from end to find the most recent valid messages record
     for (let i = lines.length - 1; i >= 0; i--) {
       try {
         const rec: SessionRecord = JSON.parse(lines[i])
         if (rec.type === "messages" && Array.isArray(rec.payload)) {
-          return rec.payload as ChatMessage[]
+          return { status: "ok", messages: rec.payload as ChatMessage[], skippedLines }
         }
       } catch {
-        continue
+        skippedLines++
       }
     }
-    return []
+    return { status: skippedLines > 0 ? "corrupt" : "empty", messages: [], skippedLines }
   }
 
   static async list(): Promise<SessionSummary[]> {
@@ -121,6 +155,8 @@ export class AsyncSessionWriter {
   private flushing = false
   private initPromise?: Promise<void>
   private droppedCount = 0
+  private lastError?: string
+  private lastFlushAt?: number
   private logger: RuntimeLogger
 
   private static MAX_QUEUE_SIZE = 500
@@ -189,6 +225,16 @@ export class AsyncSessionWriter {
     return this.droppedCount
   }
 
+  getStatus(): SessionWriterStatus {
+    return {
+      queueSize: this.queue.length,
+      droppedCount: this.droppedCount,
+      flushing: this.flushing,
+      lastError: this.lastError,
+      lastFlushAt: this.lastFlushAt,
+    }
+  }
+
   /** Best-effort drain: wait until the queue is empty and no flush in progress.
    *  Idempotent; does not throw. */
   async drain(): Promise<void> {
@@ -223,6 +269,7 @@ export class AsyncSessionWriter {
         try {
           await appendFile(this.path, chunk, "utf-8")
         } catch (err) {
+          this.lastError = err instanceof Error ? err.message : String(err)
           if (this.logger.isEnabled("debug")) {
             this.logger.debug("session.writer.append_error", {
               error: err instanceof Error ? err.message : String(err),
@@ -232,6 +279,8 @@ export class AsyncSessionWriter {
           throw err
         }
       }
+      this.lastError = undefined
+      this.lastFlushAt = Date.now()
     } catch {
       // best-effort: swallow write errors silently
     } finally {

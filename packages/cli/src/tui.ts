@@ -35,7 +35,13 @@ async function main(): Promise<void> {
   // Initialize MCP host in background — don't block startup
   const mcpHost = new McpHost()
   setMcpHost(mcpHost)
-  const mcpLoadPromise = mcpHost.loadConfig().catch(() => { /* no mcp.json or connection failure */ })
+  const mcpLoadPromise = mcpHost.loadConfig().then((summary) => {
+    if (summary.failed.length > 0) {
+      errorOutput.write(`[deepicode] MCP loaded with ${summary.failed.length}/${summary.serverCount} server failure(s)\n`)
+    }
+  }).catch((error) => {
+    errorOutput.write(`[deepicode] MCP config load failed: ${error instanceof Error ? error.message : String(error)}\n`)
+  })
 
   const engine = sessionId
     ? await ReasonixEngine.recover(config, sessionId)

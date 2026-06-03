@@ -15,9 +15,43 @@ import type { ChatMessage } from "../src/types.js"
 // Mock TokenizerPool to use deterministic fallback
 vi.mock("../src/context/tokenizer-pool.js", () => ({
   TokenizerPool: class {
+    healthy = true
+    fallbackCount = 0
+    timeoutCount = 0
+    workerErrorCount = 0
+    lastFallbackReason: string | undefined
+    tasks = new Map<number, { messages: any[]; resolve: (value: number) => void }>()
+
     estimate(messages: any[]) {
+      if (!this.healthy) {
+        this.fallbackCount += 1
+        this.lastFallbackReason = "unhealthy"
+      }
       return Promise.resolve(messages.length * 10)
     }
+
+    resolvePendingWithFallback(reason: string) {
+      for (const [, task] of this.tasks) {
+        task.resolve(task.messages.length * 10)
+      }
+      this.tasks.clear()
+      this.fallbackCount += 1
+      this.lastFallbackReason = reason
+      if (reason.includes("timeout")) this.timeoutCount += 1
+      if (reason.includes("worker")) this.workerErrorCount += 1
+    }
+
+    getDiagnostics() {
+      return {
+        healthy: this.healthy,
+        pendingTasks: this.tasks.size,
+        fallbackCount: this.fallbackCount,
+        timeoutCount: this.timeoutCount,
+        workerErrorCount: this.workerErrorCount,
+        lastFallbackReason: this.lastFallbackReason,
+      }
+    }
+
     shutdown() {}
   },
 }))

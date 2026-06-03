@@ -3,10 +3,34 @@ import type { ToolCall } from "./types.js"
 import type { PermissionEngine, HookManager, PermissionDecision } from "@deepicode/security"
 import { maybePersistResult, type ResultPersistenceConfig } from "./result-persistence.js"
 import { type RuntimeLogger } from "./runtime-logger.js"
+import { repairToolArguments } from "./context/repair.js"
 
 // ─── Permission Decision Helper ───
 
-export type PermissionOutcome = "allow" | "deny" | "ask"
+export type PermissionOutcome = "allow" | "deny" | "ask" | "invalid"
+
+export type ParsedToolCallArgs =
+  | { ok: true; args: Record<string, unknown>; repaired: boolean }
+  | { ok: false; error: string }
+
+export function parseToolCallArgs(raw: string, toolName: string): ParsedToolCallArgs {
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { ok: false, error: `Invalid JSON arguments for tool ${toolName}: arguments must be a JSON object` }
+    }
+    return { ok: true, args: parsed as Record<string, unknown>, repaired: false }
+  } catch {
+    const repaired = repairToolArguments(raw)
+    if (!repaired.success) {
+      return { ok: false, error: `Invalid JSON arguments for tool ${toolName}: failed all repair stages` }
+    }
+    if (repaired.partial) {
+      return { ok: false, error: `Invalid JSON arguments for tool ${toolName}: partial repair is unsafe` }
+    }
+    return { ok: true, args: repaired.args, repaired: true }
+  }
+}
 
 /**
  * CL-50: Evaluate whether a tool call should be allowed, denied, or requires user confirmation.
@@ -18,12 +42,14 @@ export async function evaluatePermission(
   permissionEngine?: PermissionEngine,
   hookManager?: HookManager,
   requestPermission?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>,
+  parsedArgs?: Record<string, unknown>,
 ): Promise<PermissionOutcome> {
   const handler = tools.get(tc.function.name)
   if (!handler || !permissionEngine) return "allow"
 
-  let args: Record<string, unknown>
-  try { args = JSON.parse(tc.function.arguments) } catch { args = {} }
+  const argsResult = parsedArgs ? { ok: true as const, args: parsedArgs, repaired: false } : parseToolCallArgs(tc.function.arguments, tc.function.name)
+  if (!argsResult.ok) return "invalid"
+  const args = argsResult.args
 
   const check = permissionEngine.decide(tc.function.name, args, handler.approval)
   if (check?.decision !== "ask") return "allow"

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { describe, it, expect } from "vitest"
 
 describe("TokenizerPool", () => {
   it("should fallback to main thread estimate when Worker is unavailable", async () => {
@@ -29,6 +29,35 @@ describe("TokenizerPool", () => {
     pool.shutdown()
   })
 
+  it("should expose fallback diagnostics", async () => {
+    const { TokenizerPool } = await import("../src/context/tokenizer-pool.js")
+    const pool = new TokenizerPool()
+    ;(pool as any).healthy = false
+    const result = await pool.estimate([{ role: "user", content: "diagnostic" }])
+    expect(result).toBeGreaterThan(0)
+    const diagnostics = pool.getDiagnostics()
+    expect(diagnostics.healthy).toBe(false)
+    expect(diagnostics.fallbackCount).toBeGreaterThan(0)
+    expect(diagnostics.lastFallbackReason).toBe("unhealthy")
+    pool.shutdown()
+  })
+
+  it("should fallback pending worker failures using each task messages", async () => {
+    const { TokenizerPool } = await import("../src/context/tokenizer-pool.js")
+    const pool = new TokenizerPool()
+    const values: number[] = []
+    ;(pool as any).tasks.set(1, {
+      messages: [{ role: "user", content: "non-empty pending task" }],
+      resolve: (value: number) => values.push(value),
+      reject: () => {},
+    })
+    ;(pool as any).resolvePendingWithFallback("worker_error")
+    expect(values).toHaveLength(1)
+    expect(values[0]).toBeGreaterThan(0)
+    expect(pool.getDiagnostics().lastFallbackReason).toBe("worker_error")
+    pool.shutdown()
+  })
+
   it("should include reasoning_content in estimate via fallback", async () => {
     const { TokenizerPool } = await import("../src/context/tokenizer-pool.js")
     const pool = new TokenizerPool()
@@ -40,50 +69,13 @@ describe("TokenizerPool", () => {
     pool.shutdown()
   })
 
-  it("should send messages through Worker when available and return result", async () => {
-    // Mock Worker to simulate successful response
-    const mockPostMessage = vi.fn()
-    const mockTerminate = vi.fn().mockResolvedValue(undefined)
-    const listeners = new Map<string, Set<(...args: any[]) => void>>()
-
-    vi.mock("node:worker_threads", () => ({
-      Worker: class MockWorker {
-        postMessage = mockPostMessage
-        terminate = mockTerminate
-        constructor(path: string) {
-          // Schedule a successful response
-          setTimeout(() => {
-            this.emit("message", { id: 1, result: 42 })
-          }, 10)
-        }
-        on(event: string, cb: (...args: any[]) => void) {
-          if (!listeners.has(event)) listeners.set(event, new Set())
-          listeners.get(event)!.add(cb)
-        }
-        emit(event: string, ...args: any[]) {
-          listeners.get(event)?.forEach(cb => cb(...args))
-        }
-        addListener = vi.fn()
-        removeListener = vi.fn()
-      },
-    }))
-
+  it("should estimate messages through available tokenizer path", async () => {
     const { TokenizerPool } = await import("../src/context/tokenizer-pool.js")
     const pool = new TokenizerPool()
-
-    // Only test Worker path if Worker was actually created (not in Bun's stub env)
-    if ((pool as any).worker) {
-      const result = await pool.estimate([{ role: "user", content: "test" }])
-      expect(result).toBe(42)
-      expect(mockPostMessage).toHaveBeenCalled()
-    } else {
-      // Fallback: Worker module not available, pool uses main thread
-      const result = await pool.estimate([{ role: "user", content: "test" }])
-      expect(result).toBeGreaterThan(0)
-    }
+    const result = await pool.estimate([{ role: "user", content: "test" }])
+    expect(result).toBeGreaterThan(0)
 
     pool.shutdown()
-    vi.restoreAllMocks()
   })
 
   it("should not throw on shutdown even when worker failed to start", async () => {

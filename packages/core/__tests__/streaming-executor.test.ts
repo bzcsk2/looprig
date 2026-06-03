@@ -52,6 +52,31 @@ describe("StreamingToolExecutor", () => {
     expect(toolEvents.length).toBeGreaterThan(0)
   })
 
+  it("should fail fast on unsafe invalid JSON arguments instead of executing with empty args", async () => {
+    const { StreamingToolExecutor } = await import("../src/streaming-executor.js")
+    let executed = false
+    const tool: AgentTool = {
+      ...makeHandler("write_tool", { concurrency: "exclusive", approval: "write" }),
+      async execute() { executed = true; return { content: "bad", isError: false } },
+    }
+    const tools = new Map<string, AgentTool>([["write_tool", tool]])
+    const executor = new StreamingToolExecutor(tools, "test-session", process.cwd())
+    const toolCalls = [{
+      id: "1", type: "function" as const,
+      function: { name: "write_tool", arguments: "[1,2,3]" },
+    }]
+    const results: ToolResult[] = []
+    const events: LoopEvent[] = []
+    for await (const e of executor.run(toolCalls, new AbortController().signal, (_tc, r) => results.push(r))) {
+      events.push(e)
+    }
+    expect(executed).toBe(false)
+    expect(results).toHaveLength(1)
+    expect(results[0].isError).toBe(true)
+    expect(JSON.parse(results[0].content).error).toContain("Invalid JSON arguments")
+    expect(events.some((event) => event.role === "error")).toBe(true)
+  })
+
   it("should execute shared tools concurrently", async () => {
     const { StreamingToolExecutor } = await import("../src/streaming-executor.js")
     const tools = new Map<string, AgentTool>([
