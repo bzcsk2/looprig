@@ -1,19 +1,30 @@
 import { pluginSource, type PluginConfigItem } from "./config.js"
 
+export interface PluginHooks {
+  [key: string]: (...args: unknown[]) => unknown
+}
+
+export interface PluginServer {
+  (...args: unknown[]): PluginHooks | Promise<PluginHooks>
+}
+
 export interface PluginModule {
   id: string
-  server: (...args: unknown[]) => unknown
+  server: PluginServer
   [key: string]: unknown
 }
 
 export interface PluginLoaded extends PluginConfigItem {
   mod: PluginModule
+  hooks?: PluginHooks
 }
 
 export type PluginLoadError =
   | { type: "import_failed"; spec: string; cause: string }
   | { type: "missing_id"; spec: string }
   | { type: "server_not_function"; spec: string }
+  | { type: "server_threw"; spec: string; cause: string }
+  | { type: "hooks_not_object"; spec: string }
   | { type: "duplicate_id"; id: string; spec: string }
   | { type: "load_error"; spec: string; cause: string }
 
@@ -29,6 +40,30 @@ async function importPlugin(spec: string): Promise<{ mod: unknown; error?: strin
     return { mod: exported }
   } catch (e) {
     return { mod: null, error: e instanceof Error ? e.message : String(e) }
+  }
+}
+
+function isHooksObject(value: unknown): value is PluginHooks {
+  if (!value || typeof value !== "object") return false
+  const record = value as Record<string, unknown>
+  for (const key of Object.keys(record)) {
+    if (typeof record[key] !== "function") return false
+  }
+  return true
+}
+
+async function callServer(
+  server: PluginServer,
+  spec: string,
+): Promise<{ hooks?: PluginHooks; error?: PluginLoadError }> {
+  try {
+    const result = await server()
+    if (!isHooksObject(result)) {
+      return { error: { type: "hooks_not_object", spec } }
+    }
+    return { hooks: result }
+  } catch (e) {
+    return { error: { type: "server_threw", spec, cause: e instanceof Error ? e.message : String(e) } }
   }
 }
 
@@ -50,7 +85,7 @@ function validatePlugin(mod: unknown, spec: string): { plugin?: PluginModule; er
   return {
     plugin: {
       id: record.id,
-      server: record.server as (...args: unknown[]) => unknown,
+      server: record.server as PluginServer,
     },
   }
 }
@@ -84,7 +119,14 @@ export async function loadPlugins(items: PluginConfigItem[]): Promise<PluginLoad
     }
 
     seenIds.add(plugin!.id)
-    loaded.push({ ...item, mod: plugin! })
+
+    const { hooks, error: serverError } = await callServer(plugin!.server, item.spec)
+    if (serverError) {
+      errors.push(serverError)
+      continue
+    }
+
+    loaded.push({ ...item, mod: plugin!, hooks })
   }
 
   return { loaded, errors }

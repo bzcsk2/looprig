@@ -1118,20 +1118,25 @@ RuntimeLogger 增加事件：
 
 ### PLG-20：loader 与 v1 server plugin shape
 
-目标：
+**状态：✅ 已完成（2026-06-03）**
 
-- 实现 dynamic import。
-- 识别 `default export { id, server }`。
-- 校验 id、server 函数、返回 hooks 对象。
-- 加载顺序稳定。
-- 加载失败隔离。
+实现内容：
+
+- `packages/plugin/src/loader.ts`：增强 loader 支持 server() 调用和 hooks 验证
+- 识别 `default export { id, server }`
+- 校验 id、server 函数、返回 hooks 对象（所有值必须是函数）
+- 加载顺序稳定
+- 加载失败隔离
+- 21 个单元测试覆盖所有场景
 
 测试：
 
 - 成功加载本地 plugin。
 - 缺 id 的 file plugin 失败。
 - server 不是函数失败。
-- plugin 抛错被隔离。
+- server 抛错被隔离。
+- server 返回非对象被拒绝。
+- server 返回对象包含非函数值被拒绝。
 - 两个 plugin id 重复时后者失败。
 
 ### PLG-30：tool adapter

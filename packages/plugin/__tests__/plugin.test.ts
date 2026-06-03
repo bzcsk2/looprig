@@ -109,17 +109,20 @@ describe("Plugin Loader", () => {
     rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it("loads a valid plugin", async () => {
+  it("loads a valid plugin with hooks", async () => {
     writeFileSync(
       pluginPath,
       `export default {
         id: "test-plugin",
-        server: () => ({ hooks: {} })
+        server: () => ({ hook1: () => "result1", hook2: () => "result2" })
       }`,
     )
     const result = await loadPlugins([{ spec: pluginPath, options: {}, source: "file", deprecated: false }])
     expect(result.loaded.length).toBe(1)
     expect(result.loaded[0].mod.id).toBe("test-plugin")
+    expect(result.loaded[0].hooks).toBeDefined()
+    expect(typeof result.loaded[0].hooks!.hook1).toBe("function")
+    expect(typeof result.loaded[0].hooks!.hook2).toBe("function")
     expect(result.errors.length).toBe(0)
   })
 
@@ -150,20 +153,62 @@ describe("Plugin Loader", () => {
     expect(result.errors[0].type).toBe("server_not_function")
   })
 
+  it("rejects plugin when server throws", async () => {
+    writeFileSync(
+      pluginPath,
+      `export default {
+        id: "test-plugin",
+        server: () => { throw new Error("server failed") }
+      }`,
+    )
+    const result = await loadPlugins([{ spec: pluginPath, options: {}, source: "file", deprecated: false }])
+    expect(result.loaded.length).toBe(0)
+    expect(result.errors.length).toBe(1)
+    expect(result.errors[0].type).toBe("server_threw")
+  })
+
+  it("rejects plugin when server returns non-object", async () => {
+    writeFileSync(
+      pluginPath,
+      `export default {
+        id: "test-plugin",
+        server: () => "not an object"
+      }`,
+    )
+    const result = await loadPlugins([{ spec: pluginPath, options: {}, source: "file", deprecated: false }])
+    expect(result.loaded.length).toBe(0)
+    expect(result.errors.length).toBe(1)
+    expect(result.errors[0].type).toBe("hooks_not_object")
+  })
+
+  it("rejects plugin when server returns object with non-function values", async () => {
+    writeFileSync(
+      pluginPath,
+      `export default {
+        id: "test-plugin",
+        server: () => ({ hook1: "not a function" })
+      }`,
+    )
+    const result = await loadPlugins([{ spec: pluginPath, options: {}, source: "file", deprecated: false }])
+    expect(result.loaded.length).toBe(0)
+    expect(result.errors.length).toBe(1)
+    expect(result.errors[0].type).toBe("hooks_not_object")
+  })
+
   it("rejects duplicate plugin ids", async () => {
     const pluginPath2 = join(tmpDir, `test-plugin-dup-${counter++}.ts`)
     writeFileSync(
       pluginPath,
       `export default {
         id: "test-plugin",
-        server: () => ({ hooks: {} })
+        server: () => ({ hook1: () => "result1" })
       }`,
     )
     writeFileSync(
       pluginPath2,
       `export default {
         id: "test-plugin",
-        server: () => ({ hooks: {} })
+        server: () => ({ hook2: () => "result2" })
       }`,
     )
     const result = await loadPlugins([
@@ -198,14 +243,14 @@ describe("Plugin Loader", () => {
       pluginPath,
       `export default {
         id: "plugin-1",
-        server: () => ({ hooks: {} })
+        server: () => ({ hook1: () => "result1" })
       }`,
     )
     writeFileSync(
       pluginPath2,
       `export default {
         id: "plugin-2",
-        server: () => ({ hooks: {} })
+        server: () => ({ hook2: () => "result2" })
       }`,
     )
     const result = await loadPlugins([
