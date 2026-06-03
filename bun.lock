@@ -89,6 +89,16 @@
         "@deepicode/tools": "workspace:*",
       },
     },
+    "packages/plugin": {
+      "name": "@deepicode/plugin",
+      "version": "0.1.0",
+      "dependencies": {
+        "@deepicode/core": "workspace:*",
+      },
+      "devDependencies": {
+        "typescript": "^5.8.3",
+      },
+    },
     "packages/security": {
       "name": "@deepicode/security",
       "version": "0.1.0",
@@ -130,6 +140,8 @@
     "@deepicode/ink": ["@deepicode/ink@workspace:packages/ink"],
 
     "@deepicode/mcp": ["@deepicode/mcp@workspace:packages/mcp"],
+
+    "@deepicode/plugin": ["@deepicode/plugin@workspace:packages/plugin"],
 
     "@deepicode/security": ["@deepicode/security@workspace:packages/security"],
 
