@@ -342,11 +342,12 @@ DEEPICODE_TRACE=1
 |------|------|------|
 | ST1 | `strategy/tiers.ts` 四级 tiers 数据模型和测试 | 已完成 |
 
-### 4.8 Context 压缩专项（CTX-10）
+### 4.8 Context 压缩专项（CTX-10, CTX-30）
 
 | 编号 | 内容 | 状态 |
 |------|------|------|
 | CTX-10 | 策略类型、配置加载和菜单解析 | 已完成 |
+| CTX-30 | 摘要区和 summarizer 接口 | 已完成 |
 
 **实现边界：**
 
@@ -369,6 +370,30 @@ bun test
 - `.deepicode/context.json` 独立持久化，不混入主配置文件。
 - 读取失败回退默认值，不阻塞启动。
 - `setContextPolicy()` 异步保存，best-effort。
+
+### 4.9 Context 压缩专项（CTX-30）
+
+**实现边界：**
+
+- 新增 `packages/core/src/context/summary.ts`：`ContextSummary` 类类，维护 summary message，支持 replace / clear / read，summary 带 `[CONTEXT_SUMMARY]` / `[/CONTEXT_SUMMARY]` 标记。
+- 新增 `packages/core/src/context/summarizer.ts`：`ContextSummarizer` 接口、`FakeSummarizer`（测试用）和 `MechanicalSummarizer`（本地机械摘要）。
+- `ContextManager` 使用 `ContextSummary` 替代旧的 `summaryMessages` 字段，暴露 `getSummary()`、`setSummarizer()` 和 `runSummarize()` 方法。
+- summary 插入顺序稳定：prefix → summary → log → scratch。
+- 新增 `packages/core/__tests__/context-summary.test.ts`：覆盖 ContextSummary、isSummaryMessage、FakeSummarizer、MechanicalSummarizer 和 ContextManager 集成（25 个测试）。
+
+**验收命令：**
+
+```bash
+bun test packages/core/__tests__/context-summary.test.ts
+bun run typecheck
+bun test
+```
+
+**保留限制：**
+
+- summary 标记方便模型识别，避免重复包装。
+- `setSummarizer()` 可选注入，不注入时 `runSummarize()` 返回 false。
+- compress 模式才更新 summary，trim 模式不更新。
 
 ---
 

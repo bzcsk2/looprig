@@ -60,7 +60,7 @@ bun test packages/mcp/__tests__/mcp-host.test.ts packages/mcp/__tests__/mcp-tool
 
 | 顺序 | 任务 | 原因 |
 |------|------|------|
-| 1 | `CTX-30` 摘要区和 summarizer 接口 | CTX-10 已完成，按 ADVICE.md 顺序继续。 |
+| 1 | `CTX-40` Engine 自动 trim/compact 触发 | CTX-30 已完成，按 ADVICE.md 顺序继续。 |
 | 2 | `OS-12/13-R` macOS/Windows 原生验收 | 代码层面已就绪，需在原生环境验收。 |
 
 不要一次领取多个任务。每个编号完成后都应保持全量测试为绿色。
@@ -68,6 +68,39 @@ bun test packages/mcp/__tests__/mcp-host.test.ts packages/mcp/__tests__/mcp-tool
 ---
 
 ## 2. 后续任务
+
+### CTX-40：Engine 自动 trim/compact 触发
+
+优先级：`P1`。CTX-30 已完成后执行。
+
+当前状态：
+
+- `getContextPolicy()` / `setContextPolicy()` / `getContextStatus()` 已存在。
+- `submit()` 前会检查 budget。
+- `trim` 时会自动裁剪。
+- 会产生状态事件和 runtime logs。
+- `ContextSummarizer` 接口和 `FakeSummarizer` 已就绪。
+
+目标：
+
+- `compact` 时调用真实 summarizer。
+- summarizer 失败后的真实 fallback 链路。
+
+执行要求：
+
+1. 在 `ReasonixEngine.submit()` 里，保留"用户输入前检查"的入口。
+2. `trim` 模式：到阈值就裁剪，裁剪成功后继续 submit。
+3. `compact` 模式：调用 summarizer，成功后安装 summary，再删除旧历史，失败时 fallback trim。
+4. 记录日志：记录前后 token、删除消息数、是否 fallback，不记录原始消息正文。
+5. 编写 `packages/core/__tests__/engine-context-policy.test.ts` 测试文件。
+
+验收命令：
+
+```bash
+bun test packages/core/__tests__/engine-context-policy.test.ts
+bun run typecheck
+bun test
+```
 
 ### CTX-30：摘要区和 summarizer 接口
 
@@ -129,9 +162,10 @@ bun test
 ## 3. 当前验证状态
 
 - CTX-10：策略类型、配置加载和菜单解析 ✅ 已完成
-- CTX-30：摘要区和 summarizer 接口 ⬜ 待开始
+- CTX-30：摘要区和 summarizer 接口 ✅ 已完成
+- CTX-40：Engine 自动 trim/compact 触发 ⬜ 待开始
 
-下一步：执行 `CTX-30` 摘要区和 summarizer 接口。
+下一步：执行 `CTX-40` Engine 自动 trim/compact 触发。
 
 ---
 

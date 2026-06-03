@@ -233,18 +233,15 @@ bun run typecheck
 
 ### CTX-30：摘要区和 summarizer 接口
 
-**状态：⬜ 未完成**
+**状态：✅ 已完成**
 
 已完成：
 
 - `buildMessages()` 已包含 summary 区域。
 - `summaryTokens` 已计入 budget。
-
-未完成：
-
 - 独立 `ContextSummary` 模块。
 - `ContextSummarizer` 接口。
-- fake summarizer。
+- fake summarizer 和 mechanical summarizer。
 
 #### 目标
 

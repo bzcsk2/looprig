@@ -5,6 +5,8 @@ import { VolatileScratch } from "./scratch.js"
 import { getFoldDecision, estimateTokens } from "./token-estimator.js"
 import { TokenizerPool } from "./tokenizer-pool.js"
 import type { FoldDecision } from "./token-estimator.js"
+import { ContextSummary } from "./summary.js"
+import type { ContextSummarizer } from "./summarizer.js"
 
 export interface ContextBudget {
   prefixTokens: number
@@ -32,7 +34,8 @@ export class ContextManager {
   readonly prefix: ImmutablePrefix
   readonly log: AppendOnlyLog
   readonly scratch: VolatileScratch
-  private summaryMessages: ChatMessage[] = []
+  private summary: ContextSummary
+  private summarizer?: ContextSummarizer
   private maxRounds: number
 
   private tokenizer: TokenizerPool
@@ -41,6 +44,7 @@ export class ContextManager {
     this.prefix = new ImmutablePrefix()
     this.log = new AppendOnlyLog()
     this.scratch = new VolatileScratch()
+    this.summary = new ContextSummary()
     this.maxRounds = maxRounds
     this.tokenizer = new TokenizerPool()
   }
@@ -59,7 +63,7 @@ export class ContextManager {
 
   async getBudget(): Promise<ContextBudget> {
     const prefixTokens = estimateTokens([...this.prefix.messages])
-    const summaryTokens = estimateTokens([...this.summaryMessages])
+    const summaryTokens = estimateTokens(this.summary.getMessages())
     const log = this.prepareLog()
     const logTokens = estimateTokens(log)
     const scratchTokens = estimateTokens([...this.scratch.messages])
@@ -87,7 +91,7 @@ export class ContextManager {
 
   buildMessages(): ChatMessage[] {
     const prefixMsgs = this.prefix.messages
-    const summaryMsgs = this.summaryMessages
+    const summaryMsgs = this.summary.getMessages()
     const scratchMsgs = this.scratch.messages
 
     const log = this.prepareLog()
@@ -125,7 +129,7 @@ export class ContextManager {
         afterTokens: beforeTokens,
         targetTokens,
         removedMessages: 0,
-        summaryTokens: estimateTokens(this.summaryMessages),
+        summaryTokens: estimateTokens(this.summary.getMessages()),
       }
     }
 
@@ -136,7 +140,7 @@ export class ContextManager {
     const removed: ChatMessage[] = []
 
     const estimateWithTail = (candidate: ChatMessage[]): number =>
-      estimateTokens([...this.prefix.messages, ...this.summaryMessages, ...candidate, ...protectedTail, ...this.scratch.messages])
+      estimateTokens([...this.prefix.messages, ...this.summary.getMessages(), ...candidate, ...protectedTail, ...this.scratch.messages])
 
     while (current.length > 0 && estimateWithTail(current) > targetTokens) {
       const end = this.firstRoundEnd(current)
@@ -145,7 +149,8 @@ export class ContextManager {
     }
 
     if (mode === "compress" && removed.length > 0) {
-      this.summaryMessages = [this.createSummaryMessage(removed)]
+      const summaryContent = this.createSummaryContent(removed)
+      this.summary.replace(summaryContent)
       while (current.length > 0 && estimateWithTail(current) > targetTokens) {
         const end = this.firstRoundEnd(current)
         current = current.slice(end)
@@ -160,7 +165,7 @@ export class ContextManager {
       afterTokens,
       targetTokens,
       removedMessages: removed.length,
-      summaryTokens: estimateTokens(this.summaryMessages),
+      summaryTokens: estimateTokens(this.summary.getMessages()),
     }
   }
 
@@ -179,8 +184,8 @@ export class ContextManager {
     return -1
   }
 
-  private createSummaryMessage(messages: ChatMessage[]): ChatMessage {
-    const existing = this.summaryMessages.map(m => m.content ?? "").filter(Boolean).join("\n\n")
+  private createSummaryContent(messages: ChatMessage[]): string {
+    const existing = this.summary.getRawContent()
     const lines = messages.map((message) => {
       const raw = message.content ?? ""
       const content = raw.replace(/\s+/g, " ").trim()
@@ -188,14 +193,12 @@ export class ContextManager {
       return `${message.role}: ${clipped}`
     }).filter(line => !line.endsWith(": "))
 
-    const summary = [
+    return [
       "Previous conversation summary:",
       existing,
       lines.join("\n"),
       "This summary was generated to reduce context usage. Newer messages override this summary when conflicts exist.",
     ].filter(Boolean).join("\n\n")
-
-    return { role: "system", content: summary }
   }
 
   private truncateByRounds(log: ChatMessage[]): ChatMessage[] {
@@ -219,7 +222,7 @@ export class ContextManager {
   private truncateToBudget(log: ChatMessage[]): ChatMessage[] {
     if (log.length === 0) return log
 
-    const baselineTokens = estimateTokens([...this.prefix.messages, ...this.summaryMessages, ...this.scratch.messages])
+    const baselineTokens = estimateTokens([...this.prefix.messages, ...this.summary.getMessages(), ...this.scratch.messages])
 
     let current = [...log]
     let estimated = estimateTokens(current)
@@ -257,5 +260,39 @@ export class ContextManager {
 
   startTurn(): void {
     this.scratch.reset()
+  }
+
+  getSummary(): ContextSummary {
+    return this.summary
+  }
+
+  setSummarizer(summarizer: ContextSummarizer): void {
+    this.summarizer = summarizer
+  }
+
+  async runSummarize(targetTokens: number, signal?: AbortSignal): Promise<boolean> {
+    if (!this.summarizer) return false
+
+    const log = [...this.log.messages]
+    if (log.length === 0) return false
+
+    try {
+      const result = await this.summarizer.summarize(
+        {
+          messages: log,
+          currentSummary: this.summary.getRawContent(),
+          targetTokens,
+        },
+        signal,
+      )
+
+      if (result.summary) {
+        this.summary.replace(result.summary)
+        return true
+      }
+      return false
+    } catch {
+      return false
+    }
   }
 }
