@@ -194,11 +194,14 @@ interface AppProps {
  * @param config - DeepicodeConfig 配置对象（provider / model / contextWindow 等）
  */
 export function App({ engine, config }: AppProps) {
-  const [bridgeState, setBridgeState] = useState<BridgeState>(initialState);
+  const [bridgeState, setBridgeState] = useState<BridgeState>(() => ({
+    ...initialState,
+    thinkingMode: engine.getThinkingMode?.() ?? 'off',
+  }));
   const bridge = useMemo(() => createBridge(engine, setBridgeState), [engine]);
   const bridgeRef = useRef(bridge);
   bridgeRef.current = bridge;
-  const contextTotal = config.contextWindow ?? 128_000;
+  const contextTotal = engine.getContextWindow?.() ?? config.contextWindow ?? 128_000;
   const engineRef = useRef(engine);
   const mountedRef = useRef(true);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);

@@ -114,6 +114,8 @@ export interface CoreEngine {
   enqueueInstruction(instruction: string): EnqueueInstructionResult
   getTier?(): { id: string; label: string; budgetCNY: number }
   setTier?(tierId: string): void
+  getThinkingMode?(): string
+  getContextWindow?(): number
 }
 
 export interface AgentConfig {

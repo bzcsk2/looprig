@@ -117,6 +117,16 @@ export class ReasonixEngine implements CoreEngine {
     this.modeSelectorState.currentMode = mode
   }
 
+  /** AS3: Get current thinking mode */
+  getThinkingMode(): ThinkingMode {
+    return this.modeSelectorState.currentMode
+  }
+
+  /** Get context window size */
+  getContextWindow(): number {
+    return this.ctx.getContextWindow()
+  }
+
   /** AS6: Get thinking mode statistics summary */
   getModeSummary(): string {
     return getModeSummary(this.modeStats)
