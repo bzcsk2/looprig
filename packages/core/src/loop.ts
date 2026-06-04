@@ -68,8 +68,10 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
     : (tier && !tier.enableReasoning ? "off" as const : thinkingModeOverride)
 
   // ST2: Apply tier overrides to config
+  // IMPORTANT: model override is only safe for DeepSeek's native API.
+  // Third-party providers (Zen, Mimo) have their own model inventories.
   if (tier) {
-    if (tier.recommendedModel) config.model = tier.recommendedModel
+    if (tier.recommendedModel && (!config.provider || config.provider === "deepseek")) config.model = tier.recommendedModel
     if (tier.temperature !== null) config.temperature = tier.temperature
   }
 

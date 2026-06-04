@@ -21,7 +21,7 @@ bun test
 | 检查项 | 状态 |
 |--------|------|
 | TypeScript | 最新 CI `bun run typecheck` 通过 |
-| 测试 | 最新 CI Ubuntu：`1050 pass / 0 fail / 18 skip`，共 `78` 个测试文件 |
+| 测试 | 最新 CI Ubuntu：`1054 pass / 0 fail / 18 skip`，共 `78` 个测试文件 |
 | 稳定性 | 连续 3 次全绿（TEST-STABILITY-01 已关闭） |
 | CI | 最新 master run `26928659701`：✓ ubuntu-latest ✓ windows-latest ✓ macos-latest |
 
@@ -534,6 +534,10 @@ bun test packages/mcp/__tests__/mcp-host.test.ts
 - 同名工具和重复 index 不再覆盖历史卡片。
 - 权限弹窗支持允许、始终允许和拒绝。
 - 终端退出流程恢复 raw mode、鼠标和光标状态。
+
+### Provider 与 API
+
+- **Zen 401 修复**：tier 系统的 `recommendedModel`（`deepseek-v4-flash`）覆盖了用户为 Zen 选择的模型（如 `mimo-v2.5-free`），但 `deepseek-v4-flash` 在 Zen API 上不存在，Zen 返回 401 "Missing API key"。修复方式：`loop.ts:74` 模型覆盖只在 `provider === "deepseek"` 或未指定时生效，第三方 provider 不受影响。
 
 ### T21-R：斜杠命令补全键盘事件冲突
 
