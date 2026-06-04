@@ -1,21 +1,10 @@
-/**
- * DeepiMessages — 消息列表主组件
- * 负责渲染对话时间线中的所有消息与交互卡片。
- * 输入参数：
- *   - timeline: TimelineItem[]，对话时间线数组，包含纯消息和 turn（助手工作单元）两种类型
- * 内部状态：
- *   - detailsOpen: boolean，全局控制是否展开推理过程、工具调用等细节面板
- */
-import React, { useState, memo, useMemo } from 'react';
+import React, { memo, useMemo, useState } from 'react';
 import { Box, Text, useInput } from '@deepicode/ink';
 import type { ChatMessage } from '@deepicode/core';
-import type { TimelineItem, ToolStatus, TurnView } from './bridge.js';
+import type { TimelineItem, ToolStatus } from './bridge.js';
 import { Markdown } from './MarkdownRenderer.js';
 import { Card } from './reasonix/Card.js';
-import { CardHeader } from './reasonix/CardHeader.js';
-import { Spinner } from './reasonix/Spinner.js';
 import { StreamingCard } from './reasonix/StreamingCard.js';
-import { ToolCard, type ToolCardData } from './reasonix/ToolCard.js';
 import { FG, SURFACE, TONE } from './reasonix/tokens.js';
 import { t } from './i18n/index.js';
 
@@ -24,239 +13,317 @@ interface DeepiMessagesProps {
   scrollRef?: React.RefObject<any>;
 }
 
-/**
- * 格式化工具调用的输出内容
- * - 对 bash/shell 类工具，将 JSON stdout/stderr 合并为纯文本
- * - 对 list_dir 工具，将文件/目录列表格式化为行文本
- * - 包含 message/error/content 字段的 JSON 直接提取字符串值
- * - 兜底返回原始 output 字符串
- */
+function markdownText(text: string): React.ReactNode {
+  if (!text) return null;
+  return <Markdown text={text} />;
+}
+
+function summarizeJsonValue(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, 5)
+      .map(item => summarizeJsonValue(item))
+      .filter(Boolean)
+      .join('\n');
+  }
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, item]) => item !== undefined && item !== null)
+      .slice(0, 6);
+    return entries
+      .map(([key, item]) => {
+        const summary = summarizeJsonValue(item);
+        return summary ? `${key}: ${summary}` : key;
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+  return '';
+}
+
 function formatToolOutput(tool: ToolStatus): string {
-  let parsed: Record<string, unknown> | null = null;
+  let parsed: unknown = null;
   try { parsed = JSON.parse(tool.output); } catch {}
 
   if (tool.name === 'bash' || tool.name === 'shell' || tool.name === 'shell_exec') {
-    if (parsed) {
-      const stdout = String(parsed.stdout ?? '');
-      const stderr = String(parsed.stderr ?? '');
-      return stdout + (stderr.trim() ? `\n${stderr}` : '');
-    }
-    return tool.output;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return tool.output;
+    const record = parsed as Record<string, unknown>;
+    const stdout = String(record.stdout ?? '');
+    const stderr = String(record.stderr ?? '');
+    return stdout + (stderr.trim() ? `\n${stderr}` : '');
   }
 
-  if (tool.name === 'list_dir' && parsed) {
-    const items = parsed.items as Array<Record<string, unknown>> | undefined;
+  if (tool.name === 'list_dir' && parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+    const items = (parsed as Record<string, unknown>).items as Array<Record<string, unknown>> | undefined;
     if (Array.isArray(items)) {
       return items.map(item => item.type === 'dir' ? `${String(item.name ?? '')}/` : String(item.name ?? '')).join('\n');
     }
   }
 
-  if (parsed) {
-    const msg = parsed.message ?? parsed.error ?? parsed.content;
-    if (typeof msg === 'string') return msg;
-    return JSON.stringify(parsed, null, 2);
+  if (!parsed) return tool.output;
+  if (typeof parsed !== 'object' || Array.isArray(parsed)) return summarizeJsonValue(parsed);
+  const record = parsed as Record<string, unknown>;
+  const msg = record.message ?? record.error ?? record.content;
+  if (typeof msg === 'string') return msg;
+  return summarizeJsonValue(parsed);
+}
+
+function displayToolName(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower === 'bash' || lower === 'shell' || lower === 'shell_exec') return 'Bash';
+  if (lower === 'read_file' || lower === 'read') return 'Read';
+  if (lower === 'write_file' || lower === 'create_file' || lower === 'write') return 'Write';
+  if (lower === 'edit' || lower === 'apply_patch') return 'Edit';
+  if (lower === 'list_dir' || lower === 'ls') return 'List';
+  if (lower === 'grep' || lower === 'glob' || lower === 'websearch' || lower === 'web_search') return 'Search';
+  if (lower === 'webfetch' || lower === 'web_fetch') return 'Fetch';
+  if (lower === 'skill') return 'Skill';
+  if (lower === 'agenttool' || lower === 'taskcreate') return 'Task';
+  return name;
+}
+
+function firstString(args: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = args[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  }
+  return undefined;
+}
+
+function compactText(value: string, max = 90): string {
+  const singleLine = value.replace(/\s+/g, ' ').trim();
+  return singleLine.length > max ? `${singleLine.slice(0, max - 1)}…` : singleLine;
+}
+
+function formatToolUseSummary(tool: ToolStatus): string {
+  const name = tool.name.toLowerCase();
+  const args = tool.args;
+
+  if (name === 'bash' || name === 'shell' || name === 'shell_exec') {
+    return compactText(firstString(args, ['command', 'cmd', 'script']) ?? '');
+  }
+  if (name === 'read_file' || name === 'write_file' || name === 'create_file' || name === 'edit') {
+    return compactText(firstString(args, ['path', 'file_path', 'filename']) ?? '');
+  }
+  if (name === 'list_dir') {
+    return compactText(firstString(args, ['path', 'dir', 'directory']) ?? '.');
+  }
+  if (name === 'grep' || name === 'glob') {
+    const pattern = firstString(args, ['pattern', 'query']) ?? '';
+    const path = firstString(args, ['path', 'include', 'glob']) ?? '';
+    return compactText([pattern && `"${pattern}"`, path].filter(Boolean).join(' in '));
+  }
+  if (name === 'webfetch' || name === 'web_fetch') {
+    return compactText(firstString(args, ['url']) ?? '');
+  }
+  if (name === 'websearch' || name === 'web_search') {
+    return compactText(firstString(args, ['query', 'q']) ?? '');
+  }
+  if (name === 'skill') {
+    const command = firstString(args, ['command']) ?? '';
+    const query = firstString(args, ['query', 'name']) ?? '';
+    return compactText([command, query].filter(Boolean).join(' '));
+  }
+  if (name === 'agenttool' || name === 'taskcreate') {
+    return compactText(firstString(args, ['description', 'task', 'prompt']) ?? '');
   }
 
-  return tool.output;
+  const preferred = firstString(args, ['path', 'file_path', 'command', 'query', 'pattern', 'url', 'name', 'description']);
+  if (preferred) return compactText(preferred);
+  const keys = Object.keys(args);
+  return keys.length > 0 ? compactText(keys.join(', ')) : '';
 }
 
-/**
- * 消息正文渲染组件
- * 将纯文本通过 Markdown 解析器渲染为格式化内容。
- * 使用 useMemo 缓存解析结果，避免 text 未变化时重复解析。
- */
-function MessageContent({ text }: { text: string }) {
-  const tokens = useMemo(() => text, [text]);
-  if (!tokens) return null;
-  return <Markdown text={tokens} />;
+function formatToolResultSummary(tool: ToolStatus): string {
+  const output = formatToolOutput(tool).trim();
+  if (!output) return tool.status === 'error' ? 'Error' : 'Done';
+  const lines = output.split('\n').map(line => line.trim()).filter(Boolean);
+  if (lines.length === 0) return tool.status === 'error' ? 'Error' : 'Done';
+  const maxLines = tool.status === 'error' ? 3 : 2;
+  return lines.slice(0, maxLines).map(line => compactText(line, 120)).join('\n');
 }
 
-/**
- * ReasoningCard — 思考过程卡片
- * 显示模型的推理/思考过程，用户可通过打开/关闭控制详细内容的可见性。
- * 输入参数：
- *   - text: string，推理文本内容
- *   - isOpen: boolean，是否展开显示详情
- * 视觉说明：
- *   - 折叠时仅显示标题行和 ▶ 图标，右侧提示按 Ctrl+O 展开
- *   - 展开时 ▼ 图标 + 缩进的灰色文本显示详细推理
- */
-const MemoizedReasoningCard = memo(function ReasoningCard({ text, isOpen }: { text: string; isOpen: boolean }) {
+const UserMessage = memo(function UserMessage({ message }: { message: ChatMessage }) {
   return (
     <Card>
-      <CardHeader
-        glyph={isOpen ? '\u25BC' : '\u25B6'}
-        tone={TONE.accent}
-        title={t().thinking}
-        right={!isOpen ? <Text dimColor>{t().ctrlO}</Text> : undefined}
-      />
-      {isOpen && (
-        <Box marginTop={1} paddingLeft={2}>
-          <Text color={FG.sub} wrap="wrap">{text}</Text>
-        </Box>
-      )}
+      <Box flexDirection="row" backgroundColor={SURFACE.bgInput} paddingX={1} paddingY={1}>
+        <Text bold color={TONE.brand}>{'\u276F '}</Text>
+        <Box flexGrow={1}>{markdownText(message.content ?? '')}</Box>
+      </Box>
     </Card>
   );
 });
 
-/**
- * ToolUseSection — 工具调用列表区域
- * 展示同一次助手回复中执行的所有工具调用。
- * 输入参数：
- *   - tools: ToolStatus[]，该次回复中的工具调用列表
- *   - isOpen: boolean，是否展开显示详情
- * 内部处理：
- *   - 遍历 tools，将每个 ToolStatus 转为 ToolCardData 传给 ToolCard 组件
- *   - 根据 tool.status 决定 exitCode：error 状态为 1，done 为 0，running 则 undefined
- */
-const MemoizedToolUseSection = memo(function ToolUseSection({ tools, isOpen }: { tools: ToolStatus[]; isOpen: boolean }) {
-  if (tools.length === 0) return null;
+const AssistantTextMessage = memo(function AssistantTextMessage({ text }: { text: string }) {
+  if (!text) return null;
   return (
-    <Card>
-      <CardHeader
-        glyph={isOpen ? '\u25BC' : '\u25B6'}
-        tone={TONE.brand}
-        title={t().toolUse}
-        meta={[`${tools.length}`]}
-        right={!isOpen ? <Text dimColor>{t().ctrlO}</Text> : undefined}
-      />
-      {isOpen && (
+    <Box flexDirection="row" width="100%" paddingX={1} paddingY={1}>
+      <Box minWidth={2}>
+        <Text color={TONE.ok}>{'\u2039'}</Text>
+      </Box>
+      <Box flexDirection="column" flexGrow={1}>
+        {markdownText(text)}
+      </Box>
+    </Box>
+  );
+});
+
+const AssistantThinkingMessage = memo(function AssistantThinkingMessage({
+  text,
+  isStreaming,
+  startTs,
+  expanded,
+}: {
+  text: string;
+  isStreaming: boolean;
+  startTs: number;
+  expanded: boolean;
+}) {
+  if (!text) return null;
+  if (isStreaming) {
+    return <StreamingCard text={text} startTs={startTs} title={t().thinking} />;
+  }
+  if (!expanded) {
+    return (
+      <Box paddingX={1}>
+        <Text dimColor italic>{'\u2234'} {t().thinking} </Text>
+        <Text dimColor>{t().ctrlO}</Text>
+      </Box>
+    );
+  }
+  return (
+    <Box flexDirection="column" width="100%" paddingX={1}>
+      <Text dimColor italic>{'\u2234'} {t().thinking}</Text>
+      <Box paddingLeft={2}>
+        <Markdown text={text} />
+      </Box>
+    </Box>
+  );
+});
+
+const AssistantToolUseMessage = memo(function AssistantToolUseMessage({
+  tool,
+  expanded,
+}: {
+  tool: ToolStatus;
+  expanded: boolean;
+}) {
+  const name = displayToolName(tool.name);
+  const summary = formatToolUseSummary(tool);
+  const result = formatToolResultSummary(tool);
+  const color = tool.status === 'error' ? TONE.err : tool.status === 'running' ? TONE.brand : TONE.ok;
+  const glyph = tool.status === 'running' ? '\u25CF' : tool.status === 'error' ? '\u2717' : '\u2713';
+
+  return (
+    <Box flexDirection="column" width="100%" paddingX={1}>
+      <Box flexDirection="row" flexWrap="wrap">
+        <Text color={color}>{glyph} </Text>
+        <Text bold color={color}>{name}</Text>
+        {summary && <Text>({summary})</Text>}
+        <Text dimColor>{tool.elapsedMs !== undefined ? ` ${(tool.elapsedMs / 1000).toFixed(1)}s` : ''}</Text>
+      </Box>
+      {(tool.status === 'running' || expanded || tool.status === 'error') && result && (
         <Box flexDirection="column" paddingLeft={2}>
-          {tools.map(tool => {
-            const card: ToolCardData = {
-              id: tool.key,
-              name: tool.name,
-              args: tool.args,
-              output: formatToolOutput(tool),
-              exitCode: tool.status === 'error' ? 1 : tool.status === 'done' ? 0 : undefined,
-              done: tool.status !== 'running',
-              elapsedMs: tool.elapsedMs,
-            };
-            return <ToolCard key={tool.key} card={card} isInflight={tool.status === 'running'} />;
-          })}
-        </Box>
-      )}
-    </Card>
-  );
-});
-
-/**
- * PlainMessage — 单条消息渲染组件
- * 处理 user 和 assistant 两种角色的消息显示。
- * 输入参数：
- *   - message: ChatMessage，包含 role、content、reasoning_content 等字段
- *   - detailsOpen?: boolean，是否展开推理过程详情
- * 视觉说明：
- *   - 用户消息: 带背景色 (SURFACE.bgInput) 的卡片，❯ 图标 + brand 色
- *   - 助手消息: 包含可折叠的推理卡片 + 正文内容卡片
- */
-const MemoizedPlainMessage = memo(function PlainMessage({ message, detailsOpen = false }: { message: ChatMessage; detailsOpen?: boolean }) {
-  if (message.role === 'user') {
-    return (
-      <Card>
-        <Box flexDirection="row" backgroundColor={SURFACE.bgInput} paddingX={1} paddingY={1}>
-          <Text bold color={TONE.brand}>{'\u276F '}</Text>
-          <Box flexGrow={1}><MessageContent text={message.content ?? ''} /></Box>
-        </Box>
-      </Card>
-    );
-  }
-  if (message.role === 'assistant') {
-    return (
-      <>
-        {message.reasoning_content && (
-          <MemoizedReasoningCard text={message.reasoning_content} isOpen={detailsOpen} />
-        )}
-        <Card>
-          <Box flexDirection="column" paddingX={1} paddingY={1}>
-            <CardHeader glyph={'\u2022 ' } tone={TONE.ok} title={t().assistant} />
-            <Box paddingLeft={2}><MessageContent text={message.content ?? ''} /></Box>
-          </Box>
-        </Card>
-      </>
-    );
-  }
-  return null;
-});
-
-/**
- * Turn — 单个完整助手工作单元
- * 展示一次助手回复的完整生命周期：用户问题 → 推理过程 → 工具调用 → 流式/完整回复。
- * 输入参数：
- *   - turn: TurnView，包含用户文本、助手文本、推理文本、流式文本、工具调用列表、时间戳等
- *   - detailsOpen: boolean，全局控制推理和工具调用的展开状态
- * 状态分支说明：
- *   - showDetails = isLoading || detailsOpen — 加载中总是显示详情
- *   - streamingText !== null → 使用 StreamingCard 实时展示；否则使用完整回复卡片
- *   - 仅当加载中且没有任何内容时显示纯 Spinner
- */
-const MemoizedTurn = memo(function Turn({ turn, detailsOpen }: { turn: TurnView; detailsOpen: boolean }) {
-  const showDetails = turn.isLoading || detailsOpen;
-  const userMsg = useMemo<ChatMessage>(() => ({ role: 'user', content: turn.userText }), [turn.userText]);
-  const assistantMsg = useMemo<ChatMessage | null>(
-    () => turn.assistantText ? { role: 'assistant', content: turn.assistantText } : null,
-    [turn.assistantText]
-  );
-
-  return (
-    <Box flexDirection="column">
-      <MemoizedPlainMessage message={userMsg} />
-      {turn.reasoningText && <MemoizedReasoningCard text={turn.reasoningText} isOpen={showDetails} />}
-      <MemoizedToolUseSection tools={turn.tools} isOpen={showDetails} />
-      {(turn.streamingText !== null || assistantMsg) && (
-        turn.streamingText !== null
-          ? <StreamingCard text={turn.streamingText} startTs={turn.startTs} />
-          : (
-            <Card>
-              <Box flexDirection="column" paddingX={1} paddingY={1}>
-                <CardHeader glyph={'\u2039'} tone={TONE.ok} title={t().reply} />
-                <Box paddingLeft={1}>
-                  <MessageContent text={assistantMsg!.content ?? ''} />
-                </Box>
-              </Box>
-            </Card>
-          )
-      )}
-      {!turn.isLoading && turn.elapsedMs !== undefined && (
-        <Box paddingLeft={1}>
-          <Text color={FG.faint}>{`- Worked for ${(turn.elapsedMs / 1000).toFixed(1)}s `}</Text>
-          <Text color={FG.faint}>{'\u2500'.repeat(12)}</Text>
-        </Box>
-      )}
-      {turn.isLoading && turn.streamingText === null && !turn.reasoningText && turn.tools.length === 0 && (
-        <Box>
-          <Spinner kind="braille" color={TONE.brand} bold />
-          <Text color={FG.sub}>{t().thinkingDots}</Text>
+          {result.split('\n').map((line, index) => (
+            <Text key={`${tool.key}:result:${index}`} color={tool.status === 'error' ? TONE.err : FG.sub}>
+              {line}
+            </Text>
+          ))}
         </Box>
       )}
     </Box>
   );
 });
 
-export function DeepiMessages({ timeline }: DeepiMessagesProps) {
-  // detailsOpen: 全局控制所有推理/工具详情区域的展开与折叠
-  const [detailsOpen, setDetailsOpen] = useState(false);
+function ToolResultMessage({ message, expanded }: { message: ChatMessage; expanded: boolean }) {
+  return (
+    <AssistantToolUseMessage
+      tool={{
+        key: message.tool_call_id ?? `tool-${message.name ?? 'unknown'}`,
+        name: message.name ?? 'tool',
+        status: message.is_error ? 'error' : 'done',
+        args: {},
+        output: message.content ?? '',
+        startedAt: Date.now(),
+        elapsedMs: 0,
+      }}
+      expanded={expanded}
+    />
+  );
+}
 
-  // 监听 Ctrl+O 快捷键，切换详情展开状态
-  // \x0f 是 Ctrl+O 的 ASCII 码，同时也显式检查 key.ctrl && input === 'o'
+const MessageBlock = memo(function MessageBlock({
+  item,
+  expanded,
+}: {
+  item: TimelineItem;
+  expanded: boolean;
+}) {
+  switch (item.kind) {
+    case 'message':
+      if (item.message.role === 'user') return <UserMessage message={item.message} />;
+      if (item.message.role === 'assistant') {
+        return (
+          <>
+            <AssistantTextMessage text={item.message.content ?? ''} />
+            {item.message.reasoning_content && (
+              <AssistantThinkingMessage
+                text={item.message.reasoning_content}
+                isStreaming={false}
+                startTs={Date.now()}
+                expanded={expanded}
+              />
+            )}
+          </>
+        );
+      }
+      if (item.message.role === 'tool') return <ToolResultMessage message={item.message} expanded={expanded} />;
+      return null;
+
+    case 'assistant_text':
+      return <AssistantTextMessage text={item.text} />;
+
+    case 'reasoning':
+      return (
+        <AssistantThinkingMessage
+          text={item.text}
+          isStreaming={item.isStreaming}
+          startTs={item.startTs}
+          expanded={expanded}
+        />
+      );
+
+    case 'tool':
+      return <AssistantToolUseMessage tool={item.tool} expanded={expanded} />;
+  }
+});
+
+export function DeepiMessages({ timeline }: DeepiMessagesProps) {
+  const [expanded, setExpanded] = useState(true);
+
   useInput((input, key) => {
     if (input === '\x0f' || (key.ctrl && input === 'o')) {
-      setDetailsOpen(prev => !prev);
+      setExpanded(prev => !prev);
     }
   });
 
   const renderedItems = useMemo(() =>
-    timeline.map(item =>
-      item.kind === 'message'
-        ? <MemoizedPlainMessage key={item.id} message={item.message} detailsOpen={detailsOpen} />
-        : <MemoizedTurn key={item.id} turn={item.turn} detailsOpen={detailsOpen} />
-    ),
-    [timeline, detailsOpen]
+    timeline.map(item => <MessageBlock key={item.id} item={item} expanded={expanded} />),
+    [timeline, expanded]
   );
 
   return (
     <Box flexDirection="column" width="100%" paddingX={1}>
       {renderedItems}
+      {timeline.length === 0 && (
+        <Box paddingX={1}>
+          <Text color={FG.faint}>{''}</Text>
+        </Box>
+      )}
     </Box>
   );
 }

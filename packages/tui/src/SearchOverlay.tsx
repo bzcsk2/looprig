@@ -40,15 +40,15 @@ function collectSearchableText(timeline: TimelineItem[]): SearchResult[] {
   for (const item of timeline) {
     if (item.kind === 'message') {
       const text = item.message.content ?? '';
-      if (text) results.push({ itemId: item.id, source: item.message.role as 'user' | 'assistant', text });
-    } else {
-      const turn = item.turn;
-      if (turn.userText) results.push({ itemId: item.id, source: 'user', text: turn.userText });
-      if (turn.assistantText) results.push({ itemId: item.id, source: 'assistant', text: turn.assistantText });
-      if (turn.reasoningText) results.push({ itemId: item.id, source: 'reasoning', text: turn.reasoningText });
-      for (const tool of turn.tools) {
-        if (tool.output) results.push({ itemId: item.id, source: 'tool', text: tool.output });
-      }
+      if (text && item.message.role === 'user') results.push({ itemId: item.id, source: 'user', text });
+      if (text && item.message.role === 'assistant') results.push({ itemId: item.id, source: 'assistant', text });
+      if (text && item.message.role === 'tool') results.push({ itemId: item.id, source: 'tool', text });
+    } else if (item.kind === 'assistant_text') {
+      if (item.text) results.push({ itemId: item.id, source: 'assistant', text: item.text });
+    } else if (item.kind === 'reasoning') {
+      if (item.text) results.push({ itemId: item.id, source: 'reasoning', text: item.text });
+    } else if (item.kind === 'tool') {
+      if (item.tool.output) results.push({ itemId: item.id, source: 'tool', text: item.tool.output });
     }
   }
   return results;

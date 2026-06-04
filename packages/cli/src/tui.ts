@@ -1,5 +1,6 @@
 import { stdin as input, stdout as output, stderr as errorOutput } from "node:process"
-import { writeSync } from "node:fs"
+import { readFileSync, writeSync } from "node:fs"
+import { resolve } from "node:path"
 import { loadConfig, ReasonixEngine, SessionLoader } from "@deepicode/core"
 import { buildSystemPrompt } from "@deepicode/core"
 import { createDefaultTools, clearReadTracker, normalizePlatform, resolveShellBackend } from "@deepicode/tools"
@@ -124,9 +125,11 @@ async function runPipeMode(engine: ReasonixEngine): Promise<void> {
 }
 
 async function runTUIMode(engine: ReasonixEngine, config: ReturnType<typeof loadConfig>): Promise<void> {
+  const pluginCount = readConfiguredPluginCount()
+  const mcpCount = readConfiguredMcpCount()
   try {
     const { waitUntilExit } = await render(
-      React.createElement(App, { engine, config }),
+      React.createElement(App, { engine, config, pluginCount, mcpCount }),
       { exitOnCtrlC: false }  // Don't let Ink intercept \x03 — we handle SIGINT ourselves
     );
     await waitUntilExit();
@@ -134,6 +137,32 @@ async function runTUIMode(engine: ReasonixEngine, config: ReturnType<typeof load
     // Ensure terminal is restored even if render throws
     try { writeSync(1, '\x1b[?1049l'); } catch {} // EXIT_ALT_SCREEN
     try { writeSync(1, '\x1b[?25h'); } catch {}   // SHOW_CURSOR
+  }
+}
+
+function readConfiguredPluginCount(): number {
+  try {
+    const raw = readFileSync(resolve(process.cwd(), ".deepicode", "plugins.json"), "utf8")
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return 0
+    return parsed.filter((item) => {
+      if (item && typeof item === "object" && !Array.isArray(item)) {
+        return (item as { options?: { enabled?: boolean } }).options?.enabled !== false
+      }
+      return true
+    }).length
+  } catch {
+    return 0
+  }
+}
+
+function readConfiguredMcpCount(): number {
+  try {
+    const raw = readFileSync(resolve(process.cwd(), ".deepicode", "mcp.json"), "utf8")
+    const parsed = JSON.parse(raw) as { mcpServers?: Record<string, unknown> }
+    return Object.keys(parsed.mcpServers ?? {}).length
+  } catch {
+    return 0
   }
 }
 

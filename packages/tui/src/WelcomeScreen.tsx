@@ -30,6 +30,10 @@ interface WelcomeScreenProps {
   provider: string;
   agent: string;
   thinkingMode: string;
+  contextMode: string;
+  skillCount: number;
+  pluginCount: number;
+  mcpCount: number;
 }
 
 /**
@@ -121,9 +125,16 @@ function Row({ label, value }: { label: string; value: React.ReactNode }): React
  * 4. 双列面板（Agent 设置 | 组件状态）
  * 5. 快捷提示
  */
-export function WelcomeScreen({ model, provider, agent, thinkingMode }: WelcomeScreenProps): React.ReactElement {
-  // 推理模式显示：off 显示为 "自动"
-  const thinking = thinkingMode === 'off' ? '自动' : thinkingMode;
+function contextModeLabel(mode: string): string {
+  if (mode === 'trim') return '裁剪';
+  if (mode === 'compact' || mode === 'compress') return '压缩';
+  return mode;
+}
+
+export function WelcomeScreen({ model, provider, agent, thinkingMode, contextMode, skillCount, pluginCount, mcpCount }: WelcomeScreenProps): React.ReactElement {
+  // 推理模式与状态栏保持一致，直接显示 auto/off/open/high。
+  const thinking = thinkingMode || 'off';
+  const context = contextModeLabel(contextMode);
   // 只显示 agent 名称，去掉 " Agent" 后缀
   const agentShort = agent?.replace(/\s+Agent$/i, '') ?? agent;
 
@@ -144,20 +155,21 @@ export function WelcomeScreen({ model, provider, agent, thinkingMode }: WelcomeS
       </Box>
       <Box height={1} />
       {/* 双列面板 */}
-      <Box flexDirection="row" width="60%" justifyContent="space-between">
-        {/* Agent 设置面板 */}
-        <Panel title="Agent设置">
-          <Row label="推理档 " value={thinking} />
-          <Row label="上下文 " value="压缩" />
-          <Row label="子代理 " value={agentShort} />
-        </Panel>
-
-        {/* 组件状态面板 */}
-        <Panel title="组件状态">
-          <Row label="插件:" value={provider} />
-          <Row label="技能:" value="52" />
-          <Row label="MCPs:" value="3" />
-        </Panel>
+      <Box flexDirection="row" width="100%" justifyContent="flex-end">
+        <Box flexDirection="row" width="75%" justifyContent="space-between">
+          {/* Agent 设置面板 */}
+          <Panel title="Agent设置">
+            <Row label="推理档 " value={thinking} />
+            <Row label="上下文 " value={context} />
+            <Row label="子代理 " value={agentShort} />
+          </Panel>
+          {/* 组件状态面板 */}
+          <Panel title="组件状态">
+            <Row label="插件:" value={String(pluginCount)} />
+            <Row label="技能:" value={String(skillCount)} />
+            <Row label="MCPs:" value={String(mcpCount)} />
+          </Panel>
+        </Box>
       </Box>
       <Box height={1} />
       {/* 快捷提示 1 */}

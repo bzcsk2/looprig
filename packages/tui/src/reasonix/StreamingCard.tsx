@@ -35,6 +35,8 @@ interface StreamingCardProps {
   aborted?: boolean;
   startTs: number;
   expanded?: boolean;
+  title?: string;
+  doneTitle?: string;
 }
 
 /**
@@ -75,7 +77,7 @@ function formatRate(tps: number | null): string {
   return t().tps(`${tps}`);
 }
 
-export function StreamingCard({ text, done = false, aborted = false, startTs, expanded = false }: StreamingCardProps): React.ReactElement {
+export function StreamingCard({ text, done = false, aborted = false, startTs, expanded = false, title, doneTitle }: StreamingCardProps): React.ReactElement {
   // 每 1000ms 触发一次重渲染，用于更新经过时间和速率显示
   const [, setTick] = useState(0);
   useInterval(() => setTick(t => t + 1), 1000);
@@ -95,7 +97,7 @@ export function StreamingCard({ text, done = false, aborted = false, startTs, ex
 
   const headColor = aborted ? TONE.err : TONE.brand;
   const glyph = aborted ? '\u2298' : '\u25CF';
-  const headLabel = aborted ? t().aborted : t().writing;
+  const headLabel = aborted ? t().aborted : title ?? t().writing;
 
   // 已完成且未终止：显示完整的 Markdown 渲染结果，不再展示 Spinner
   if (done && !aborted) {
@@ -104,7 +106,7 @@ export function StreamingCard({ text, done = false, aborted = false, startTs, ex
         <CardHeader
           glyph={'\u2039'}
           tone={TONE.ok}
-          title={t().reply}
+          title={doneTitle ?? t().reply}
           right={tps !== null ? <Text dimColor>{formatRate(tps)}</Text> : undefined}
         />
         <Markdown text={text} />

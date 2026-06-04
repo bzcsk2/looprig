@@ -22,6 +22,7 @@ import { SkillModal } from './SkillModal.js';
 import { ContextModal } from './ContextModal.js';
 import { formatStatus } from './status/format.js';
 import { t, setLocale } from './i18n/index.js';
+import { loadTuiSettings, saveTuiSettings } from './settings.js';
 import {
   buildHelpText,
   parseSlashCommand,
@@ -178,6 +179,8 @@ export function getProviderLabel(provider: string): string {
 interface AppProps {
   engine: ReasonixEngine;
   config: DeepicodeConfig;
+  pluginCount?: number;
+  mcpCount?: number;
 }
 
 /**
@@ -193,10 +196,17 @@ interface AppProps {
  * @param engine - ReasonixEngine 实例，驱动 LLM 通信
  * @param config - DeepicodeConfig 配置对象（provider / model / contextWindow 等）
  */
-export function App({ engine, config }: AppProps) {
+export function App({ engine, config, pluginCount = 0, mcpCount = 0 }: AppProps) {
+  const persistedSettings = useMemo(() => loadTuiSettings(), []);
+  const persistedThinkingMode = persistedSettings.thinkingMode && !validateThinkingMode(persistedSettings.thinkingMode)
+    ? persistedSettings.thinkingMode
+    : undefined;
+  const persistedAgent = persistedSettings.agent && AGENTS[persistedSettings.agent]
+    ? persistedSettings.agent
+    : undefined;
   const [bridgeState, setBridgeState] = useState<BridgeState>(() => ({
     ...initialState,
-    thinkingMode: engine.getThinkingMode?.() ?? 'off',
+    thinkingMode: persistedThinkingMode ?? engine.getThinkingMode?.() ?? 'off',
   }));
   const bridge = useMemo(() => createBridge(engine, setBridgeState), [engine]);
   const bridgeRef = useRef(bridge);
@@ -262,11 +272,33 @@ export function App({ engine, config }: AppProps) {
   const [showSkillModal, setShowSkillModal] = useState(false);                   // 是否显示技能管理弹窗覆盖层
   const [showContextModal, setShowContextModal] = useState(false);               // 是否显示上下文策略管理弹窗覆盖层
   const [showSearch, setShowSearch] = useState(false);                           // 是否显示搜索覆盖层（Ctrl+F 触发）
-  const [activeAgent, setActiveAgent] = useState(engine.getAgentName?.() ?? 'build'); // 当前 Agent 名称
-  const [activeSkills, setActiveSkills] = useState(engine.getActiveSkills?.() ?? []); // 当前已启用的技能列表
+  const [activeAgent, setActiveAgent] = useState(persistedAgent ?? engine.getAgentName?.() ?? 'build'); // 当前 Agent 名称
+  const [activeSkills, setActiveSkills] = useState(persistedSettings.activeSkills ?? engine.getActiveSkills?.() ?? []); // 当前已启用的技能列表
   const [inputHistory, setInputHistory] = useState<string[]>([]);                // 输入历史记录（最多 MAX_INPUT_HISTORY 条）
   const [inputInjection, setInputInjection] = useState<{ id: number; text: string } | undefined>(undefined); // 外部注入到输入框的文本
   const [contextPolicy, setContextPolicy] = useState(engine.getContextPolicy()); // 当前上下文策略
+
+  useEffect(() => {
+    if (persistedAgent) {
+      engineRef.current.switchAgent(persistedAgent);
+    }
+    if (persistedThinkingMode) {
+      engineRef.current.setThinkingMode(persistedThinkingMode as any);
+    }
+    if (persistedSettings.activeSkills) {
+      engineRef.current.setActiveSkills(persistedSettings.activeSkills);
+    }
+  }, [persistedAgent, persistedSettings.activeSkills, persistedThinkingMode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void engineRef.current.getContextPolicyAsync().then(policy => {
+      if (!cancelled) {
+        setContextPolicy(policy);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   /** 提交处理：解析用户输入，执行斜杠命令或通过 bridge 发送消息 */
   const handleSubmit = useCallback((text: string) => {
@@ -333,6 +365,7 @@ export function App({ engine, config }: AppProps) {
           return;
         }
         engineRef.current.setThinkingMode(command.mode as any);
+        saveTuiSettings({ thinkingMode: command.mode });
         setBridgeState(prev => ({ ...prev, thinkingMode: command.mode }));
         appendMessage({ role: 'assistant' as const, content: `Thinking mode set to: ${command.mode}` });
         return;
@@ -370,6 +403,7 @@ export function App({ engine, config }: AppProps) {
   const handleAgentChoose = useCallback((next: string) => {
     const label = engineRef.current.switchAgent(next);
     setActiveAgent(next);
+    saveTuiSettings({ agent: next });
     setShowAgentMenu(false);
     appendMessage({ role: 'assistant' as const, content: t().switchedTo(label) });
   }, [appendMessage]);
@@ -389,6 +423,7 @@ export function App({ engine, config }: AppProps) {
       return;
     }
     engineRef.current.setThinkingMode(mode as any);
+    saveTuiSettings({ thinkingMode: mode });
     setBridgeState(prev => ({ ...prev, thinkingMode: mode }));
     setShowThinkingMenu(false);
     appendMessage({ role: 'assistant' as const, content: `Thinking mode set to: ${mode}` });
@@ -528,6 +563,7 @@ export function App({ engine, config }: AppProps) {
         onChange={(skills) => {
           setActiveSkills(skills);
           engineRef.current.setActiveSkills(skills);
+          saveTuiSettings({ activeSkills: skills });
         }}
         onInsertSkill={(skillName) => {
           const text = `#${skillName} `;
@@ -574,6 +610,10 @@ export function App({ engine, config }: AppProps) {
           provider={providerLabel}
           agent={AGENTS[activeAgent]?.label ?? activeAgent}
           thinkingMode={bridgeState.thinkingMode}
+          contextMode={contextPolicy.mode}
+          skillCount={activeSkills.length}
+          pluginCount={pluginCount}
+          mcpCount={mcpCount}
         />
       ) : null}
       {bridgeState.warnings.map((w, i) => (
