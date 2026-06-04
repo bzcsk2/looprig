@@ -99,7 +99,7 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
   let turnCount = 0
   let consecutiveErrors = 0
   const recentToolCalls = createDuplicateDetector()
-  let currentMode: ThinkingMode = thinkingMode
+  let currentMode: ThinkingMode = thinkingMode === "auto" ? "off" : thinkingMode
   let totalToolCalls = 0
 
   while (turnCount < maxTurns) {
@@ -259,7 +259,7 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
             sessionWriter?.enqueue({ ts: Date.now(), type: "event", payload: { role: "done", metadata: { reason } } })
 
             // CL-51: Evaluate thinking mode switch before returning
-            if (modeSelectorState && !signal.aborted) {
+            if (modeSelectorState && !signal.aborted && thinkingMode === "auto") {
               const switchResult = evaluateModeSwitchForTurn(modeSelectorState, currentMode, totalToolCalls, fullContent.length, turnCount, consecutiveErrors, !!streamError)
               if (switchResult.switched) {
                 currentMode = switchResult.to!
@@ -282,7 +282,7 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
     }
 
     // CL-51: Evaluate thinking mode switch after each turn
-    if (modeSelectorState && !signal.aborted) {
+    if (modeSelectorState && !signal.aborted && thinkingMode === "auto") {
       const switchResult = evaluateModeSwitchForTurn(modeSelectorState, currentMode, totalToolCalls, fullContent.length, turnCount, consecutiveErrors, !!streamError)
       if (switchResult.switched) {
         currentMode = switchResult.to!
