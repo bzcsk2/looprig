@@ -1,8 +1,8 @@
 # Deepicode 后续开发建议
 
-最后更新：2026-06-03
+最后更新：2026-06-04
 
-本文只保留后续 Agent 仍需要执行的专项指导。已完成能力以 [DONE.md](DONE.md) 为准；待办入口以 [TODO.md](TODO.md) 为准。
+本文只保留后续 Agent 仍需要执行的专项指导。已完成能力以 [DONE.md](DONE.md) 为准；待办入口以 [TODO.md](TODO.md) 为准；CI 与平台兼容性排查按 [CI-Compatibility-Fix-Guide.md](CI-Compatibility-Fix-Guide.md) 执行。
 
 当前包含两个专项：
 
@@ -63,7 +63,7 @@
    - `packages/tui/src/App.tsx`
 
 2. 补充用户文档：
-   - 在 `README.md` 或 `TEST.md` 增加 `/context` 使用说明。
+   - 在 `README.md` 增加 `/context` 使用说明。
    - 说明 `trim` 是机械裁剪。
    - 说明 `compact` 会调用模型生成 summary，失败会 fallback 到 trim。
    - 说明默认策略是 `70% -> 30%`。

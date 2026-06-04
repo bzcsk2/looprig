@@ -1,9 +1,9 @@
 # Deepicode TODO 与开发交接指南
 
-最后更新：2026-06-03
+最后更新：2026-06-04
 
 本文是后续 Agent 的唯一待办入口，只记录**尚未完成**、**待验收**、**明确暂缓**或**已经驳回**的工作。
-已完成能力和历史实施结论见 [DONE.md](DONE.md)。Context 的专项设计见 [ADVICE.md](ADVICE.md)。
+已完成能力和历史实施结论见 [DONE.md](DONE.md)。Context 的专项设计见 [ADVICE.md](ADVICE.md)。CI 与平台兼容性执行规范见 [CI-Compatibility-Fix-Guide.md](CI-Compatibility-Fix-Guide.md)。
 
 ---
 
@@ -62,7 +62,7 @@ bun test packages/mcp/__tests__/mcp-host.test.ts packages/mcp/__tests__/mcp-tool
 |------|------|------|
 | 1 | `FG-60-R` best-effort 日志收尾 | Find_ground 已完成高风险项，剩余低风险日志和状态接入。 |
 | 2 | `CTX-70` 文档和验收 | CTX-10/30/40/50 已完成，只剩交付验收。 |
-| 3 | `OS-12/13-R` macOS/Windows 原生验收 | 代码层面已就绪，需在原生环境验收。 |
+| 3 | `OS-12/13-R` macOS/Windows 原生体验验收 | 三平台 CI 自动化已通过，仍需真实终端体验确认。 |
 
 不要一次领取多个任务。每个编号完成后都应保持全量测试为绿色。
 
@@ -115,7 +115,7 @@ bun test packages/tools/__tests__/edit.test.ts packages/tools/__tests__/edit-int
 
 执行要求：
 
-1. README 或 TEST.md 增加 `/context` 说明。
+1. README 增加 `/context` 说明。
 2. TODO 记录当前 CTX 阶段。
 3. DONE 记录已完成阶段。
 4. 手工验收 `70% -> 30%` 的 trim 和 compact。
@@ -142,25 +142,27 @@ bun run typecheck
 bun test
 ```
 
-### OS-12/13-R：macOS 与 Windows 原生验收
+### OS-12/13-R：macOS 与 Windows 原生体验验收
 
-优先级：`P1`。三平台 CI 已通过后执行。
+优先级：`P1`。三平台 CI 自动化已通过；本项只保留真实终端和系统集成体验确认。
 
 当前状态：
 
 - 路径、文件 URL、权限位和 Monitor backend 的代码层已完成。
-- 原生平台行为仍需按 `TEST.md` 的 `G3` 与 `H8` 验收。
+- 最新 CI 已确认 `ubuntu-latest`、`macos-latest`、`windows-latest` 全部通过。
+- CI 修复和后续排查方法已沉淀到 [CI-Compatibility-Fix-Guide.md](CI-Compatibility-Fix-Guide.md)。
+- 原生平台仍需人工确认真实 TUI、PTY/ConPTY、通知、剪贴板、中文路径和终端显示体验。
 
 执行要求：
 
-1. macOS 验证 Bash、BSD `ps`、`df`、`osascript`、crontab、PTY 和路径边界。
-2. Windows 验证 PowerShell backend、ConPTY、盘符、反斜杠、UNC path、中文与空格路径、进程树、Monitor、Scheduler、通知 fallback 和剪贴板。
-3. GitHub Actions Matrix 只能覆盖自动化部分，不能替代真实终端体验确认。
+1. macOS 验证 Bash、BSD `ps`、`df`、`osascript`、crontab、PTY、路径边界和 TUI 显示。
+2. Windows 验证 PowerShell backend、ConPTY、盘符、反斜杠、UNC path、中文与空格路径、进程树、Monitor、Scheduler、通知 fallback、剪贴板和 TUI 显示。
+3. GitHub Actions Matrix 已覆盖自动化部分，但不能替代真实终端体验确认。
 
 关闭条件：
 
-- `TEST.md` 中目标平台对应的 `G3` 自动化项通过。
-- 项目负责人完成目标平台对应的 `H8` 人工验收。
+- CI 最新 master run 三平台 success。
+- 项目负责人完成目标平台人工验收。
 - 结果写入 `DONE.md`。
 
 
@@ -176,6 +178,7 @@ bun test
 - CTX-70：文档和验收 ⬜ 待开始
 - FG-20/30/40/50/70：隐性兜底高风险项 ✅ 已完成
 - FG-60-R：best-effort 日志收尾 ⬜ 待开始
+- CI/平台自动化：`6379767` 对应 run `26928659701` 三平台 ✅ 已通过
 
 下一步：执行 `FG-60-R` 或 `CTX-70`。
 

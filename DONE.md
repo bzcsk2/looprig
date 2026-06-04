@@ -1,6 +1,6 @@
 # Deepicode 完成记录
 
-最后更新：2026-06-03
+最后更新：2026-06-04
 
 本文只记录当前代码中仍然成立的已完成功能和已验证修复。
 未完成、待验收、明确暂缓和已驳回方案统一见 [TODO.md](TODO.md)。当前后续专项交接见 [ADVICE.md](ADVICE.md)。
@@ -9,7 +9,7 @@
 
 ## 1. 当前验证基线
 
-本次整理时实际运行：
+本次同步依据最新 GitHub Actions 与最近一次本地全量验证：
 
 ```bash
 bun run typecheck
@@ -20,10 +20,17 @@ bun test
 
 | 检查项 | 状态 |
 |--------|------|
-| TypeScript | `bun run typecheck` 通过 |
-| 测试 | `969 pass / 0 fail / 18 skip`，共 `74` 个测试文件 |
+| TypeScript | 最新 CI `bun run typecheck` 通过 |
+| 测试 | 最新 CI Ubuntu：`1050 pass / 0 fail / 18 skip`，共 `78` 个测试文件 |
 | 稳定性 | 连续 3 次全绿（TEST-STABILITY-01 已关闭） |
-| CI | ✓ ubuntu-latest ✓ windows-latest ✓ macos-latest（OS-17-R 已关闭） |
+| CI | 最新 master run `26928659701`：✓ ubuntu-latest ✓ windows-latest ✓ macos-latest |
+
+最新已验证提交：
+
+- `6379767 docs: update ci green baseline`
+- GitHub Actions: `https://github.com/bzcsk2/deepicode/actions/runs/26928659701`
+- 真实代码 checkpoint：`c61cb0e chore: checkpoint full project state`
+- CI 修复指南：[CI-Compatibility-Fix-Guide.md](CI-Compatibility-Fix-Guide.md)
 
 ---
 
@@ -931,7 +938,7 @@ bun test packages/mcp/__tests__/mcp-host.test.ts
 
 `TEST-STABILITY-01` 和 `OS-17-R` 已完成并记录在本文。仍未完成的原生平台人工验收见 `TODO.md`。
 
-2026-06-03 后，`ADVICE.md` 只保留仍需交接执行的专项。当前只剩 Context 的 `CTX-70` 文档和验收。
+2026-06-04 后，`ADVICE.md` 只保留仍需交接执行的专项。当前剩余 Context 的 `CTX-70` 文档/人工验收和 FG best-effort 日志收尾。
 
 ### 6.1 LSP 专项进度
 
@@ -966,7 +973,7 @@ bun test packages/mcp/__tests__/mcp-host.test.ts
 | PLG-30：tool adapter | ✅ 已完成 | tool-adapter.ts、schema 转换、9 个测试 |
 | PLG-40：hook adapter | ✅ 已完成 | hook-adapter.ts、PluginHookRegistry、10 个测试 |
 | PLG-50：CLI 集成和生命周期 | ✅ 已完成 | runtime.ts、PluginRuntime、7 个测试 |
-| PLG-60：文档和验收 | ✅ 已完成 | README、examples、TEST.md |
+| PLG-60：文档和验收 | ✅ 已完成 | README、examples、历史验收记录 |
 
 ---
 
@@ -977,7 +984,7 @@ bun test packages/mcp/__tests__/mcp-host.test.ts
 | STAT-10：Core 状态快照 | ✅ 已完成 | EngineStatusSnapshot、getStatusSnapshot()、8 个测试 |
 | STAT-20：Slash command 接入 | ✅ 已完成 | /status 命令、format.ts、6 个测试 |
 | STAT-30：Codex 风格格式化 | ✅ 已完成 | format.ts 增强、Unicode/ASCII、16 个测试 |
-| STAT-40：文档和验收 | ✅ 已完成 | README、TEST.md、G0-04 |
+| STAT-40：文档和验收 | ✅ 已完成 | README、历史验收记录、G0-04 |
 
 ---
 

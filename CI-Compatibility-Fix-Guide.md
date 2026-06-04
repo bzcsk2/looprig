@@ -16,12 +16,12 @@
 
 最新已通过提交：
 
-- `cbe7d40 docs: add ci compatibility fix guide`
+- `6379767 docs: update ci green baseline`
 
 最新已通过 GitHub Actions run：
 
-- `26928492923`
-- URL: `https://github.com/bzcsk2/deepicode/actions/runs/26928492923`
+- `26928659701`
+- URL: `https://github.com/bzcsk2/deepicode/actions/runs/26928659701`
 - 结论: `success`
 - 平台:
   - `ubuntu-latest`: success
