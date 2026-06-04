@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit --project tsconfig.json"
   },
   "devDependencies": {
+    "@types/figlet": "^1.7.0",
     "@types/lodash-es": "^4.17.12",
     "@types/node": "^22.0.0",
     "@types/react": "^19.2.15",
@@ -29,6 +30,7 @@
     "cli-boxes": "^4.0.1",
     "code-excerpt": "^4.0.0",
     "emoji-regex": "^10.6.0",
+    "figlet": "^1.11.0",
     "figures": "^6.1.0",
     "get-east-asian-width": "^1.6.0",
     "indent-string": "^5.0.0",

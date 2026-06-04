@@ -1,3 +1,14 @@
+/**
+ * ModelPicker — 模型选择弹窗
+ *
+ * 功能：引导用户分三步选择 AI 模型：选择提供商 → 输入 API Key（如需）→ 选择模型。
+ * 通过 step 状态控制当前展示步骤，支持键盘上下键导航、回车确认、Esc 返回/取消。
+ *
+ * @param currentProvider - 当前已选的提供商 ID
+ * @param currentModel - 当前已选的模型名称
+ * @param onSelect - 确认选择后的回调，传入 { provider, model, apiKey, baseUrl }
+ * @param onCancel - 用户按 Esc 取消时的回调
+ */
 import { useState, useCallback } from 'react';
 import { Box, Text, useInput } from '@deepicode/ink';
 import { PROVIDERS, getApiKeyEnvVar } from '@deepicode/core';
@@ -11,10 +22,17 @@ interface ModelPickerProps {
   onCancel: () => void;
 }
 
+/** 当前所处的选择步骤：'provider' 选择提供商，'key' 输入 API Key，'model' 选择具体模型 */
 type Step = 'provider' | 'key' | 'model';
 
+/** 提供商列表的显示顺序，数组索引同时也决定了键盘上下键的选中顺序 */
 const PROVIDER_ORDER = ['zen', 'deepseek', 'mimo'];
 
+/**
+ * tryReadClipboard — 尝试从系统剪贴板读取文本
+ * 按平台依次尝试：macOS 用 pbpaste，Windows 用 powershell Get-Clipboard，Linux 用 wl-paste / xclip / xsel
+ * 用于在输入 API Key 时支持 Ctrl+V 粘贴操作
+ */
 async function tryReadClipboard(): Promise<string | null> {
   const platform = process.platform;
   const cmds: Array<{ bin: string; args: string[] }> = [];
@@ -41,13 +59,26 @@ async function tryReadClipboard(): Promise<string | null> {
 }
 
 export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel }: ModelPickerProps) {
+  /** 当前步骤：提供商选择 → 输入 Key → 模型选择 */
   const [step, setStep] = useState<Step>('provider');
+  /** 当前选中的列表项索引，用于上下键导航 */
   const [selIdx, setSelIdx] = useState(Math.max(0, PROVIDER_ORDER.indexOf(currentProvider)));
+  /** 用户选中的提供商 ID */
   const [selProvider, setSelProvider] = useState(currentProvider);
+  /** 用户选中的模型名称 */
   const [selModel, setSelModel] = useState(currentModel);
+  /** 用户输入的 API Key */
   const [apiKey, setApiKey] = useState('');
+  /** 输入缓存区，用于收集键盘字符输入（也支持终端的 bracketed paste 多字符粘贴） */
   const [inputBuf, setInputBuf] = useState('');
 
+  /**
+   * confirmSelection — 确认并提交选择结果
+   * @param modelOverride - 可选，用于覆盖当前选中的模型（直接回车选择时传入）
+   *
+   * model 优先级：显式传入的 modelOverride > 已缓存的 selModel > 提供商默认模型
+   * apiKey 优先级：用户输入的 apiKey > 环境变量中的 Key > 提供商预设的 defaultKey
+   */
   const confirmSelection = useCallback((modelOverride?: string) => {
     const cfg = PROVIDERS[selProvider];
     if (!cfg) return;
@@ -60,6 +91,12 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
     });
   }, [selProvider, selModel, apiKey, onSelect]);
 
+  /**
+   * goBack — 返回上一步
+   * - 如果在第一步（provider），则取消整个弹窗
+   * - 如果在 key 输入步骤，清空输入缓存后退回提供商选择
+   * - 如果在 model 选择步骤：若当前提供商必须输入 Key 且尚未提供，则退回 key 步骤；否则直接退回提供商选择
+   */
   const goBack = useCallback(() => {
     if (step === 'provider') {
       onCancel();
@@ -68,6 +105,7 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
       setStep('provider');
     } else {
       const p = PROVIDERS[selProvider];
+      // 若提供商需要 Key、无默认 Key 且环境变量中也没有，则退回 key 输入步骤让用户输入
       if (p && p.requiresKey && !p.defaultKey && !process.env[getApiKeyEnvVar(selProvider)]) {
         setSelIdx(0);
         setStep('key');
@@ -102,6 +140,7 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
         setSelProvider(p);
         setSelModel(PROVIDERS[p].models[0]?.model ?? '');
         setInputBuf('');
+        // 如果该提供商要求 Key、没有默认 Key 且环境变量未设置 → 跳到 key 输入页面；否则直接进入模型选择
         if (PROVIDERS[p].requiresKey && !PROVIDERS[p].defaultKey && !process.env[getApiKeyEnvVar(p)]) {
           setStep('key');
         } else {
@@ -131,7 +170,7 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
         return;
       }
       if (_input) {
-        // Multi-character input = bracketed paste from terminal
+        // Multi-character input = bracketed paste from 
         setInputBuf(prev => prev + _input);
       }
       return;
@@ -163,6 +202,7 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
   const models = PROVIDERS[selProvider]?.models ?? [];
 
   return (
+    // 主容器：纵向排列，圆角边框，padding 1，宽度 100%
     <Box flexDirection="column" paddingX={1} paddingY={1} borderStyle="round" width="100%">
       <Box marginBottom={1}>
         <Text bold>{t().modelSettings}</Text>
@@ -170,13 +210,16 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
 
       {step === 'provider' && (
         <Box flexDirection="column">
+          {/* dimColor 表示辅助性提示文字，降低视觉权重 */}
           <Text dimColor>{t().selectProvider}</Text>
           {PROVIDER_ORDER.map((p, i) => {
             const info = PROVIDERS[p];
             if (!info) return null;
             return (
               <Box key={p}>
+                {/* ❯ 表示当前选中项；未选中时保留两个空格占位保持对齐 */}
                 <Text>{i === selIdx ? '❯ ' : '  '}</Text>
+                {/* bold 加粗当前选中项的标签，提供视觉焦点 */}
                 <Text bold={i === selIdx}>{info.label}</Text>
                 {p === currentProvider && <Text dimColor>{t().current}</Text>}
               </Box>
@@ -188,6 +231,7 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
       {step === 'key' && (
         <Box flexDirection="column">
           <Text dimColor>{t().enterApiKey(providerName)}</Text>
+          {/* inputBuf 显示当前输入内容，▊ 为光标指示符；无输入时不显示光标 */}
           <Text>  {inputBuf}{inputBuf.length > 0 ? '▊' : ''}</Text>
           <Text dimColor>{t().escToGoBack}</Text>
         </Box>
@@ -195,10 +239,12 @@ export function ModelPicker({ currentProvider, currentModel, onSelect, onCancel 
 
       {step === 'model' && (
         <Box flexDirection="column">
+          {/* dimColor 降低提示文字亮度，不干扰列表内容 */}
           <Text dimColor>{t().selectModel(providerName)}</Text>
           {models.map((m, i) => (
             <Box key={m.model}>
               <Text>{i === selIdx ? '❯ ' : '  '}</Text>
+              {/* bold 高亮当前选中的模型名称 */}
               <Text bold={i === selIdx}>{m.label}</Text>
               {m.model === currentModel && <Text dimColor>{t().current}</Text>}
             </Box>

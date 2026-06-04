@@ -1,11 +1,21 @@
 import React, { type ReactNode } from 'react';
-import { Box, ScrollBox, Text, type ScrollBoxHandle } from '@deepicode/ink';
+import { Box, ScrollBox, type ScrollBoxHandle } from '@deepicode/ink';
 import { isFullscreenEnvEnabled } from './fullscreen.js';
-import { FG, SURFACE, TONE } from './reasonix/tokens.js';
+import { SURFACE } from './reasonix/tokens.js';
 
+/**
+ * FullscreenLayout —— 全屏布局容器
+ *
+ * 根据终端是否支持全屏，决定以横向（side-by-side）还是纵向（垂直堆叠）方式排布子区域。
+ * 包含可滚动内容区和底部固定区域。
+ * 所有 box-sizing、overflow、尺寸相关参数调整都会影响整体显示效果。
+ */
 type Props = {
+  /** 主内容区——可滚动的内容，放在 ScrollBox 中渲染 */
   scrollable: ReactNode;
+  /** 底部区域——固定在底部，不滚动，通常用于状态栏/提示/输入行等 */
   bottom: ReactNode;
+  /** 可选的 ScrollBox 引用句柄，外部可通过它控制滚动位置 */
   scrollRef?: React.RefObject<ScrollBoxHandle | null>;
 };
 
@@ -14,7 +24,6 @@ export function FullscreenLayout({ scrollable, bottom, scrollRef }: Props): Reac
     return (
       <Box flexDirection="row" flexGrow={1} overflow="hidden" width="100%" backgroundColor={SURFACE.bg}>
         <Box flexDirection="column" flexGrow={1} overflow="hidden">
-          <TerminalHeader />
           <Box flexGrow={1} flexDirection="column" overflow="hidden">
             <ScrollBox ref={scrollRef} flexGrow={1} flexDirection="column" paddingTop={1} stickyScroll>
               {scrollable}
@@ -32,7 +41,6 @@ export function FullscreenLayout({ scrollable, bottom, scrollRef }: Props): Reac
 
   return (
     <Box flexDirection="column" flexGrow={1} overflow="hidden" width="100%" backgroundColor={SURFACE.bg}>
-      <TerminalHeader />
       <Box flexGrow={1} flexDirection="column" overflow="hidden">
         <ScrollBox ref={scrollRef} flexGrow={1} flexDirection="column" paddingTop={1} stickyScroll>
           {scrollable}
@@ -43,19 +51,6 @@ export function FullscreenLayout({ scrollable, bottom, scrollRef }: Props): Reac
           {bottom}
         </Box>
       </Box>
-    </Box>
-  );
-}
-
-export function TerminalHeader(): React.ReactElement {
-  return (
-    <Box width="100%" flexDirection="row" backgroundColor={SURFACE.bgCode} paddingX={1}>
-      <Text color={TONE.err}>{'\u25CF '}</Text>
-      <Text color={TONE.warn}>{'\u25CF '}</Text>
-      <Text color={TONE.ok}>{'\u25CF'}</Text>
-      <Box flexGrow={1} />
-      <Text color={FG.meta}>deepicode agent terminal</Text>
-      <Box flexGrow={1} />
     </Box>
   );
 }

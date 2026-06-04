@@ -1,7 +1,6 @@
 import React from 'react';
 import { Box, Text } from '@deepicode/ink';
 import { FG, TONE } from './reasonix/tokens.js';
-import figlet from 'figlet';
 
 /**
  * WelcomeScreen 组件 - 欢迎界面
@@ -33,23 +32,23 @@ interface WelcomeScreenProps {
 }
 
 /**
- * Logo 组件 - Figlet ASCII Art DEEPICODE 文字
+ * Logo 组件 - 渐变色 DEEPICODE 文字
  *
- * 使用 figlet ANSI Regular 字体渲染（实心方块字符），
- * 每行使用不同的渐变色，从蓝色过渡到紫色。
+ * 每个字母使用不同的渐变色，从蓝色过渡到紫色
+ * 显示参数：每个字母使用独立的 color 属性
  */
 function Title(): React.ReactElement {
-  const ascii = figlet.textSync('deepseek', { font: 'ANSI Regular' });
-  // 去除末尾换行，按行分割
-  const lines = ascii.replace(/\n$/, '').split('\n');
-  // 渐变色列表：从蓝色到紫色
-  const colors: any[] = ['#4FA3F7', '#5C94F9', '#6985FA', '#7676FC', '#866FFB', '#9868F9', '#B064F6', '#C15FF3', '#CA5FF2'];
-
   return (
-    <Box flexDirection="column" justifyContent="center">
-      {lines.map((line, i) => (
-        <Text key={i} bold color={colors[i % colors.length]}>{line}</Text>
-      ))}
+    <Box flexDirection="row" justifyContent="center">
+      <Text bold color="#4FA3F7">D </Text>
+      <Text bold color="#5C94F9">E </Text>
+      <Text bold color="#6985FA">E </Text>
+      <Text bold color="#7676FC">P </Text>
+      <Text bold color="#866FFB">I </Text>
+      <Text bold color="#9868F9">C </Text>
+      <Text bold color="#B064F6">O </Text>
+      <Text bold color="#C15FF3">D </Text>
+      <Text bold color="#CA5FF2">E</Text>
     </Box>
   );
 }
@@ -75,20 +74,34 @@ function CheckValue({ children }: { children: React.ReactNode }): React.ReactEle
 }
 
 /**
- * 面板组件 - 无边框信息面板
+ * 面板组件 - 带边框的信息面板
  *
- * 简洁无边框设计：
- * - 标题使用琥珀色加粗文字
- * - 内容直接排列在标题下方
+ * 【显示参数】
+ * - borderStyle="round": 圆角边框
+ * - borderColor="#222222": 深灰色边框（低调）
+ * - backgroundColor="#030303": 接近黑色的背景
+ * - paddingX={1}, paddingY={1}: 内边距 1 字符/行
  *
  * @param title - 面板标题
  * @param children - 面板内容
  */
 function Panel({ title, children }: { title: string; children: React.ReactNode }): React.ReactElement {
   return (
-    <Box flexDirection="column" flexGrow={1}>
-      <Text bold color="#F59E0B">{title}</Text>
-      <Box flexDirection="column">
+    <Box
+      flexDirection="column"
+      flexGrow={1}
+      borderStyle="round"
+      borderColor="#222222"
+      backgroundColor="#030303"
+      paddingX={1}
+      paddingY={1}
+    >
+      {/* 标题栏：底部边框分隔 */}
+      <Box borderStyle="single" borderTop={false} borderLeft={false} borderRight={false} borderColor="#222222">
+        <Text bold color="#F59E0B">{title}</Text>
+      </Box>
+      {/* 内容区：顶部边距 1 行 */}
+      <Box flexDirection="column" marginTop={1}>
         {children}
       </Box>
     </Box>
@@ -126,11 +139,17 @@ export function WelcomeScreen({ model, provider, agent, thinkingMode }: WelcomeS
   const thinking = thinkingMode === 'off' ? '自动' : thinkingMode;
 
   return (
-    <Box flexDirection="column" width="100%" justifyContent="center" alignItems="center">
+    // 显示参数：paddingX={1} 左右内边距 1 字符
+    <Box flexDirection="column" width="100%" paddingX={1}>
       {/* Logo 区域 */}
       <Box
         flexDirection="column"
         width="100%"
+        borderStyle="round"
+        borderColor="#222222"
+        backgroundColor="#050505"
+        paddingX={1}
+        paddingY={1}
       >
         <Box justifyContent="center">
           <Title />
@@ -138,19 +157,26 @@ export function WelcomeScreen({ model, provider, agent, thinkingMode }: WelcomeS
         <Box justifyContent="center">
           <Text bold color={FG.body}>探索未至之境</Text>
         </Box>
+        <Box justifyContent="center" marginTop={1}>
+          <Text color={FG.meta}>
+            当前模型: <Text bold color={FG.strong}>{model}</Text>
+            <Text color={FG.meta}> · 计费: </Text>
+            <Text color={FG.strong}>免费</Text>
+          </Text>
+        </Box>
       </Box>
 
       {/* 双列面板 */}
-      <Box flexDirection="row" width="75%" justifyContent="center">
+      <Box flexDirection="row" width="100%" marginTop={1}>
         {/* Agent 设置面板 */}
         <Panel title="Agent设置">
-          <Row label="推理档 " value={<CheckValue>{thinking}</CheckValue>} />
-          <Row label="上下文 " value={<CheckValue>压缩</CheckValue>} />
+          <Row label="推理档位 " value={<CheckValue>{thinking}</CheckValue>} />
+          <Row label="上下文裁剪 " value={<CheckValue>开启</CheckValue>} />
           <Row label="子代理 " value={<CheckValue>{agent}</CheckValue>} />
         </Panel>
 
         {/* 列间距：1 字符 */}
-        <Box width={20} />
+        <Box width={1} />
 
         {/* 组件状态面板 */}
         <Panel title="组件状态">
@@ -161,7 +187,14 @@ export function WelcomeScreen({ model, provider, agent, thinkingMode }: WelcomeS
       </Box>
 
       {/* 快捷提示 1 */}
-      <Box flexDirection="row">
+      <Box flexDirection="row" width="100%" marginTop={1}>
+        <Text color={FG.meta}>- 我准备好了，可以开始</Text>
+        {/* 分隔线：使用单线边框样式 */}
+        <Box flexGrow={1} borderStyle="single" borderBottom={false} borderLeft={false} borderRight={false} borderColor="#222222" />
+      </Box>
+
+      {/* 快捷提示 2 */}
+      <Box flexDirection="row" marginTop={1}>
         <Text color={FG.meta}>/help 可以提问本软件任何用法</Text>
         <Text color={FG.meta}> • </Text>
         <Text color={FG.meta}>/lang can switch to English</Text>

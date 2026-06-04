@@ -8,7 +8,7 @@ import { createBridge, timelineFromMessages, type BridgeState } from './bridge.j
 import { DeepiMessages } from './DeepiMessages.js';
 import { DeepiPromptInput, type DeepiPromptInputHandle } from './DeepiPromptInput.js';
 import { StatusBar } from './StatusBar.js';
-import { FullscreenLayout, TerminalHeader } from './FullscreenLayout.js';
+import { FullscreenLayout } from './FullscreenLayout.js';
 import { WelcomeScreen } from './WelcomeScreen.js';
 import { isFullscreenEnvEnabled } from './fullscreen.js';
 import { ModelPicker } from './ModelPicker.js';
@@ -28,19 +28,32 @@ import {
   validateThinkingMode,
 } from './commands.js';
 
-// ---- Module-level interrupt state (shared by SIGINT handler + useInput \x03 handler) ----
+// ---- 模块级中断/退出状态（由 SIGINT 处理器和 useInput \x03 处理器共享） ----
 
+/** TUI 运行状态: 'idle' 空闲 / 'loading' 加载中 */
 let tuiState: 'idle' | 'loading' = 'idle';
 export function setTUIState(s: 'idle' | 'loading') { tuiState = s; }
 
+/** 退出双击计时器: 首次 Ctrl+C 后启动，2 秒内再次按下则执行退出 */
 let exitTimer: ReturnType<typeof setTimeout> | null = null;
+/** 退出挂起标志: 为 true 时忽略后续中断信号 */
 let exitPending = false;
 
-// Module-level callbacks set by the App component on mount
+/**
+ * 模块级回调 —— 由 App 组件挂载时注入。
+ * _cancel:       取消当前 LLM 请求
+ * _interrupt:    中断引擎执行
+ * _setStatusMsg: 更新状态栏提示文字
+ */
 let _cancel: (() => void) | null = null;
 let _interrupt: (() => void) | null = null;
 let _setStatusMsg: ((m: string | null) => void) | null = null;
 
+/**
+ * 清理终端环境。
+ * 依次执行：禁用鼠标跟踪 → 卸载 Ink 实例退出备用屏幕 → 排空 stdin → 分离实例并恢复 raw mode → 显示光标。
+ * 此函数在退出前被调用，确保终端恢复至正常状态。
+ */
 function cleanupTerminal(): void {
   const inst = instances.get(process.stdout);
 
@@ -68,6 +81,11 @@ function cleanupTerminal(): void {
   try { writeSync(1, SHOW_CURSOR); } catch {}
 }
 
+/**
+ * 中断处理（Ctrl+C 处理器）。
+ * - loading 状态：调用 _cancel 取消当前请求
+ * - idle 状态：首次按下启动 2 秒退出倒计时；倒计时内再次按下则直接退出进程
+ */
 function doInterrupt(): void {
   if (exitPending) return;
 
@@ -111,6 +129,11 @@ interface SkillRecord {
   content: string;
 }
 
+/**
+ * 从输入文本中提取技能标签（以 # 开头的单词）。
+ * @param text - 用户输入文本
+ * @returns 去重后的技能名称列表
+ */
 function extractSkillTags(text: string): string[] {
   const names = new Set<string>();
   for (const match of text.matchAll(/(?:^|\s)#([A-Za-z0-9_.-]+)/g)) {
@@ -127,6 +150,12 @@ function parseSkillDetail(content: string): SkillRecord {
   return { name: parsed.name, description: parsed.description, content: parsed.content };
 }
 
+/**
+ * 根据技能名称列表加载对应的技能记录。
+ * 遍历名称列表，依次调用 createSkillTool 执行 load 命令获取技能内容并解析。
+ * @param names - 技能名称数组
+ * @returns 技能记录列表（失败项自动跳过）
+ */
 async function loadTaggedSkills(names: string[]): Promise<SkillRecord[]> {
   if (names.length === 0) return [];
   const { createSkillTool } = await import('@deepicode/tools');
@@ -151,6 +180,19 @@ interface AppProps {
   config: DeepicodeConfig;
 }
 
+/**
+ * App —— 终端用户界面的根组件。
+ *
+ * 职责：
+ * - 管理 Bridge（与 LLM 引擎通信的桥梁）生命周期
+ * - 维护全部 UI 状态（消息时间线、模型选择、技能、Agent、语言等）
+ * - 处理键盘输入（Ctrl+C 中断、Ctrl+F 搜索、提交消息、斜杠命令等）
+ * - 根据状态变量切换显示覆盖层（模型选择器 / 会话选择器 / Agent 菜单等）
+ * - 组合主内容区 (scrollableContent) 与底部输入区 (bottomContent)
+ *
+ * @param engine - ReasonixEngine 实例，驱动 LLM 通信
+ * @param config - DeepicodeConfig 配置对象（provider / model / contextWindow 等）
+ */
 export function App({ engine, config }: AppProps) {
   const [bridgeState, setBridgeState] = useState<BridgeState>(initialState);
   const bridge = useMemo(() => createBridge(engine, setBridgeState), [engine]);
@@ -198,30 +240,32 @@ export function App({ engine, config }: AppProps) {
     }
   });
 
+  /** 取消当前 LLM 请求 */
   const handleCancel = useCallback(() => {
     bridgeRef.current.cancel();
   }, []);
   const scrollRef = useRef<any>(null);
   const promptInputRef = useRef<DeepiPromptInputHandle>(null);
 
-  const [activeProvider, setActiveProvider] = useState(config.provider ?? 'zen');
-  const [activeModel, setActiveModel] = useState(config.model);
-  const [inputText, setInputText] = useState('');
-  const [showAutocomplete, setShowAutocomplete] = useState(false);
-  const [showModelPicker, setShowModelPicker] = useState(false);
-  const [showSessionPicker, setShowSessionPicker] = useState(false);
-  const [showAgentMenu, setShowAgentMenu] = useState(false);
-  const [showLangMenu, setShowLangMenu] = useState(false);
-  const [showThinkingMenu, setShowThinkingMenu] = useState(false);
-  const [showSkillModal, setShowSkillModal] = useState(false);
-  const [showContextModal, setShowContextModal] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
-  const [activeAgent, setActiveAgent] = useState(engine.getAgentName?.() ?? 'build');
-  const [activeSkills, setActiveSkills] = useState(engine.getActiveSkills?.() ?? []);
-  const [inputHistory, setInputHistory] = useState<string[]>([]);
-  const [inputInjection, setInputInjection] = useState<{ id: number; text: string } | undefined>(undefined);
-  const [contextPolicy, setContextPolicy] = useState(engine.getContextPolicy());
+  const [activeProvider, setActiveProvider] = useState(config.provider ?? 'zen'); // 当前选中的 LLM 提供商
+  const [activeModel, setActiveModel] = useState(config.model);                  // 当前选中的模型名称
+  const [inputText, setInputText] = useState('');                                // 用户输入框当前文本
+  const [showAutocomplete, setShowAutocomplete] = useState(false);               // 是否显示命令自动补全面板
+  const [showModelPicker, setShowModelPicker] = useState(false);                 // 是否显示模型选择器覆盖层
+  const [showSessionPicker, setShowSessionPicker] = useState(false);             // 是否显示会话选择器覆盖层
+  const [showAgentMenu, setShowAgentMenu] = useState(false);                     // 是否显示 Agent 切换菜单覆盖层
+  const [showLangMenu, setShowLangMenu] = useState(false);                       // 是否显示语言切换菜单覆盖层
+  const [showThinkingMenu, setShowThinkingMenu] = useState(false);               // 是否显示推理档位选择菜单覆盖层
+  const [showSkillModal, setShowSkillModal] = useState(false);                   // 是否显示技能管理弹窗覆盖层
+  const [showContextModal, setShowContextModal] = useState(false);               // 是否显示上下文策略管理弹窗覆盖层
+  const [showSearch, setShowSearch] = useState(false);                           // 是否显示搜索覆盖层（Ctrl+F 触发）
+  const [activeAgent, setActiveAgent] = useState(engine.getAgentName?.() ?? 'build'); // 当前 Agent 名称
+  const [activeSkills, setActiveSkills] = useState(engine.getActiveSkills?.() ?? []); // 当前已启用的技能列表
+  const [inputHistory, setInputHistory] = useState<string[]>([]);                // 输入历史记录（最多 MAX_INPUT_HISTORY 条）
+  const [inputInjection, setInputInjection] = useState<{ id: number; text: string } | undefined>(undefined); // 外部注入到输入框的文本
+  const [contextPolicy, setContextPolicy] = useState(engine.getContextPolicy()); // 当前上下文策略
 
+  /** 提交处理：解析用户输入，执行斜杠命令或通过 bridge 发送消息 */
   const handleSubmit = useCallback((text: string) => {
     const submitted = text.trim();
     if (submitted) {
@@ -319,6 +363,7 @@ export function App({ engine, config }: AppProps) {
     })();
   }, [activeAgent, appendMessage, bridge]);
 
+  /** Agent 切换回调：调用引擎切换 Agent 并更新显示名称 */
   const handleAgentChoose = useCallback((next: string) => {
     const label = engineRef.current.switchAgent(next);
     setActiveAgent(next);
@@ -326,12 +371,14 @@ export function App({ engine, config }: AppProps) {
     appendMessage({ role: 'assistant' as const, content: t().switchedTo(label) });
   }, [appendMessage]);
 
+  /** 语言切换回调：设置界面语言 */
   const handleLangChoose = useCallback((next: string) => {
     setLocale(next as any);
     setShowLangMenu(false);
     appendMessage({ role: 'assistant' as const, content: t().switchedLang(next) });
   }, [appendMessage]);
 
+  /** 推理档位选择回调：更新引擎和 bridge 的 thinkingMode */
   const handleThinkingChoose = useCallback((mode: string) => {
     const error = validateThinkingMode(mode);
     if (error) {
@@ -344,6 +391,7 @@ export function App({ engine, config }: AppProps) {
     appendMessage({ role: 'assistant' as const, content: `Thinking mode set to: ${mode}` });
   }, [appendMessage, bridgeState.thinkingMode]);
 
+  /** 模型选择回调：更新引擎配置并保存至持久化存储 */
   const handleModelSelect = useCallback((sel: { provider: string; model: string; apiKey: string; baseUrl: string }) => {
     engineRef.current.updateConfig({
       provider: sel.provider,
@@ -358,10 +406,12 @@ export function App({ engine, config }: AppProps) {
     appendMessage({ role: 'assistant' as const, content: t().switchedModel(PROVIDERS[sel.provider]?.label ?? sel.provider, sel.model) });
   }, [appendMessage]);
 
+  /** 模型选择取消回调：关闭选择器覆盖层 */
   const handleModelCancel = useCallback(() => {
     setShowModelPicker(false);
   }, []);
 
+  /** 会话选择回调：加载指定会话的消息并重置 bridge 状态 */
   const handleSessionSelect = useCallback(async (sessionId: string) => {
     setShowSessionPicker(false);
     // Load session messages into the current engine
@@ -376,10 +426,12 @@ export function App({ engine, config }: AppProps) {
     appendMessage({ role: 'assistant' as const, content: t().resumedSession(sessionId.slice(0, 8), msgs.length) });
   }, [appendMessage]);
 
+  /** 会话选择取消回调：关闭选择器覆盖层 */
   const handleSessionCancel = useCallback(() => {
     setShowSessionPicker(false);
   }, []);
 
+  /** 权限请求回调：向引擎传递用户的允许/拒绝决策 */
   const handlePermissionSelect = useCallback((allow: boolean, alwaysAllow?: boolean) => {
     engineRef.current.respondPermission(allow, alwaysAllow);
     setBridgeState(prev => ({ ...prev, permissionPrompt: null }));
@@ -387,6 +439,7 @@ export function App({ engine, config }: AppProps) {
 
   const providerLabel = getProviderLabel(activeProvider);
 
+  // ---- 覆盖层：模型选择器（当 showModelPicker 为 true 时显示） ----
   if (showModelPicker) {
     return (
       <CenteredStage width={88}>
@@ -400,6 +453,7 @@ export function App({ engine, config }: AppProps) {
     );
   }
 
+  // ---- 覆盖层：会话恢复选择器（当 showSessionPicker 为 true 时显示） ----
   if (showSessionPicker) {
     return (
       <CenteredStage width={92}>
@@ -411,6 +465,7 @@ export function App({ engine, config }: AppProps) {
     );
   }
 
+  // ---- 覆盖层：Agent 切换菜单（当 showAgentMenu 为 true 时显示） ----
   if (showAgentMenu) {
     return (
       <ChoiceMenu
@@ -426,6 +481,7 @@ export function App({ engine, config }: AppProps) {
     );
   }
 
+  // ---- 覆盖层：语言切换菜单（当 showLangMenu 为 true 时显示） ----
   if (showLangMenu) {
     return (
       <ChoiceMenu
@@ -441,6 +497,7 @@ export function App({ engine, config }: AppProps) {
     );
   }
 
+  // ---- 覆盖层：推理档位选择菜单（当 showThinkingMenu 为 true 时显示） ----
   if (showThinkingMenu) {
     return (
       <ChoiceMenu
@@ -459,6 +516,7 @@ export function App({ engine, config }: AppProps) {
     );
   }
 
+  // ---- 覆盖层：技能管理弹窗（当 showSkillModal 为 true 时显示） ----
   if (showSkillModal) {
     return (
       <SkillModal
@@ -478,6 +536,7 @@ export function App({ engine, config }: AppProps) {
     );
   }
 
+  // ---- 覆盖层：上下文策略管理弹窗（当 showContextModal 为 true 时显示） ----
   if (showContextModal) {
     return (
       <ContextModal
@@ -493,6 +552,7 @@ export function App({ engine, config }: AppProps) {
     );
   }
 
+  // ---- 主内容区（可滚动区域）：消息时间线、搜索结果、欢迎屏、警告/错误提示、权限请求弹窗 ----
   const scrollableContent = (
     <>
       <SearchOverlay
@@ -532,6 +592,7 @@ export function App({ engine, config }: AppProps) {
     </>
   );
 
+  // ---- 底部区域（固定定位）：命令自动补全、输入框、状态栏 ----
   const bottomContent = (
     <Box flexDirection="column" width="100%">
       {showAutocomplete && (
@@ -599,7 +660,6 @@ export function App({ engine, config }: AppProps) {
 
   return (
     <>
-      <TerminalHeader />
       {scrollableContent}
       {bottomContent}
     </>
