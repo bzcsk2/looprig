@@ -50,7 +50,7 @@ export const PROVIDERS: Record<string, ProviderInfo> = {
     ],
   },
   mimo: {
-    baseUrl: "https://api.mimo.ai/v1",
+    baseUrl: "https://api.xiaomimimo.com/v1",
     model: "mimo-v2.5",
     requiresKey: true,
     label: "Mimo",

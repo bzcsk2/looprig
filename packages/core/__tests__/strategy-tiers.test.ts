@@ -29,10 +29,9 @@ describe("Strategy Tier Configuration", () => {
     }
   })
 
-  it("maxChainLength increases across tiers", () => {
-    const lengths = TIER_ORDER.map(id => STRATEGY_TIERS[id].maxChainLength)
-    for (let i = 1; i < lengths.length; i++) {
-      expect(lengths[i]).toBeGreaterThan(lengths[i - 1])
+  it("all tiers have maxChainLength of 500", () => {
+    for (const id of TIER_ORDER) {
+      expect(STRATEGY_TIERS[id].maxChainLength).toBe(500)
     }
   })
 
@@ -102,7 +101,7 @@ describe("ST2: Engine tier integration", () => {
     engine.setTier("deep")
     expect(engine.getTier().id).toBe("deep")
     expect(engine.getTier().label).toBe("Deep")
-    expect(engine.getTier().maxChainLength).toBe(25)
+    expect(engine.getTier().maxChainLength).toBe(500)
   })
 
   it("resolveTierDecision resolves valid tier", async () => {
@@ -124,7 +123,7 @@ describe("ST2: Engine tier integration", () => {
 
   it("tier data accessible via public API", async () => {
     const { getTier } = await import("../src/strategy/tiers.js")
-    expect(getTier("minimal").maxChainLength).toBe(2)
+    expect(getTier("minimal").maxChainLength).toBe(500)
     expect(getTier("deep").enableReasoning).toBe(true)
     expect(getTier("exhaustive").budgetCNY).toBe(1.00)
   })
@@ -157,7 +156,7 @@ describe("ST4: Tier recommender", () => {
     expect(result.suggestedTier).toBe("minimal")
   })
 
-  it("upgrades when near max turns with high context", () => {
+  it("stays when far from max turns even with high context", () => {
     const result = recommendTier({
       currentTierId: "normal",
       stats: { totalCost: 0.03, promptTokens: 100, completionTokens: 50, cacheHitTokens: 10, cacheMissTokens: 5, apiCalls: 1 },
@@ -166,11 +165,10 @@ describe("ST4: Tier recommender", () => {
       contextUsagePercent: 0.85,
       tier: getTier("normal"),
     })
-    expect(result.action).toBe("upgrade")
-    expect(result.suggestedTier).toBe("deep")
+    expect(result.action).toBe("stay")
   })
 
-  it("upgrades with many tools and headroom", () => {
+  it("stays with few tools relative to max chain length", () => {
     const result = recommendTier({
       currentTierId: "normal",
       stats: { totalCost: 0.02, promptTokens: 100, completionTokens: 50, cacheHitTokens: 10, cacheMissTokens: 5, apiCalls: 1 },
@@ -179,8 +177,7 @@ describe("ST4: Tier recommender", () => {
       contextUsagePercent: 0.3,
       tier: getTier("normal"),
     })
-    expect(result.action).toBe("upgrade")
-    expect(result.suggestedTier).toBe("deep")
+    expect(result.action).toBe("stay")
   })
 
   it("downgrades on sustained low cost", () => {

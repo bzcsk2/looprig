@@ -108,7 +108,7 @@ export class DeepSeekClient implements ChatClient {
       }),
       stream: true,
       temperature: opts.temperature,
-      max_tokens: opts.maxTokens,
+      max_completion_tokens: opts.maxTokens,
     }
 
     if (opts.tools && opts.tools.length > 0) {
