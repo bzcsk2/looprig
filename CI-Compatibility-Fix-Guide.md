@@ -12,14 +12,33 @@
 
 ## 当前已知稳定基线
 
+截至 2026-06-04，master 最新 CI 已确认三平台通过。
+
+最新已通过提交：
+
+- `cbe7d40 docs: add ci compatibility fix guide`
+
+最新已通过 GitHub Actions run：
+
+- `26928492923`
+- URL: `https://github.com/bzcsk2/deepicode/actions/runs/26928492923`
+- 结论: `success`
+- 平台:
+  - `ubuntu-latest`: success
+  - `macos-latest`: success
+  - `windows-latest`: success
+
+最近一次已确认通过的真实代码 checkpoint：
+
+- `c61cb0e chore: checkpoint full project state`
+
 最近一次已确认通过的真实 CI 修复提交：
 
 - `f06bc0f fix(ci): stabilize windows platform tests`
 
-其后 checkpoint：
+其后历史 checkpoint：
 
 - `e9ccb4f chore: checkpoint full code after ci green`
-- `c61cb0e chore: checkpoint full project state`
 
 本地验证命令：
 
@@ -369,4 +388,3 @@ gh run watch <run_id> --repo bzcsk2/deepicode --exit-status
 - GitHub Actions 最新 master run 三平台 success。
 - 文档或 TODO 中不再保留已完成的 CI bug 项。
 - `git status --short` 中没有意外未提交代码。
-
