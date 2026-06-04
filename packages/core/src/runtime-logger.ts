@@ -1,4 +1,5 @@
 import { appendFile, mkdir, symlink, unlink, readdir, stat } from "node:fs/promises"
+import { readFileSync } from "node:fs"
 import { dirname, resolve, join } from "node:path"
 
 export type RuntimeLogLevel = "debug" | "info" | "warn" | "error"
@@ -239,11 +240,25 @@ export class RuntimeLogger {
 
 export const noopRuntimeLogger = new RuntimeLogger({ enabled: false })
 
+function readLogFileLevel(cwd: string): string | undefined {
+  try {
+    const configPath = resolve(cwd, ".deepicode", "config.json")
+    const raw = readFileSync(configPath, "utf-8")
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    if (typeof parsed.logLevel === "string") return parsed.logLevel.trim().toLowerCase()
+    return undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function createRuntimeLoggerFromEnv(
   bindings: Record<string, unknown> = {},
   cwd = process.cwd(),
 ): RuntimeLogger {
-  const configuredLevel = process.env.DEEPICODE_LOG_LEVEL?.trim().toLowerCase()
+  const envLevel = process.env.DEEPICODE_LOG_LEVEL?.trim().toLowerCase()
+  const fileLevel = readLogFileLevel(cwd)
+  const configuredLevel = envLevel ?? fileLevel
   const enabled = configuredLevel !== undefined && configuredLevel !== "" && configuredLevel !== "off"
   const level = isRuntimeLogLevel(configuredLevel)
     ? configuredLevel
