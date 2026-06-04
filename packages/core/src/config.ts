@@ -125,7 +125,7 @@ export function loadConfig(): DeepicodeConfig {
   // Priority: env vars > persisted last-config > defaults
   const last = loadLastConfig()
 
-  const provider = process.env.DEEPICODE_PROVIDER ?? last?.provider ?? "deepseek"
+  const provider = process.env.DEEPICODE_PROVIDER ?? last?.provider ?? "zen"
   const providerCfg = PROVIDERS[provider]
   const lastForProvider = last?.provider === provider ? last : null
 

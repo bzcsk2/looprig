@@ -113,10 +113,12 @@ describe("loadConfig - 环境变量", () => {
     expect(cfg.baseUrl).toBe("https://opencode.ai/zen/v1")
   })
 
-  it("should default to deepseek provider when no env and no last-config", () => {
+  it("should default to zen provider when no env and no last-config", () => {
     delete process.env.DEEPICODE_PROVIDER
     const cfg = loadConfig()
-    expect(cfg.provider).toBe("deepseek")
+    expect(cfg.provider).toBe("zen")
+    expect(cfg.model).toBe("deepseek-v4-flash-free")
+    expect(cfg.apiKey).toBe("public")
   })
 })
 
@@ -179,8 +181,10 @@ describe("saveLastConfig / loadConfig 持久化", () => {
 
   it("should return defaults when last-config file does not exist", () => {
     const cfg = loadConfig()
-    expect(cfg.provider).toBe("deepseek")
-    expect(cfg.baseUrl).toBe("https://api.deepseek.com")
+    expect(cfg.provider).toBe("zen")
+    expect(cfg.baseUrl).toBe("https://opencode.ai/zen/v1")
+    expect(cfg.model).toBe("deepseek-v4-flash-free")
+    expect(cfg.apiKey).toBe("public")
   })
 
   it("should not crash when last-config file is corrupted JSON", () => {
@@ -189,7 +193,7 @@ describe("saveLastConfig / loadConfig 持久化", () => {
     writeFileSync(join(dir, "last-config.json"), "{invalid json!!!}", "utf8")
 
     const cfg = loadConfig()
-    expect(cfg.provider).toBe("deepseek")
+    expect(cfg.provider).toBe("zen")
   })
 
   it("should not crash when last-config file is empty", () => {
@@ -198,6 +202,6 @@ describe("saveLastConfig / loadConfig 持久化", () => {
     writeFileSync(join(dir, "last-config.json"), "", "utf8")
 
     const cfg = loadConfig()
-    expect(cfg.provider).toBe("deepseek")
+    expect(cfg.provider).toBe("zen")
   })
 })
