@@ -39,15 +39,13 @@ interface WelcomeScreenProps {
  * 每行使用不同的渐变色，从蓝色过渡到紫色。
  */
 function Title(): React.ReactElement {
-  const ascii = figlet.textSync('deepseek', { font: 'ANSI Regular' });
-  // 去除末尾换行，按行分割
-  const lines = ascii.replace(/\n$/, '').split('\n');
+  const ascii = figlet.textSync('deepseek', { font: 'ANSI Regular' }).trim().split('\n');
   // 渐变色列表：从蓝色到紫色
   const colors: any[] = ['#4FA3F7', '#5C94F9', '#6985FA', '#7676FC', '#866FFB', '#9868F9', '#B064F6', '#C15FF3', '#CA5FF2'];
 
   return (
     <Box flexDirection="column" justifyContent="center">
-      {lines.map((line, i) => (
+      {ascii.map((line, i) => (
         <Text key={i} bold color={colors[i % colors.length]}>{line}</Text>
       ))}
     </Box>
@@ -105,8 +103,10 @@ function Row({ label, value }: { label: string; value: React.ReactNode }): React
   return (
     <Box flexDirection="row" width="100%">
       <Text color={FG.body}>{label}</Text>
-      <Box flexGrow={1} />
-      {value}
+      <Box width={2} />
+      <Text color={FG.body}>[</Text>
+      <Text color={TONE.ok}>{value}</Text>
+      <Text color={FG.body}>]</Text>
     </Box>
   );
 }
@@ -137,31 +137,29 @@ export function WelcomeScreen({ model, provider, agent, thinkingMode }: WelcomeS
         <Box justifyContent="center">
           <Title />
         </Box>
+        <Box height={1} />
         <Box justifyContent="center">
           <Text bold color={FG.body}>探索未至之境</Text>
         </Box>
       </Box>
-
+      <Box height={1} />
       {/* 双列面板 */}
-      <Box flexDirection="row" width="75%" justifyContent="center">
+      <Box flexDirection="row" width="60%" justifyContent="space-between">
         {/* Agent 设置面板 */}
         <Panel title="Agent设置">
-          <Row label="推理档 " value={<CheckValue>{thinking}</CheckValue>} />
-          <Row label="上下文 " value={<CheckValue>压缩</CheckValue>} />
-          <Row label="子代理 " value={<CheckValue>{agentShort}</CheckValue>} />
+          <Row label="推理档 " value={thinking} />
+          <Row label="上下文 " value="压缩" />
+          <Row label="子代理 " value={agentShort} />
         </Panel>
-
-        {/* 列间距：1 字符 */}
-        <Box width={20} />
 
         {/* 组件状态面板 */}
         <Panel title="组件状态">
-          <Row label="Provider:" value={<CheckValue>{provider}</CheckValue>} />
-          <Row label="Skills:" value={<CheckValue>已加载</CheckValue>} />
-          <Row label="MCP:" value={<CheckValue>按需连接</CheckValue>} />
+          <Row label="插件:" value={provider} />
+          <Row label="技能:" value="52" />
+          <Row label="MCPs:" value="3" />
         </Panel>
       </Box>
-
+      <Box height={1} />
       {/* 快捷提示 1 */}
       <Box flexDirection="row">
         <Text color={FG.meta}>/help 可以提问本软件任何用法</Text>

@@ -1,17 +1,17 @@
 import { describe, it, expect } from "vitest"
-import { getAgent, agentConfigFor, AGENTS } from "../src/agent.js"
+import { getAgent, agentConfigFor, AGENTS, getMainMode, MAIN_MODES } from "../src/agent.js"
 
 describe("getAgent", () => {
   it("should return Build Agent definition for 'build'", () => {
     const agent = getAgent("build")
     expect(agent.name).toBe("build")
-    expect(agent.label).toBe("Build Agent")
+    expect(agent.label).toBe("Build Mode")
   })
 
   it("should return Plan Agent definition for 'plan'", () => {
     const agent = getAgent("plan")
     expect(agent.name).toBe("plan")
-    expect(agent.label).toBe("Plan Agent")
+    expect(agent.label).toBe("Plan Mode")
   })
 
   it("should fallback to build for unknown agent", () => {
@@ -31,6 +31,20 @@ describe("getAgent", () => {
     expect(agent.toolNames).toContain("list_dir")
     expect(agent.toolNames).toContain("grep")
     expect(agent.toolNames).toContain("todowrite")
+  })
+})
+
+describe("getMainMode", () => {
+  it("should return build mode by default", () => {
+    const mode = getMainMode("unknown")
+    expect(mode.name).toBe("build")
+    expect(mode.permissionProfile).toBe("build")
+  })
+
+  it("should return plan mode with readonly profile", () => {
+    const mode = getMainMode("plan")
+    expect(mode.name).toBe("plan")
+    expect(mode.permissionProfile).toBe("readonly")
   })
 })
 

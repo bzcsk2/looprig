@@ -13,7 +13,7 @@ import { FG, SURFACE, TONE } from './reasonix/tokens.js';
  * - cacheHitTokens/cacheMissTokens: 用于计算缓存命中率
  * - contextUsed/contextTotal: 上下文窗口使用量（已用/总量）
  * - pendingInstructionCount: >0 时显示待处理指令通知
- * - thinkingMode: "off" 时不显示思考模式；其他值显示 🧠 Thinking 徽标
+ * - thinkingMode: 始终显示当前思考模式（auto/off/open/high）
  * - tier: 服务层级标签（如 free/pro）
  * - cwd: 当前工作目录路径
  * - statusMessage: 有值时显示 ⚠ 警告信息
@@ -67,8 +67,7 @@ export function StatusBar({ model, provider, agent, inputTokens, outputTokens, c
   const agentShort = agent?.replace(/\s+Agent$/i, '') ?? agent;
   // 只显示当前文件夹名
   const cwdShort = cwd ? cwd.split('/').filter(Boolean).pop() ?? cwd : '';
-  // thinkingMode: off 不显示，其他显示 auto/open/high
-  const showThinking = thinkingMode && thinkingMode !== 'off';
+  const thinkingLabel = thinkingMode ?? 'off';
   return (
     <Box width="100%" flexDirection="column">
       {/* 状态警告信息（如 ⚠ 提示），仅在 statusMessage 有值时显示 */}
@@ -86,7 +85,7 @@ export function StatusBar({ model, provider, agent, inputTokens, outputTokens, c
       {/* 主信息栏：背景色透明，水平内边距 paddingX=1 */}
       <Box width="100%" flexDirection="row" paddingX={1}>
         <Text color={FG.meta}>{`${agentShort} ${model}`}</Text>
-        {showThinking ? <Text color={TONE.accent}>{` [${thinkingMode}]`}</Text> : null}
+        <Text color={TONE.accent}>{` [${thinkingLabel}]`}</Text>
         {/* flexGrow=1 将后面元素推到右侧 */}
         <Box flexGrow={1} />
         <Text color={FG.faint}>{`${fmt(inputTokens)} ${t().inputTokens} `}</Text>

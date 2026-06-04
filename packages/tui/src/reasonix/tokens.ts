@@ -40,7 +40,7 @@ export interface ThemeTokens {
 const dark: ThemeTokens = {
   fg: { strong: '#ffffff', body: '#E1D3DC', sub: '#8D7B88', meta: '#8D7B88', faint: '#5D5159' },
   tone: { brand: '#00FF66', accent: '#4A90E2', ok: '#00FF66', warn: '#FFBD2E', err: '#FF5F56', info: '#4A90E2' },
-  surface: { bg: '#000000', bgInput: '#1D3B5C', bgCode: '#0C0C0C', bgElev: '#13283F' },
+  surface: { bg: '#000000', bgInput: '#653a99be', bgCode: '#0C0C0C', bgElev: '#13283F' },
 };
 
 // 仅在运行时需要切换主题时使用（例如用户设置偏好），当前始终使用 dark。

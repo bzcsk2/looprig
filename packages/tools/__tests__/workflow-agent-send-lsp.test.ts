@@ -54,19 +54,45 @@ describe("AgentTool", () => {
     const r = await tool.execute({ task: "refactor this code" }, ctx)
     expect(r.isError).toBe(false)
     const p = JSON.parse(r.content as string)
-    expect(p.agent).toBe("build")
+    expect(p.subagent_type).toBe("general-purpose")
   })
 
-  it("should accept plan agent type", async () => {
+  it("should accept plan agent type (legacy compat)", async () => {
     const tool = createAgentToolTool()
     const r = await tool.execute({ task: "analyze", agent_type: "plan" }, ctx)
     const p = JSON.parse(r.content as string)
-    expect(p.agent).toBe("plan")
+    expect(p.subagent_type).toBe("Plan")
   })
 
-  it("should reject empty task", async () => {
+  it("should accept new subagent_type parameter", async () => {
+    const localCtx = {
+      ...ctx,
+      spawnSubagent: async (opts: any) => ({
+        status: "completed",
+        id: "subagent_test",
+        subagent_type: opts.subagentType ?? "general-purpose",
+        description: opts.description,
+        result: "done",
+        files: opts.files ?? [],
+        usage: { promptTokens: 0, completionTokens: 0 },
+        warnings: [],
+      }),
+    }
     const tool = createAgentToolTool()
-    const r = await tool.execute({ task: "" }, ctx)
+    const r = await tool.execute({ prompt: "explore code", description: "explore", subagent_type: "Explore" }, localCtx)
+    const p = JSON.parse(r.content as string)
+    expect(p.subagent_type).toBe("Explore")
+  })
+
+  it("should reject empty prompt", async () => {
+    const tool = createAgentToolTool()
+    const r = await tool.execute({ prompt: "" }, ctx)
+    expect(r.isError).toBe(true)
+  })
+
+  it("should reject when both prompt and task are empty", async () => {
+    const tool = createAgentToolTool()
+    const r = await tool.execute({}, ctx)
     expect(r.isError).toBe(true)
   })
 
@@ -75,6 +101,37 @@ describe("AgentTool", () => {
     const r = await tool.execute({ task: "fix bug", files: ["src/index.ts"] }, ctx)
     const p = JSON.parse(r.content as string)
     expect(p.files).toEqual(["src/index.ts"])
+  })
+
+  it("should generate description from prompt when not provided", async () => {
+    const tool = createAgentToolTool()
+    const r = await tool.execute({ task: "refactor this code and clean it up" }, ctx)
+    const p = JSON.parse(r.content as string)
+    expect(p.description).toBeDefined()
+    expect(p.description.length).toBeGreaterThan(0)
+  })
+
+  it("should use spawnSubagent when available", async () => {
+    const localCtx = {
+      ...ctx,
+      spawnSubagent: async (opts: any) => ({
+        status: "completed",
+        id: "subagent_test",
+        subagent_type: "Plan",
+        description: "test plan",
+        result: "analysis complete",
+        files: [],
+        usage: { promptTokens: 10, completionTokens: 20 },
+        warnings: [],
+      }),
+    }
+    const tool = createAgentToolTool()
+    const r = await tool.execute({ prompt: "analyze auth", description: "analyze", subagent_type: "Plan" }, localCtx)
+    expect(r.isError).toBe(false)
+    const p = JSON.parse(r.content as string)
+    expect(p.status).toBe("completed")
+    expect(p.subagent_type).toBe("Plan")
+    expect(p.result).toBe("analysis complete")
   })
 })
 

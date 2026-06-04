@@ -57,7 +57,10 @@ export interface ToolContext {
   invokeTool?: (name: string, args: Record<string, unknown>) => Promise<ToolResult>
   delegateTask?: (task: string, agentType: "build" | "plan", files: string[]) => Promise<string>
   switchAgent?: (name: "build" | "plan") => string
+  spawnSubagent?: (options: SubagentRunOptions) => Promise<SubagentRunResult>
 }
+
+import type { SubagentRunOptions, SubagentRunResult } from "./subagent/types.js"
 
 export interface ToolProgressUpdate {
   content: string

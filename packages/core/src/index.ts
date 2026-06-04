@@ -14,9 +14,11 @@ export { ContextManager } from "./context/manager.js"
 export { ImmutablePrefix } from "./context/immutable.js"
 export { AppendOnlyLog } from "./context/append-log.js"
 export { VolatileScratch } from "./context/scratch.js"
-export { loadConfig, PROVIDERS, getApiKeyEnvVar, saveLastConfig } from "./config.js"
+export { loadConfig, PROVIDERS, getApiKeyEnvVar, getModelContextWindow, saveLastConfig } from "./config.js"
 export { buildSystemPrompt } from "./system-prompt.js"
 export { AGENTS, getAgent, agentConfigFor } from "./agent.js"
+export { getMainMode, MAIN_MODES } from "./main-mode.js"
+export type { MainMode, MainModeDefinition } from "./main-mode.js"
 export { QueryEngine } from "./query-engine.js"
 export type { AgentDefinition } from "./agent.js"
 export type { DeepicodeConfig, ProviderInfo, ProviderModel } from "./config.js"
@@ -26,3 +28,20 @@ export { SessionLoader } from "./session.js"
 export type { SessionSummary } from "./session.js"
 export { getTier, STRATEGY_TIERS, TIER_ORDER, DEFAULT_TIER } from "./strategy/tiers.js"
 export type { StrategyTier } from "./strategy/tiers.js"
+export {
+  SubagentRegistry,
+  defaultSubagentRegistry,
+  BUILTIN_SUBAGENTS,
+  checkSubagentPermission,
+  SubagentRunner,
+} from "./subagent/index.js"
+export type {
+  SubagentPermissionMode,
+  SubagentDefinition,
+  SubagentRun,
+  SubagentRunStatus,
+  SubagentRunUsage,
+  SubagentRunOptions,
+  SubagentRunResult,
+  SubagentPermissionCheck,
+} from "./subagent/index.js"

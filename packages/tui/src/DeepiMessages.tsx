@@ -169,7 +169,7 @@ const MemoizedPlainMessage = memo(function PlainMessage({ message, detailsOpen =
         )}
         <Card>
           <Box flexDirection="column" paddingX={1} paddingY={1}>
-            <CardHeader glyph="\u2022" tone={TONE.ok} title={t().assistant} />
+            <CardHeader glyph={'\u2022 ' } tone={TONE.ok} title={t().assistant} />
             <Box paddingLeft={2}><MessageContent text={message.content ?? ''} /></Box>
           </Box>
         </Card>

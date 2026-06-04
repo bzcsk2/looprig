@@ -3,7 +3,7 @@ import { Box, Text, AlternateScreen, instances, SHOW_CURSOR, EXIT_ALT_SCREEN, us
 import { writeSync } from 'node:fs';
 import type { ReasonixEngine } from '@deepicode/core';
 import type { ChatMessage, DeepicodeConfig } from '@deepicode/core';
-import { PROVIDERS, AGENTS, saveLastConfig } from '@deepicode/core';
+import { PROVIDERS, AGENTS, getModelContextWindow, saveLastConfig } from '@deepicode/core';
 import { createBridge, timelineFromMessages, type BridgeState } from './bridge.js';
 import { DeepiMessages } from './DeepiMessages.js';
 import { DeepiPromptInput, type DeepiPromptInputHandle } from './DeepiPromptInput.js';
@@ -396,11 +396,13 @@ export function App({ engine, config }: AppProps) {
 
   /** 模型选择回调：更新引擎配置并保存至持久化存储 */
   const handleModelSelect = useCallback((sel: { provider: string; model: string; apiKey: string; baseUrl: string }) => {
+    const contextWindow = getModelContextWindow(sel.provider, sel.model);
     engineRef.current.updateConfig({
       provider: sel.provider,
       model: sel.model,
       apiKey: sel.apiKey,
       baseUrl: sel.baseUrl,
+      contextWindow,
     });
     setActiveProvider(sel.provider);
     setActiveModel(sel.model);

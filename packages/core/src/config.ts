@@ -16,6 +16,7 @@ export interface DeepicodeConfig {
 export interface ProviderModel {
   label: string
   model: string
+  contextWindow?: number
 }
 
 export interface ProviderInfo {
@@ -25,7 +26,11 @@ export interface ProviderInfo {
   label: string
   models: ProviderModel[]
   defaultKey?: string
+  contextWindow?: number
 }
+
+export const DEFAULT_CONTEXT_WINDOW = 128_000
+export const MILLION_TOKEN_CONTEXT_WINDOW = 1_000_000
 
 export const PROVIDERS: Record<string, ProviderInfo> = {
   zen: {
@@ -33,9 +38,10 @@ export const PROVIDERS: Record<string, ProviderInfo> = {
     model: "deepseek-v4-flash-free",
     requiresKey: false,
     label: "Zen (Free)",
+    contextWindow: MILLION_TOKEN_CONTEXT_WINDOW,
     models: [
-      { label: "deepseek-v4-flash-free", model: "deepseek-v4-flash-free" },
-      { label: "mimo-v2.5-free", model: "mimo-v2.5-free" },
+      { label: "deepseek-v4-flash-free", model: "deepseek-v4-flash-free", contextWindow: MILLION_TOKEN_CONTEXT_WINDOW },
+      { label: "mimo-v2.5-free", model: "mimo-v2.5-free", contextWindow: MILLION_TOKEN_CONTEXT_WINDOW },
     ],
     defaultKey: "public",
   },
@@ -44,9 +50,10 @@ export const PROVIDERS: Record<string, ProviderInfo> = {
     model: "deepseek-v4",
     requiresKey: true,
     label: "DeepSeek",
+    contextWindow: MILLION_TOKEN_CONTEXT_WINDOW,
     models: [
-      { label: "pro", model: "deepseek-v4-pro" },
-      { label: "flash", model: "deepseek-v4-flash" },
+      { label: "pro", model: "deepseek-v4-pro", contextWindow: MILLION_TOKEN_CONTEXT_WINDOW },
+      { label: "flash", model: "deepseek-v4-flash", contextWindow: MILLION_TOKEN_CONTEXT_WINDOW },
     ],
   },
   mimo: {
@@ -54,11 +61,18 @@ export const PROVIDERS: Record<string, ProviderInfo> = {
     model: "mimo-v2.5",
     requiresKey: true,
     label: "Mimo",
+    contextWindow: MILLION_TOKEN_CONTEXT_WINDOW,
     models: [
-      { label: "mimo-v2.5-pro", model: "mimo-v2.5-pro" },
-      { label: "mimo-v2.5", model: "mimo-v2.5" },
+      { label: "mimo-v2.5-pro", model: "mimo-v2.5-pro", contextWindow: MILLION_TOKEN_CONTEXT_WINDOW },
+      { label: "mimo-v2.5", model: "mimo-v2.5", contextWindow: MILLION_TOKEN_CONTEXT_WINDOW },
     ],
   },
+}
+
+export function getModelContextWindow(provider: string | undefined, model: string | undefined): number {
+  const providerCfg = provider ? PROVIDERS[provider] : undefined
+  const modelCfg = providerCfg?.models.find((entry) => entry.model === model)
+  return modelCfg?.contextWindow ?? providerCfg?.contextWindow ?? DEFAULT_CONTEXT_WINDOW
 }
 
 export function getApiKeyEnvVar(provider: string): string {
@@ -137,6 +151,7 @@ export function loadConfig(): DeepicodeConfig {
   const legacyDeepSeekModelEnv = provider === "deepseek" ? process.env.DEEPSEEK_MODEL : undefined
   const rawModel = providerModelEnv ?? legacyDeepSeekModelEnv ?? lastForProvider?.model ?? providerCfg?.model ?? DEEPSEEK_MODEL
   const model = normalizeModelForProvider(providerCfg, rawModel)
+  const contextWindow = getModelContextWindow(provider, model)
 
   const apiKeyEnvVar = getApiKeyEnvVar(provider)
   let apiKey = process.env[apiKeyEnvVar] ?? providerCfg?.defaultKey ?? ""
@@ -151,7 +166,7 @@ export function loadConfig(): DeepicodeConfig {
     maxTokens: 8192,
     temperature: 0.3,
     maxContextRounds: 20,
-    contextWindow: 128_000,
+    contextWindow,
     provider,
   }
 }

@@ -408,13 +408,23 @@ export const DeepiPromptInput = forwardRef<DeepiPromptInputHandle, DeepiPromptIn
     : `${input.slice(0, cursor)}▊${input.slice(cursor)}${queueHint}${loadingHint}`;
 
   return (
-    // borderColor: 边框使用主题强调色 TONE.accent
-    // backgroundColor: 输入区域背景色 SURFACE.bgInput
-    // paddingX: 水平内边距 1
-    <Box flexDirection="row" width="100%" borderStyle="round" borderColor={TONE.accent} backgroundColor={SURFACE.bgInput} paddingX={1}>
-      <Text bold color={TONE.brand}>{'\u276F '}</Text>
-      {/* wrap="wrap" 自动换行；color: 占位符用次要色 FG.sub，正常用强调色 FG.strong */}
-      <Text wrap="wrap" color={isPlaceholder ? FG.sub : FG.strong}>{displayText}</Text>
+    <Box flexDirection="column" width="100%">
+      {/* 输入内容区域 */}
+      <Box
+        flexDirection="column"
+        width="200%"
+        backgroundColor={SURFACE.bgInput}
+        paddingX={1}
+        paddingY={0}
+      >
+        <Text backgroundColor={SURFACE.bgInput}> </Text>
+        <Box flexDirection="row" backgroundColor={SURFACE.bgInput}>
+          <Text bold color={TONE.brand} backgroundColor={SURFACE.bgInput}>{'\u276F '}</Text>
+          <Text wrap="wrap" color={isPlaceholder ? FG.sub : FG.strong} backgroundColor={SURFACE.bgInput}>{displayText}</Text>
+          <Box flexGrow={1} backgroundColor={SURFACE.bgInput} />
+        </Box>
+        <Text backgroundColor={SURFACE.bgInput}> </Text>
+      </Box>
     </Box>
   );
 });

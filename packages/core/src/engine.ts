@@ -10,7 +10,9 @@ import { AsyncSessionWriter, SessionLoader } from "./session.js"
 import { runLoop } from "./loop.js"
 import type { LoopOptions } from "./loop.js"
 import { PermissionEngine, HookManager } from "@deepicode/security"
-import { getAgent, agentConfigFor } from "./agent.js"
+import { getAgent, agentConfigFor, getMainMode } from "./agent.js"
+import { SubagentRegistry, checkSubagentPermission } from "./subagent/index.js"
+import type { SubagentRunOptions, SubagentRunResult, SubagentDefinition } from "./subagent/index.js"
 import { createModeSelectorState } from "./mode-selector.js"
 import type { ModeSelectorState } from "./mode-selector.js"
 import type { ThinkingMode } from "./provider-thinking.js"
@@ -108,9 +110,13 @@ export class ReasonixEngine implements CoreEngine {
 
   /** Context policy store for persistence */
   private policyStore: ContextPolicyStore
+  private contextPolicyLoadPromise: Promise<void> = Promise.resolve()
 
   /** ST2: Pending tier decision from TUI */
   private pendingTierDecision: { resolve: (v: boolean) => void; tier: string } | null = null
+
+  /** Subagent registry for resolving subagent definitions */
+  private subagentRegistry: SubagentRegistry
 
   /** AS3: Set thinking mode for auto-switch */
   setThinkingMode(mode: ThinkingMode): void {
@@ -178,6 +184,7 @@ export class ReasonixEngine implements CoreEngine {
     this.currentAgent = "build"
     this.permissionEngine = new PermissionEngine()
     this.hookManager = new HookManager()
+    this.subagentRegistry = new SubagentRegistry()
     this.hookManager.setErrorObserver((error, phase) => {
       if (this.logger.isEnabled("error")) {
         this.logger.error("hook.error", error, { phase })
@@ -199,6 +206,7 @@ export class ReasonixEngine implements CoreEngine {
       this.requestPermission,
       (task, agentType, files) => this.delegateTask(task, agentType, files),
       (name) => this.switchAgent(name),
+      (options) => this.spawnSubagent(options),
       persistConfig,
       this.logger,
     )
@@ -207,7 +215,7 @@ export class ReasonixEngine implements CoreEngine {
 
     // Initialize policy store and load saved policy
     this.policyStore = new ContextPolicyStore()
-    this.policyStore.load().then(savedPolicy => {
+    this.contextPolicyLoadPromise = this.policyStore.load().then(savedPolicy => {
       this.contextPolicy = savedPolicy
       if (this.logger.isEnabled("info")) {
         this.logger.info("context.policy.loaded", { policy: savedPolicy })
@@ -334,7 +342,13 @@ export class ReasonixEngine implements CoreEngine {
     return { ...this.contextPolicy }
   }
 
+  async getContextPolicyAsync(): Promise<ContextPolicy> {
+    await this.contextPolicyLoadPromise
+    return this.getContextPolicy()
+  }
+
   async setContextPolicy(policy: Partial<ContextPolicy>): Promise<void> {
+    await this.contextPolicyLoadPromise
     this.contextPolicy = mergeContextPolicy(this.contextPolicy, policy)
     await this.policyStore.save(this.contextPolicy)
     if (this.logger.isEnabled("info")) {
@@ -343,6 +357,7 @@ export class ReasonixEngine implements CoreEngine {
   }
 
   async getContextPolicyStatus(): Promise<ContextPolicyStatus> {
+    await this.contextPolicyLoadPromise
     const budget = await this.ctx.getBudget()
     return {
       policy: this.getContextPolicy(),
@@ -355,6 +370,7 @@ export class ReasonixEngine implements CoreEngine {
   }
 
   async runContextReduction(mode?: ContextReductionMode): Promise<ContextReductionResult> {
+    await this.contextPolicyLoadPromise
     const effectiveMode = mode ?? (this.contextPolicy.mode === "compact" ? "compress" : this.contextPolicy.mode)
     return this.ctx.reduceToTarget(effectiveMode, this.contextPolicy.targetRatio)
   }
@@ -596,28 +612,87 @@ export class ReasonixEngine implements CoreEngine {
   }
 
   private async delegateTask(task: string, agentType: "build" | "plan", files: string[]): Promise<string> {
-    const child = new ReasonixEngine(this.config, undefined, undefined, this.client, this.logger.child({ delegate: true }))
+    const subagentType = agentType === "plan" ? "Plan" : "general-purpose"
+    const result = await this.spawnSubagent({
+      description: task.split(/\s+/).slice(0, 5).join(" ") + "...",
+      prompt: files.length > 0
+        ? `${task}\n\nRelevant files:\n${files.map(file => `- ${file}`).join("\n")}`
+        : task,
+      subagentType,
+      files,
+    })
+    if (result.status === "completed") return result.result
+    return `[error] Sub-agent task failed: ${JSON.stringify(result)}`
+  }
+
+  async spawnSubagent(options: SubagentRunOptions): Promise<SubagentRunResult> {
+    const def = this.subagentRegistry.resolve(options.subagentType ?? "general-purpose")
+
+    const child = new ReasonixEngine(
+      this.config,
+      undefined,
+      undefined,
+      this.client,
+      this.logger.child({ delegate: true, subagentType: def.name }),
+    )
+
     try {
       for (const tool of this.tools.values()) {
         if (tool.name === "AgentTool") continue
+        if (def.disallowedTools?.includes(tool.name)) continue
+        if (def.tools && def.tools[0] !== "*" && !def.tools.includes(tool.name)) continue
+
         child.registerTool(tool)
-        if (tool.approval === "exec") {
+
+        const perm = checkSubagentPermission(tool.name, def.permissionMode)
+        if (!perm.allowed) {
           child.permissionEngine.addDenyRule({
             toolName: tool.name,
-            reason: `Background sub-agent cannot run exec tool without an interactive confirmation channel: ${tool.name}`,
+            reason: perm.reason ?? `Denied by subagent permission mode: ${def.permissionMode}`,
+          })
+        }
+
+        if (def.permissionMode === "denyExec" && tool.approval === "exec") {
+          child.permissionEngine.addDenyRule({
+            toolName: tool.name,
+            reason: `Subagent in denyExec mode cannot run exec tool: ${tool.name}`,
           })
         }
       }
 
-      const fileContext = files.length > 0
-        ? `\nRelevant files:\n${files.map(file => `- ${file}`).join("\n")}`
-        : ""
+      const agentCfg = agentConfigFor("build", {
+        systemPrompt: def.systemPrompt,
+        toolNames: this.subagentRegistry.getEffectiveTools(def) ?? undefined,
+        model: typeof options.model === "string" && options.model !== "inherit" ? options.model : undefined,
+      })
+
       let output = ""
-      for await (const event of child.submit(`${task}${fileContext}`, agentConfigFor(agentType))) {
+      const warnings: string[] = []
+      let usage = { promptTokens: 0, completionTokens: 0 }
+
+      for await (const event of child.submit(options.prompt, agentCfg)) {
         if (event.role === "assistant_delta") output += event.content ?? ""
-        if (event.role === "error") output += `\n[error] ${event.content ?? "unknown error"}`
+        if (event.role === "usage" && event.metadata) {
+          usage = {
+            promptTokens: (event.metadata.promptTokens as number) ?? 0,
+            completionTokens: (event.metadata.completionTokens as number) ?? 0,
+          }
+        }
+        if (event.role === "error") {
+          warnings.push(event.content ?? "unknown error")
+        }
       }
-      return output.trim()
+
+      return {
+        status: "completed",
+        id: `subagent_${randomUUID().slice(0, 8)}`,
+        subagent_type: def.name,
+        description: options.description,
+        result: output.trim(),
+        files: options.files ?? [],
+        usage,
+        warnings,
+      }
     } finally {
       await child.shutdown()
     }

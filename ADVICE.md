@@ -4,14 +4,398 @@
 
 本文只保留后续 Agent 仍需要执行的专项指导。已完成能力以 [DONE.md](DONE.md) 为准；待办入口以 [TODO.md](TODO.md) 为准；CI 与平台兼容性排查按 [CI-Compatibility-Fix-Guide.md](CI-Compatibility-Fix-Guide.md) 执行。
 
-当前包含两个专项：
+当前包含三个专项：
 
+- `AGENT-90`：主 Agent Plan/Build 状态与临时 Subagent 架构重构。
 - `CTX-70`：Context 文档和验收。
 - `FG-*`：基于 `Find_ground_Report.md` 的隐性兜底治理剩余项。
 
 ---
 
-## 1. Context 当前事实
+## 1. AGENT-90：Plan/Build 主状态与临时 Subagent 架构
+
+优先级：`P0`
+
+目标：
+
+- 主 Agent 只有两种用户可见工作状态：`Plan` 和 `Build`。
+- `Plan` 是主 Agent 的只读分析状态，只能回答、读文件、搜索、列目录、写 todo，不允许改代码、写文件、执行会改变系统状态的命令。
+- `Build` 是主 Agent 的执行状态，可以改代码、写文件、运行需要审批的命令。
+- `Subagent` 不是第三种主状态，而是由主 Agent 通过 `AgentTool` 临时生成的子代理。子代理可以是命名角色，也可以是 fork worker；它有独立会话、工具边界、最大轮次、输出汇总和生命周期事件。
+- 参考 `/vol4/Agent/best-claude-code` 的 AgentTool 设计，但不要照搬所有后台 daemon、remote agent、team swarm 能力。Deepicode 第一阶段先实现本地临时子代理。
+
+### 1.1 当前 deepicode 事实
+
+已有基础：
+
+- `packages/core/src/agent.ts` 已有 `build` 和 `plan` 两个 agent definition。
+- `packages/tui/src/App.tsx` 已有 `/agent` 切换 UI。
+- `packages/tools/src/agent-tool.ts` 已有 `AgentTool`，参数为 `task / agent_type / files`。
+- `packages/core/src/engine.ts` 已有 `delegateTask()`，会创建 child `ReasonixEngine`。
+- `delegateTask()` 当前会排除 `AgentTool`，并对 `approval === "exec"` 的工具加 deny rule，避免后台子代理直接跑 exec。
+
+主要差距：
+
+- `agent` 概念被混用：主状态、工具执行者、子代理类型都叫 agent，后续维护容易误改。
+- 当前 `AgentTool` 只能选 `build / plan`，不能表达 `Explore`、`reviewer`、`general-purpose`、`fork` 等临时子代理角色。
+- 当前子代理是同步返回字符串，没有稳定的 task id、状态、后台通知、输出文件、进度事件或恢复入口。
+- 当前 `Plan` 的只读边界主要靠 tool list，不够系统化。还需要在 permission 层 fail-closed。
+- 当前子代理没有 `maxTurns`、模型继承、system prompt 覆盖、工具 allow/deny、是否继承父上下文等配置。
+
+### 1.2 Claude Code 参考点
+
+只参考这些能力：
+
+- `/vol4/Agent/best-claude-code/docs/agent/sub-agents.mdx`
+  - 区分命名子 Agent、AgentTool fork、slash command fork、内部 `runForkedAgent()`。
+  - `AgentTool` 参数包含 `description`、`prompt`、`subagent_type`、`model`、`run_in_background`、`isolation`、`cwd` 等。
+  - 普通命名子 Agent 从零上下文启动；fork 子 Agent 继承父级上下文。
+- `/vol4/Agent/best-claude-code/docs/extensibility/custom-agents.mdx`
+  - Agent definition 支持 `name / description / tools / disallowedTools / model / maxTurns / permissionMode / background / skills / hooks`。
+  - Agent definitions 可以来自 built-in、plugin、项目目录，按优先级合并。
+- `/vol4/Agent/best-claude-code/docs/features/fork-subagent.md`
+  - fork worker 继承父级 system prompt、消息历史、工具定义和模型。
+  - fork worker 必须有递归防护，不能再次 spawn sub-agent。
+  - fork worker 的权限请求要冒泡到父级交互端，或在没有交互端时 fail-fast。
+- `/vol4/Agent/best-claude-code/packages/builtin-tools/src/tools/AgentTool/prompt.ts`
+  - 工具提示里要明确：普通 Agent 从零上下文开始，prompt 必须包含完整背景；fork 继承上下文，prompt 应写成 directive。
+  - 后台 Agent 完成后通知主 Agent；主 Agent 不能猜测后台结果。
+- `/vol4/Agent/best-claude-code/packages/builtin-tools/src/tools/AgentTool/built-in/planAgent.ts`
+  - Plan/Explore 这类只读 Agent 必须在 system prompt 和工具层双重禁止写入。
+
+不要第一阶段照搬：
+
+- team swarm、teammate idle、远程 CCR、daemon attach、agent memory、agent color、复杂任务面板。
+- `worktree` 隔离可以预留 schema，但不要作为 AGENT-90 第一阶段的必须交付，除非用户单独要求。
+
+### 1.3 命名和边界
+
+建议重命名概念，避免继续混淆：
+
+- `MainMode`：主 Agent 的用户可见状态，枚举为 `"plan" | "build"`。
+- `SubagentDefinition`：可被 `AgentTool` 临时启动的子代理定义。
+- `SubagentRun`：一次子代理运行实例，包含 `id / status / definitionName / prompt / transcript / result / createdAt / finishedAt`。
+- `AgentTool`：启动子代理的工具。它不是主状态切换工具。
+
+主状态 API：
+
+```ts
+type MainMode = "plan" | "build"
+
+interface MainModeDefinition {
+  name: MainMode
+  label: string
+  systemPrompt: string
+  toolNames: string[]
+  permissionProfile: "readonly" | "build"
+}
+```
+
+子代理 API：
+
+```ts
+type SubagentPermissionMode = "readonly" | "acceptEdits" | "bubble" | "denyExec"
+
+interface SubagentDefinition {
+  name: string
+  description: string
+  tools?: string[]
+  disallowedTools?: string[]
+  model?: "inherit" | string
+  maxTurns?: number
+  permissionMode: SubagentPermissionMode
+  background?: boolean
+  inheritContext?: boolean
+  systemPrompt: string
+}
+
+interface SubagentRunOptions {
+  description: string
+  prompt: string
+  subagentType?: string
+  model?: "inherit" | string
+  runInBackground?: boolean
+  files?: string[]
+}
+```
+
+### 1.4 主 Agent Plan/Build 实施方案
+
+1. 把 `packages/core/src/agent.ts` 从通用 `AGENTS` 语义收敛为主状态定义，或新增 `main-mode.ts` 并逐步迁移。
+
+2. `Plan` 的只读边界必须双保险：
+   - `toolNames` 只包含 `read_file`、`list_dir`、`grep`、`glob`、`WebFetch`、`WebSearch`、`Skill`、`TaskList/TaskGet/TodoWrite` 这类读或计划工具。
+   - permission 层对 `write` 和 `exec` tier 默认 deny。即使某个写工具被错误加入 Plan tool list，也必须执行失败。
+
+3. `Build` 保持完整工具集，但仍遵守现有 permission ask/allow/deny 流程。
+
+4. `/agent` 可以继续作为模式切换入口，但 UI 文案建议改为 `/mode` 或把显示文案改成 `Plan mode / Build mode`，减少和 subagent 混淆。为了兼容，`/agent` 可以保留 alias。
+
+5. `Plan` 不能自动进入 `Build`。如需从计划转执行，必须满足以下任一条件：
+   - 用户显式 `/agent` 或 `/mode` 切换到 Build。
+   - 新增类似 `PlanMode` 的工具返回“计划已完成，等待用户批准切换 Build”，TUI 展示确认。
+
+6. 测试必须覆盖：
+   - Plan 模式无法调用 `write_file / edit / bash / notebook_edit`。
+   - Plan 模式即使通过错误注册拿到写工具，也会被 permission profile 拦截。
+   - Build 模式仍可按现有权限确认流程执行写入和 exec。
+   - `/agent` 或新 `/mode` 切换后 engine 的 tool schema 与 status bar 同步变化。
+
+### 1.5 Subagent 第一阶段实施方案
+
+第一阶段先实现“本地临时命名子代理 + 同步返回”。这是对当前 `delegateTask()` 的升级，不做后台 UI。
+
+建议文件：
+
+- `packages/core/src/subagent/definition.ts`
+- `packages/core/src/subagent/registry.ts`
+- `packages/core/src/subagent/run.ts`
+- `packages/core/src/subagent/fork-context.ts`
+- `packages/tools/src/agent-tool.ts`
+- `packages/core/src/engine.ts`
+- `packages/core/src/streaming-executor.ts`
+
+内置子代理：
+
+```ts
+const BUILTIN_SUBAGENTS: SubagentDefinition[] = [
+  {
+    name: "general-purpose",
+    description: "General task worker for implementation or investigation",
+    tools: ["*"],
+    disallowedTools: ["AgentTool"],
+    model: "inherit",
+    maxTurns: 20,
+    permissionMode: "denyExec",
+    inheritContext: false,
+    systemPrompt: "...",
+  },
+  {
+    name: "Explore",
+    description: "Fast read-only code search and repository exploration",
+    tools: ["read_file", "list_dir", "grep", "glob", "WebFetch", "WebSearch"],
+    disallowedTools: ["AgentTool", "write_file", "edit", "bash", "NotebookEdit"],
+    model: "inherit",
+    maxTurns: 8,
+    permissionMode: "readonly",
+    inheritContext: false,
+    systemPrompt: "READ-ONLY exploration prompt...",
+  },
+  {
+    name: "Plan",
+    description: "Read-only software planning specialist",
+    tools: ["read_file", "list_dir", "grep", "glob", "todowrite"],
+    disallowedTools: ["AgentTool", "write_file", "edit", "bash", "NotebookEdit"],
+    model: "inherit",
+    maxTurns: 12,
+    permissionMode: "readonly",
+    inheritContext: false,
+    systemPrompt: "READ-ONLY planning prompt...",
+  },
+]
+```
+
+`AgentTool` schema 建议改为：
+
+```ts
+{
+  description: string,       // 3-5 个词，用于日志/UI
+  prompt: string,            // 给子代理的完整任务
+  subagent_type?: string,    // 缺省走 general-purpose 或 fork gate
+  model?: string,            // 可选，inherit 或具体模型
+  run_in_background?: boolean, // 第一阶段可接受但返回 unsupported，第二阶段实现
+  files?: string[],          // 兼容当前实现
+}
+```
+
+兼容策略：
+
+- 旧参数 `task` 暂时保留，内部映射为 `prompt`。
+- 旧参数 `agent_type: "build" | "plan"` 暂时映射：
+  - `build` -> `general-purpose`
+  - `plan` -> `Plan`
+- 新 prompt 中不要再鼓励使用 `agent_type`。
+
+运行流程：
+
+```text
+AgentTool.execute(args, ctx)
+  -> validate prompt/description
+  -> ctx.spawnSubagent(options)
+  -> SubagentRegistry.resolve(subagent_type ?? "general-purpose")
+  -> filter tools by tools/disallowedTools
+  -> create child ReasonixEngine
+  -> set child metadata: parentSessionId, subagentRunId, subagentType
+  -> inject child systemPrompt
+  -> submit child prompt
+  -> collect assistant_final / assistant_delta / error
+  -> return structured JSON result
+```
+
+返回格式：
+
+```json
+{
+  "status": "completed",
+  "id": "subagent_xxx",
+  "subagent_type": "Plan",
+  "description": "review auth flow",
+  "result": "...",
+  "files": ["packages/core/src/engine.ts"],
+  "usage": { "promptTokens": 0, "completionTokens": 0 },
+  "warnings": []
+}
+```
+
+### 1.6 Fork 子代理第二阶段方案
+
+第二阶段再实现 fork。fork 的语义：
+
+- `subagent_type` 省略，并且 `FEATURE_FORK_SUBAGENT=1` 或 deepicode 配置开启时，走 fork。
+- fork 继承父级 system prompt、当前可见消息历史、模型和工具 schema。
+- fork 的 prompt 是 directive，不需要重复背景。
+- fork 禁止递归 spawn：child 的 `ToolContext` 不提供 `spawnSubagent`，并且工具池移除 `AgentTool`。
+- fork 权限模式为 `bubble`。如果父级有交互 channel，则子代理权限请求通过父级 TUI 展示；如果没有，直接 deny 并返回清晰错误。
+
+Deepicode 第一版 fork 可以先做同步，不强制后台：
+
+```text
+AgentTool({ prompt: "...", fork: true })
+  -> clone parent context snapshot
+  -> append fork directive
+  -> child.submit(...)
+  -> return result
+```
+
+注意：
+
+- 不要直接共享父 `ContextManager` 实例，必须 snapshot clone，避免 child 写入污染父上下文。
+- 必须过滤未完成 tool call，避免构造非法消息链。
+- fork child 的日志要带 `delegate: true`、`subagentType: "fork"`、`parentSessionId`。
+- fork 结果默认只回给主 Agent，不直接展示给用户。主 Agent 负责综合回答。
+
+### 1.7 后台子代理第三阶段方案
+
+第三阶段实现 `run_in_background`，不要提前把 UI 和持久化做复杂。
+
+最小后台模型：
+
+- `SubagentRunStore`：内存 Map，保存 running/completed/failed/cancelled。
+- `AgentTool(run_in_background: true)` 立即返回：
+
+```json
+{
+  "status": "async_launched",
+  "id": "subagent_xxx",
+  "description": "review auth flow"
+}
+```
+
+- child 完成后生成一个主对话可消费的 `tool_notification` 或 synthetic user message：
+
+```xml
+<task-notification id="subagent_xxx" status="completed">
+...
+</task-notification>
+```
+
+- 主 Agent 收到通知后才能总结结果。未收到结果前不能猜测。
+- TUI 第一版只需在 status 或 message list 里显示后台任务完成通知，不需要完整任务面板。
+
+### 1.8 权限规则
+
+必须 fail-closed：
+
+- `readonly`：只允许 read tier 工具。写和 exec 全部 deny。
+- `denyExec`：允许 read/write，但 exec deny。适合后台 general-purpose 本地子代理。
+- `acceptEdits`：允许 read/write，exec 仍走父级 ask 或 deny，具体由主 permission policy 控制。
+- `bubble`：子代理请求权限时转发到父级交互端。没有父级交互端则 deny。
+
+子代理永远默认禁止：
+
+- 调用 `AgentTool` 生成嵌套子代理，除非后续明确支持并有深度限制。
+- 修改权限配置文件来绕过规则。
+- 在 readonly 模式下通过 `bash` 写文件、重定向、`rm`、`mv`、`cp`、`touch`、`git add`、`git commit`。
+
+`Plan` 和 `Explore` prompt 中必须写明 READ-ONLY，但 prompt 不是安全边界。真正边界在 tool filter 和 permission engine。
+
+### 1.9 Prompt 规范
+
+`AgentTool` 的 description 要明确告诉主模型：
+
+- 普通子代理从零上下文开始，必须在 `prompt` 中写完整背景、目标、文件路径、已知约束、期望输出。
+- 不要写“根据你的发现去修复”这种把理解外包给子代理的 prompt。主 Agent 必须先理解，再分派具体任务。
+- 只读任务使用 `Explore` 或 `Plan`。
+- 需要改文件的任务使用 `general-purpose` 或后续自定义 build 类子代理。
+- 子代理结果默认不可直接给用户看，主 Agent 要综合后回复。
+- 并发启动多个子代理时，必须一次性发出多个 tool call；不要 sleep/poll。
+
+### 1.10 测试计划
+
+新增或扩展测试：
+
+- `packages/tools/__tests__/agent-tool.test.ts`
+  - `task` 兼容 `prompt`。
+  - `agent_type` 兼容映射到新 `subagent_type`。
+  - 未知 `subagent_type` 返回 tool error，不静默 fallback。
+  - `description` 缺省时从 prompt 生成或返回 warning，规则必须固定。
+
+- `packages/core/__tests__/subagent-registry.test.ts`
+  - built-in definitions 加载。
+  - tools/disallowedTools 过滤。
+  - duplicate definition 优先级。
+
+- `packages/core/__tests__/subagent-permission.test.ts`
+  - readonly 子代理不能写文件。
+  - denyExec 子代理不能跑 bash。
+  - AgentTool 在 child 中不可用。
+
+- `packages/core/__tests__/subagent-run.test.ts`
+  - child engine shutdown 在成功/失败时都会执行。
+  - maxTurns 生效。
+  - child 输出和 error 能结构化返回。
+  - parent context 不被 child 污染。
+
+- `packages/tui/__tests__/commands.test.ts`
+  - `/agent` 或 `/mode` 文案和切换仍工作。
+  - status bar 显示 `Plan` 或 `Build`，不要显示临时 subagent。
+
+建议验收命令：
+
+```bash
+bun test packages/tools/__tests__/workflow-agent-send-lsp.test.ts
+bun test packages/core/__tests__/agent.test.ts
+bun test packages/core/__tests__/engine-tools.test.ts
+bun test packages/tui/__tests__/commands.test.ts
+bun run typecheck
+```
+
+### 1.11 分阶段关闭条件
+
+P0 第一阶段关闭条件：
+
+- 主 Agent `Plan/Build` 边界明确，Plan 写/exec fail-closed。
+- `AgentTool` 支持 `description / prompt / subagent_type / files`，旧参数兼容。
+- 内置 `general-purpose / Explore / Plan` 子代理可用。
+- 子代理有独立 child engine、独立 system prompt、工具过滤、maxTurns、结构化返回。
+- 子代理不能嵌套调用 `AgentTool`。
+- 相关单元测试和 typecheck 通过。
+
+P1 第二阶段关闭条件：
+
+- fork 子代理支持上下文继承和递归防护。
+- fork 不污染父 context。
+- fork 权限 bubble 或无交互 deny 行为明确。
+
+P2 第三阶段关闭条件：
+
+- `run_in_background` 可用。
+- 有最小任务状态、完成通知和取消能力。
+- 主 Agent 不会在后台结果未完成时虚构结果。
+
+---
+
+## 2. Context 当前事实
 
 - `ContextPolicy`、`ContextPolicyStore`、summary 区域、`ContextSummarizer` 接口、engine 自动触发、真实 `LLMSummarizer` 都已经实现。
 - `/context` 菜单已经实现并接入真实 engine policy：
@@ -25,7 +409,7 @@
 
 ---
 
-## 2. Context 不要重做的内容
+## 3. Context 不要重做的内容
 
 后续 Agent 不要重写以下内容：
 
@@ -40,7 +424,7 @@
 
 ---
 
-## 3. CTX-70：文档和验收
+## 4. CTX-70：文档和验收
 
 优先级：`P1`
 
@@ -99,36 +483,6 @@ bun run typecheck
 - `bun run typecheck` 通过。
 - 人工验收结果写入 `DONE.md`。
 - `TODO.md` 中删除 `CTX-70` 或只保留明确无法自动化的人工验收项。
-
----
-
-## 4. Find_ground_Report.md 审查结论
-
-我对 `Find_ground_Report.md` 的结论是：**方向有价值，但严重级别和部分推论偏激，不能原样作为开发任务执行。**
-
-报告客观指出了一个真实问题：项目中存在多处“兜底成功”路径，调用方或用户不一定能感知发生了降级、跳过或 best-effort 失败。这会降低可调试性，也会制造测试假阳性。
-
-但报告有三类过度判断：
-
-1. 把合理的 best-effort 行为直接升级为 P0/P1。
-   - `SessionLoader.read()` 容忍尾行损坏、`AsyncSessionWriter` 不阻塞主流程、MCP 单 server 失败不阻塞其他 server，这些是明确的产品取舍。
-   - 不能简单改成 fail-fast，否则会破坏 session recovery、CLI 启动和 MCP 部分可用性。
-
-2. 忽略已有日志或观察机制。
-   - `AsyncSessionWriter.append_error` 已有 debug 日志。
-   - `HookManager` 已有 `setErrorObserver()`，engine 已接到 `hook.error`。
-   - `McpHost.connect()` 已记录 `mcp.server.connect.error`，只是 `cli.ts` 的 load promise 对用户侧没有反馈。
-
-3. 建议的 API 破坏面过大。
-   - 直接把 `TokenizerPool.estimate(): Promise<number>` 改成 `{ value, source }` 会波及 `ContextManager`、status、policy、tests 和所有预算调用点。收益存在，但不是第一步。
-   - 直接把 `edit` fuzzy fallback 默认关闭，会改变工具成功率和模型编辑体验，应先做显式告警，再评估 strict mode。
-
-因此后续处理原则是：
-
-- 不消灭所有 fallback。
-- 不把 best-effort 全部改成 throw。
-- 只治理“调用方无法感知且可能产生错误行为”的兜底。
-- 对允许保留的兜底补日志、状态、测试和文档。
 
 ---
 

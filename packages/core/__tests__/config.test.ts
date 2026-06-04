@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
-import { PROVIDERS, getApiKeyEnvVar, loadConfig, saveLastConfig } from "../src/config.js"
+import { PROVIDERS, getApiKeyEnvVar, getModelContextWindow, loadConfig, saveLastConfig } from "../src/config.js"
 import { mkdtempSync, writeFileSync, existsSync, readFileSync, rmSync, mkdirSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -13,6 +13,7 @@ describe("PROVIDERS", () => {
     expect(zen.label).toBe("Zen (Free)")
     expect(zen.model).toBe("deepseek-v4-flash-free")
     expect(zen.models.map((entry) => entry.model)).toEqual(["deepseek-v4-flash-free", "mimo-v2.5-free"])
+    expect(zen.models.every((entry) => entry.contextWindow === 1_000_000)).toBe(true)
   })
 
   it("should have deepseek provider without defaultKey", () => {
@@ -26,6 +27,13 @@ describe("PROVIDERS", () => {
     const mimo = PROVIDERS.mimo
     expect(mimo).toBeDefined()
     expect(mimo.models).toHaveLength(2)
+  })
+
+  it("should resolve model-specific context windows", () => {
+    expect(getModelContextWindow("zen", "deepseek-v4-flash-free")).toBe(1_000_000)
+    expect(getModelContextWindow("deepseek", "deepseek-v4-pro")).toBe(1_000_000)
+    expect(getModelContextWindow("mimo", "mimo-v2.5")).toBe(1_000_000)
+    expect(getModelContextWindow("unknown", "custom")).toBe(128_000)
   })
 })
 
@@ -119,6 +127,7 @@ describe("loadConfig - 环境变量", () => {
     expect(cfg.provider).toBe("zen")
     expect(cfg.model).toBe("deepseek-v4-flash-free")
     expect(cfg.apiKey).toBe("public")
+    expect(cfg.contextWindow).toBe(1_000_000)
   })
 })
 

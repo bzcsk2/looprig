@@ -4,6 +4,7 @@ import type { PermissionEngine, HookManager } from "@deepicode/security"
 import { type ResultPersistenceConfig } from "./result-persistence.js"
 import { noopRuntimeLogger, type RuntimeLogger } from "./runtime-logger.js"
 import { evaluatePermission, createSettleLedger, createProgressQueue, applyResultPersistence, parseToolCallArgs } from "./executor-helpers.js"
+import type { SubagentRunOptions, SubagentRunResult } from "./subagent/types.js"
 
 export class StreamingToolExecutor {
   private tools: Map<string, AgentTool>
@@ -14,6 +15,7 @@ export class StreamingToolExecutor {
   private requestPermission?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>
   private delegateTask?: (task: string, agentType: "build" | "plan", files: string[]) => Promise<string>
   private switchAgent?: (name: "build" | "plan") => string
+  private spawnSubagent?: (options: SubagentRunOptions) => Promise<SubagentRunResult>
   private resultPersistenceConfig?: ResultPersistenceConfig
   private logger: RuntimeLogger
 
@@ -30,6 +32,7 @@ export class StreamingToolExecutor {
     requestPermission?: (toolName: string, args: Record<string, unknown>) => Promise<boolean>,
     delegateTask?: (task: string, agentType: "build" | "plan", files: string[]) => Promise<string>,
     switchAgent?: (name: "build" | "plan") => string,
+    spawnSubagent?: (options: SubagentRunOptions) => Promise<SubagentRunResult>,
     resultPersistenceConfig?: ResultPersistenceConfig,
     logger: RuntimeLogger = noopRuntimeLogger,
   ) {
@@ -41,6 +44,7 @@ export class StreamingToolExecutor {
     this.requestPermission = requestPermission
     this.delegateTask = delegateTask
     this.switchAgent = switchAgent
+    this.spawnSubagent = spawnSubagent
     this.resultPersistenceConfig = resultPersistenceConfig
     this.logger = logger
   }
@@ -272,6 +276,7 @@ export class StreamingToolExecutor {
       reportProgress,
       delegateTask: this.delegateTask,
       switchAgent: this.switchAgent,
+      spawnSubagent: this.spawnSubagent,
       invokeTool: async (name, args) => {
         if (stack.includes(name)) {
           return makeToolError(`Recursive tool invocation is not allowed: ${[...stack, name].join(" -> ")}`)
