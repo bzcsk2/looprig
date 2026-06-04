@@ -16,7 +16,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: '/lang', description: 'switch language' },
   { name: '/status', description: 'show runtime status' },
   { name: '/context', description: 'configure context trimming/compact' },
-  { name: '/thinking', description: 'set thinking mode (off/low/medium/high/max)' },
+  { name: '/thinking', description: 'set thinking mode (auto/off/open/high)' },
 ];
 
 export function filterCommands(query: string): SlashCommand[] {

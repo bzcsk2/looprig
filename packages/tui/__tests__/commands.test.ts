@@ -29,8 +29,9 @@ describe("CL-52: slash command routing helpers", () => {
   it("parses and validates thinking modes", () => {
     expect(parseSlashCommand("/thinking high")).toEqual({ name: "thinking", mode: "high" })
     expect(parseSlashCommand("/thinking")).toEqual({ name: "thinking", mode: "" })
-    expect(getThinkingModes()).toEqual(["off", "low", "medium", "high", "max"])
-    expect(validateThinkingMode("max")).toBeNull()
+    expect(getThinkingModes()).toEqual(["auto", "off", "open", "high"])
+    expect(validateThinkingMode("open")).toBeNull()
+    expect(validateThinkingMode("auto")).toBeNull()
     expect(validateThinkingMode("invalid")).toContain("Usage: /thinking <mode>")
   })
 

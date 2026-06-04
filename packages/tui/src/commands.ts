@@ -17,7 +17,7 @@ export type SlashCommand =
   | { name: "status" }
   | { name: "context" }
 
-const THINKING_MODES = ["off", "low", "medium", "high", "max"]
+const THINKING_MODES = ["auto", "off", "open", "high"]
 
 /**
  * CL-52: Parse a slash command from user input.

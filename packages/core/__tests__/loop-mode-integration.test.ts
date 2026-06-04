@@ -37,7 +37,7 @@ describe("AS3: Controller and loop integration", () => {
 
     const modeSwitch = events.find(e => e.role === "status" && e.content === "thinking_mode_switch")
     expect(modeSwitch).toBeDefined()
-    expect(modeSwitch!.metadata).toMatchObject({ from: "off", to: "high" })
+    expect(modeSwitch!.metadata).toMatchObject({ from: "off", to: "open" })
   })
 
   it("complex tool chain triggers switch from high to off", async () => {

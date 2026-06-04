@@ -85,7 +85,7 @@ export function evaluateModeSwitch(
 
   if (signal.toolCallCount <= 1 && signal.loopCount <= 2 && signal.textLength < 500 && signal.retryCount === 0 && !signal.hasError) {
     if (signal.currentMode === "off") {
-      return { action: "switch", target: "high", reason: "simple_query_enable_thinking" }
+      return { action: "switch", target: "open", reason: "simple_query_enable_thinking" }
     }
   }
 

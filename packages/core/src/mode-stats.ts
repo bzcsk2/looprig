@@ -18,7 +18,7 @@ export function createModeStats(): ModeStats {
   return {
     totalSwitches: 0,
     switchesByReason: {},
-    timeInMode: { off: 0, low: 0, medium: 0, high: 0, max: 0 },
+    timeInMode: { off: 0, open: 0, high: 0, auto: 0 },
     lastSwitch: null,
   }
 }

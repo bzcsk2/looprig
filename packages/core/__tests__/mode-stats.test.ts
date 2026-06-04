@@ -6,7 +6,7 @@ describe("AS6: Mode statistics and calibration", () => {
     const stats = createModeStats()
     expect(stats.totalSwitches).toBe(0)
     expect(stats.switchesByReason).toEqual({})
-    expect(stats.timeInMode).toEqual({ off: 0, low: 0, medium: 0, high: 0, max: 0 })
+    expect(stats.timeInMode).toEqual({ off: 0, open: 0, high: 0, auto: 0 })
     expect(stats.lastSwitch).toBeNull()
   })
 
