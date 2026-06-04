@@ -10,15 +10,15 @@ export interface ProviderThinkingCapabilities {
   mapMode(mode: ThinkingMode): ThinkingModeMapping | null
 }
 
-export function createDeepSeekCapabilities(): ProviderThinkingCapabilities {
+export function createDeepSeekCapabilities(provider?: string): ProviderThinkingCapabilities {
+  const supportsReasoningEffort = provider === "deepseek"
   return {
     supportedModes: ["off", "low", "medium", "high", "max"],
     mapMode(mode) {
       if (mode === "off") return { thinking: { type: "disabled" } }
-      return {
-        thinking: { type: "enabled" },
-        reasoningEffort: mode,
-      }
+      const result: ThinkingModeMapping = { thinking: { type: "enabled" } }
+      if (supportsReasoningEffort) result.reasoningEffort = mode
+      return result
     },
   }
 }

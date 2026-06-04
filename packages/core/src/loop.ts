@@ -125,7 +125,7 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
       temperature: config.temperature,
       signal,
       tools: toolSpecs.length > 0 ? toolSpecs : undefined,
-      ...createDeepSeekCapabilities().mapMode(currentMode),
+      ...createDeepSeekCapabilities(config.provider).mapMode(currentMode),
       traceContext: diagnosticsEnabled ? { submitId, turnCount } : undefined,
     })) {
       if (isInterrupted()) {
