@@ -10,6 +10,10 @@ import { resolveContentPack } from "./content-pack/resolver.js"
 import { isDirectory } from "./content-pack/discovery.js"
 import { parseEccAgentMarkdown } from "./content-pack/agent-parser.js"
 import { compileRules } from "./content-pack/rules-compiler.js"
+import { parseEccHooks } from "./content-pack/hook-bridge.js"
+import type { BridgedHook } from "./content-pack/hook-bridge.js"
+import { convertCommandsToSkills } from "./content-pack/command-to-skill.js"
+import type { CommandSkillEntry } from "./content-pack/command-to-skill.js"
 import type { ResolvedContentPack, ContentPackDiagnostic, ContentPackPluginOptions } from "./content-pack/types.js"
 
 export interface PluginRuntimeOptions {
@@ -176,6 +180,31 @@ export class PluginRuntime {
       this.diagnostics.push(`[warn] ${w}`)
     }
     return { systemPrompt: result.systemPrompt, count: result.count, warnings: result.warnings }
+  }
+
+  loadCommandSkills(): CommandSkillEntry[] {
+    const skills: CommandSkillEntry[] = []
+    for (const cp of this.contentPacks) {
+      const result = convertCommandsToSkills(cp.assets.commands)
+      skills.push(...result.skills)
+      for (const w of result.warnings) {
+        this.diagnostics.push(`[warn] ${w}`)
+      }
+    }
+    return skills
+  }
+
+  loadHookConfigs(): { hooks: BridgedHook[]; warnings: string[] } {
+    const all: BridgedHook[] = []
+    const warnings: string[] = []
+    for (const cp of this.contentPacks) {
+      for (const asset of cp.assets.hooks) {
+        const result = parseEccHooks(asset.path)
+        all.push(...result.hooks)
+        warnings.push(...result.warnings)
+      }
+    }
+    return { hooks: all, warnings }
   }
 
   loadMcpConfigs(): Array<{ name: string; command: string; args?: string[]; env?: Record<string, string> }> {
