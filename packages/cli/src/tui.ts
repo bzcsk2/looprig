@@ -80,7 +80,6 @@ async function main(): Promise<void> {
   let memoryService: import("@deepreef/memory").MemoryService | undefined
   let memoryBridge: import("@deepreef/memory").DeepreefMemoryBridge | undefined
   let memoryHookAdapter: ToolCallHooks | undefined
-  let lastHookPromise: Promise<void> | undefined
   const enableMemory = process.env.DEEPREEF_MEMORY !== "false"
   if (enableMemory) {
     try {
@@ -133,20 +132,9 @@ async function main(): Promise<void> {
           }
         },
       }
-      // P3-3: Wrap hook adapter to track last promise for race-safe cleanup
-      const trackedAdapter: ToolCallHooks = {
-        ...hookAdapter,
-        onLoopEvent: hookAdapter.onLoopEvent
-          ? async (event) => {
-              const p = hookAdapter.onLoopEvent!(event)
-              lastHookPromise = p
-              await p.finally(() => { if (lastHookPromise === p) lastHookPromise = undefined })
-            }
-          : undefined,
-      }
       // P1-1: Save reference for cleanup on exit
-      memoryHookAdapter = trackedAdapter
-      engine.hookManager.addHooks(trackedAdapter)
+      memoryHookAdapter = hookAdapter
+      engine.hookManager.addHooks(hookAdapter)
 
       // P1-3: Register memory_migrate tool + P0-3 fix via dynamic import
       engine.registerTool(memory.createMemoryRecallTool(memoryService))
@@ -225,9 +213,9 @@ async function main(): Promise<void> {
 
     await runTUIMode(engine, config, pluginRuntime, mcpConfigs.length, memoryBridge)
   } finally {
-    // P3-3: Wait for any in-flight hook observation to complete before cleanup
-    // (engine's void runOnLoopEvent is fire-and-forget; this prevents race with onSessionEnd)
-    await lastHookPromise?.catch(() => {})
+    // P3-3: Drain all pending hook observations before cleanup
+    // (engine's void runOnLoopEvent is fire-and-forget; drain waits for all in-flight hooks)
+    await engine.hookManager.drain().catch(() => {})
     // Phase C: Stop memory subsystem before engine (best-effort)
     await memoryBridge?.onSessionEnd(engine.getSessionId()).catch(() => {})
     // P1-1: Remove hook adapter to avoid duplicate observations on restart

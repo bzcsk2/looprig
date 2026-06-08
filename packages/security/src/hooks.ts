@@ -25,6 +25,7 @@ export type HookPhase = "before" | "after" | "loop_event"
 export class HookManager {
   private hooks: ToolCallHooks[] = []
   private onHookError?: (error: unknown, phase: HookPhase) => void
+  private pending: Set<Promise<void>> = new Set()
 
   addHooks(hooks: ToolCallHooks): void {
     this.hooks.push(hooks)
@@ -69,13 +70,22 @@ export class HookManager {
   }
 
   async runOnLoopEvent(event: Record<string, unknown>): Promise<void> {
-    for (const hooks of this.hooks) {
-      if (hooks.onLoopEvent) {
-        // P5: loop_event hook failure must not interrupt main flow
-        try { await hooks.onLoopEvent(event) } catch (e) {
-          this.onHookError?.(e, "loop_event")
+    const p = (async () => {
+      for (const hooks of this.hooks) {
+        if (hooks.onLoopEvent) {
+          // P5: loop_event hook failure must not interrupt main flow
+          try { await hooks.onLoopEvent(event) } catch (e) {
+            this.onHookError?.(e, "loop_event")
+          }
         }
       }
-    }
+    })()
+    this.pending.add(p)
+    await p.finally(() => this.pending.delete(p))
+  }
+
+  /** Wait for all in-flight hook calls to complete (best-effort). */
+  async drain(): Promise<void> {
+    await Promise.all([...this.pending])
   }
 }

@@ -158,6 +158,11 @@ export function createBridge(
   const submit = async (text: string, isQueueResubmit = false) => {
     if (running) {
       const result = engine.enqueueInstruction(text);
+      if (result.status === 'ignored') return;
+      // P0-2: Observe on first successful acceptance (queued/full/queued-ok)
+      if (!isQueueResubmit) {
+        onUserInput?.(text);
+      }
       if (result.status === 'queued') {
         setState(prev => ({ ...prev, pendingInstructionCount: result.queueLength }));
         return;
@@ -170,13 +175,11 @@ export function createBridge(
         }));
         return;
       }
-      if (result.status === 'ignored') return;
       setState(prev => ({ ...prev, messageQueue: [...prev.messageQueue, text] }));
       return;
     }
 
-    // P0-2: Only observe fresh user input, not queue re-submissions
-    // Moved after enqueue check — ignored inputs should not be observed
+    // P0-2: Observe fresh user input (not queue re-submissions)
     if (!isQueueResubmit) {
       onUserInput?.(text);
     }

@@ -1680,8 +1680,15 @@ packages/tui/src/bridge.tsx  — createBridge 新增 onUserInput 回调
 |------|--------|------|----------|
 | FIX-6 | 中 | ignored 输入不再写入 Memory：`onUserInput` 移到 `enqueueInstruction` 状态检查之后 | `bridge.tsx` |
 | FIX-7 | 中 | CLI 测试移除 tui.ts 导入（触发 `main()`/`process.exit()`） | `memory-integration.test.ts` |
-| FIX-8 | 中 | `onGenerationComplete` 竞态：追踪最后一个 hook promise，cleanup 前 await | `tui.ts` |
+| FIX-8 | 中 | `onGenerationComplete` 竞态：`HookManager.drain()` 等待所有 in-flight hooks | `hooks.ts`, `tui.ts` |
 | FIX-9 | 低 | `package.json` 添加 `test:memory-native` 脚本 | `package.json` |
+
+**第四轮（本轮）**
+
+| 编号 | 优先级 | 内容 | 修改文件 |
+|------|--------|------|----------|
+| FIX-6v2 | 高 | 修复 FIX-6 回归：`onUserInput` 改为非 ignored 时立即观察，queued/full/idle 均记录 | `bridge.tsx` |
+| FIX-8v2 | 中 | 用 `HookManager.drain()` 替代 trackedAdapter，彻底消除竞态 | `hooks.ts`, `tui.ts` |
 
 ### 20.2 关键变更说明
 
@@ -1744,22 +1751,25 @@ packages/tui/src/bridge.tsx  — createBridge 新增 onUserInput 回调
     → DEEPREEF_MEMORY_INJECT_CONTEXT=false 时不调用，不污染 system prompt
 ```
 
-**FIX-6：ignored 输入不再观察**
+**FIX-6v2：ignored 输入不再观察（修正版）**
 
 ```text
-旧：onUserInput() 在 enqueueInstruction() 之前调用
-    → 空白/ignored 输入也被记录为观察
-新：onUserInput() 移到 enqueueInstruction() 状态检查之后
-    → ignored 时直接 return，不调用 onUserInput
+v1（有缺陷）：onUserInput() 移到 running 分支之后
+    → queued/full/idle 输入也被跳过，运行期间完全不观察
+v2（正确）：在 running 分支内，ignored 检查之后立即观察
+    → ignored 跳过；queued/full/queued-ok 均观察一次
+    → isQueueResubmit 标记仍防止队列重提交重复观察
 ```
 
-**FIX-8：onGenerationComplete 竞态**
+**FIX-8v2：onGenerationComplete 竞态（彻底修复）**
 
 ```text
-旧：engine 的 void runOnLoopEvent() 是 fire-and-forget
-    → CLI finally 可能在 generation observation 完成前执行 onSessionEnd/stop
-新：hookAdapter 包装为 trackedAdapter，存储 lastHookPromise
-    → finally 中 await lastHookPromise?.catch(() => {}) 后再清理
+v1（部分）：trackedAdapter 包装 onLoopEvent，存储 lastHookPromise
+    → 仅等 CLI 自己的 hook，前序插件 hook 仍可能未完成
+v2（彻底）：HookManager 新增 drain() 方法
+    → 内部跟踪所有 pending promise（Set<Promise<void>>）
+    → CLI finally 调用 engine.hookManager.drain() 等待全部 in-flight hooks
+    → 移除 trackedAdapter，简化代码
 ```
 
 ### 20.3 验收
