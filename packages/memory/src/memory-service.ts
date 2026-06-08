@@ -100,6 +100,10 @@ export interface MemoryServiceConfig {
   autoObserve?: boolean
   injectContext?: boolean
   advancedTools?: boolean
+  enableGraph?: boolean
+  enableConsolidation?: boolean
+  enableReflect?: boolean
+  enableSlots?: boolean
 }
 
 export class MemoryService {

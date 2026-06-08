@@ -80,7 +80,15 @@ async function main(): Promise<void> {
   const enableMemory = process.env.DEEPREEF_MEMORY !== "false"
   if (enableMemory) {
     try {
-      memoryService = new MemoryService({ dataDir: undefined, autoObserve: true, injectContext: true })
+      memoryService = new MemoryService({
+        autoObserve: true,
+        injectContext: true,
+        advancedTools: process.env.DEEPREEF_MEMORY_ADVANCED === "true",
+        enableGraph: process.env.DEEPREEF_MEMORY_GRAPH === "true",
+        enableConsolidation: process.env.DEEPREEF_MEMORY_CONSOLIDATE === "true",
+        enableReflect: process.env.DEEPREEF_MEMORY_REFLECT === "true",
+        enableSlots: process.env.DEEPREEF_MEMORY_SLOTS === "true",
+      })
       await memoryService.start()
       memoryBridge = new DeepreefMemoryBridge(memoryService, { autoObserve: true, injectContext: true })
 

@@ -1576,5 +1576,17 @@ tui.ts (CLI)
 
 ### 17.1 保留限制
 
-- 高级工具（graph、consolidation、mesh 等）未默认注册，需配置开启
+- 高级工具（graph、consolidation、mesh 等）未默认注册，需 `DEEPREEF_MEMORY_ADVANCED=true` 环境变量开启
 - MCP、REST、Viewer、`deepreef memory *` CLI 命令尚未实现
+
+---
+
+## 18. AgentMemory Phase E：高级能力与数据迁移
+
+| 子项 | 状态 | 说明 |
+|------|------|------|
+| `MemoryServiceConfig` 高级开关 | ✅ 已完成 | `advancedTools/enableGraph/enableConsolidation/enableReflect/enableSlots` |
+| 环境变量门控 | ✅ 已完成 | `DEEPREEF_MEMORY_ADVANCED/GRAPH/CONSOLIDATE/REFLECT/SLOTS` |
+| `~/.agentmemory` 迁移 | ✅ 已完成 | `migrateFromAgentMemory()` 复制 state 目录，跳过已存在的文件 |
+| `memory_migrate` 工具 | ✅ 已完成 | 可从 CLI 触发的迁移工具 |
+| typecheck | ✅ 已完成 | 0 错误 |

@@ -36,6 +36,9 @@ export { getSearchIndex, rebuildIndex } from "./functions/search.js"
 // Re-export providers
 export { createProvider, createFallbackProvider, createEmbeddingProvider } from "./providers/index.js"
 
+// Phase E: Migration
+export { migrateFromAgentMemory } from "./migrate.js"
+
 // Phase D: Native AgentTool creators
 export {
   createMemoryRecallTool,
