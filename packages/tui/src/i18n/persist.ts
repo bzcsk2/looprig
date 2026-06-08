@@ -3,6 +3,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Locale } from './strings.js';
+import { LangConfigSchema } from '../settings-schema.js';
 
 const LANG_FILE = '.deepicode/lang.json';
 
@@ -14,8 +15,15 @@ export function loadLang(): Locale | null {
   try {
     const dir = getConfigDir();
     const raw = readFileSync(join(dir, 'lang.json'), 'utf8');
-    const data = JSON.parse(raw);
-    if (data.lang === 'zh-CN' || data.lang === 'en') return data.lang;
+    const parsed = JSON.parse(raw);
+    const result = LangConfigSchema["~standard"].validate(parsed);
+    if (result && typeof result === 'object' && 'then' in result) {
+      return null
+    }
+    if ('value' in (result as { value: unknown })) {
+      return (result as { value: { lang: Locale } }).value.lang
+    }
+    return null
   } catch {}
   return null;
 }

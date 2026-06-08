@@ -51,7 +51,7 @@ export class PluginRuntime {
       this.loadedPlugins = loadResult.loaded
       this.errors.push(...loadResult.errors)
 
-      const toolsResult = extractToolsFromPlugins(this.loadedPlugins)
+      const toolsResult = await extractToolsFromPlugins(this.loadedPlugins)
       this.pluginTools = toolsResult.tools
       this.errors.push(...toolsResult.errors)
 

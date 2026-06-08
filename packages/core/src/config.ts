@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs"
 import { resolve, join } from "node:path"
+import { LastConfigSchema } from "./schemas/config.js"
 import { DEEPSEEK_BASE_URL, DEEPSEEK_MODEL } from "./types.js"
 
 export interface DeepicodeConfig {
@@ -154,7 +155,15 @@ export function saveLastConfig(cfg: { provider: string; model: string; baseUrl: 
 function loadLastConfig(): { provider?: string; model?: string; baseUrl?: string } | null {
   try {
     const raw = readFileSync(resolve(process.cwd(), LAST_CONFIG_FILE), "utf8")
-    return JSON.parse(raw) as { provider?: string; model?: string; baseUrl?: string }
+    const parsed = JSON.parse(raw)
+    const result = LastConfigSchema["~standard"].validate(parsed)
+    if (result && typeof result === "object" && "then" in result) {
+      return parsed as { provider?: string; model?: string; baseUrl?: string }
+    }
+    if ("value" in (result as { value: unknown })) {
+      return (result as { value: { provider?: string; model?: string; baseUrl?: string } }).value
+    }
+    return parsed as { provider?: string; model?: string; baseUrl?: string }
   } catch {
     return null
   }

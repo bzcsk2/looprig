@@ -107,7 +107,7 @@ export function readPluginConfig(configPath: string): PluginConfigResult {
   const seenSpecs = new Set<string>()
 
   for (const raw of parsed) {
-    const { item, error } = parseConfigItem(raw, configPath)
+    const { item, error } = parseConfigItem(raw as PluginSpec, configPath)
     if (error) {
       errors.push(error)
       continue

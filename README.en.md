@@ -397,6 +397,64 @@ deepicode supports these free providers (no API key required):
 
 Use `/model` command or select from the terminal. Anonymous free tier prompts/outputs may be logged by upstream providers — do not send sensitive information.
 
+## Plugin System
+
+### Configuration
+
+Create `.deepicode/plugins.json` in your project root:
+
+```json
+[
+  "./path/to/my-plugin.ts"
+]
+```
+
+### Plugin Format
+
+Plugins must export a `default` object with `id` and `server`:
+
+```typescript
+export default {
+  id: "my-plugin",
+  server: () => ({
+    myTool: async (args: { input: string }) => {
+      return `Result: ${args.input}`
+    },
+  }),
+}
+```
+
+### Zod Schema Support
+
+Use `definePluginTool` with Zod 4 schemas for typed, validated tool parameters:
+
+```typescript
+import { definePluginTool } from "@deepicode/plugin"
+import { z } from "zod"
+
+export default {
+  id: "hello",
+  server: () => ({
+    greet: definePluginTool({
+      description: "Greet a user",
+      inputSchema: z.object({
+        name: z.string().min(1).describe("Name to greet"),
+        excited: z.boolean().default(false),
+      }).strict(),
+      async execute(args) {
+        return args.excited ? `Hello ${args.name}!` : `Hello ${args.name}`
+      },
+    }),
+  }),
+}
+```
+
+Benefits:
+- **Auto-generated JSON Schema** — `z.toJSONSchema()` converts Zod schemas to Draft-07 JSON Schema for LLMs
+- **Pre-execution validation** — model-produced args are validated via `~standard.validate()`, injecting defaults and applying transforms
+- **Type-safe** — `args` is inferred from the Zod schema output type
+- **Backward compatible** — plain function plugins continue to work unchanged
+
 ## License
 
 MIT · [`LICENSE`](./LICENSE)

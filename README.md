@@ -397,6 +397,37 @@ export default {
 - 工具名: `greet`
 - 完整工具名: `hello.greet`
 
+### Zod Schema 支持
+
+插件工具可以使用 Zod 4 schema 声明参数类型和验证规则：
+
+```typescript
+import { definePluginTool } from "@deepicode/plugin"
+import { z } from "zod"
+
+export default {
+  id: "hello",
+  server: () => ({
+    greet: definePluginTool({
+      description: "Greet a user",
+      inputSchema: z.object({
+        name: z.string().min(1).describe("Name to greet"),
+        excited: z.boolean().default(false),
+      }).strict(),
+      async execute(args) {
+        return args.excited ? `Hello ${args.name}!` : `Hello ${args.name}`
+      },
+    }),
+  }),
+}
+```
+
+优势：
+- **自动生成 JSON Schema** — 使用 `z.toJSONSchema()` 将 Zod schema 转换为 LLM 可识别的 Draft-07 JSON Schema
+- **执行前验证** — 模型返回的参数经过 `~standard.validate()` 校验，注入默认值、裁剪字符串、转换类型
+- **类型安全** — `args` 参数自动推断 Zod schema 的输出类型
+- **向后兼容** — 普通函数插件无需修改即可继续工作
+
 ---
 
 ## 斜杠命令

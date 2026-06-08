@@ -33,7 +33,7 @@ describe("Plugin Tool Adapter", () => {
     const loadResult = await loadPlugins([{ spec: pluginPath, options: {}, source: "file", deprecated: false }])
     expect(loadResult.loaded.length).toBe(1)
 
-    const result = extractToolsFromPlugins(loadResult.loaded)
+    const result = await extractToolsFromPlugins(loadResult.loaded)
     expect(result.tools.length).toBe(2)
     expect(result.tools[0].name).toBe("my-plugin.greet")
     expect(result.tools[1].name).toBe("my-plugin.add")
@@ -51,7 +51,7 @@ describe("Plugin Tool Adapter", () => {
       }`,
     )
     const loadResult = await loadPlugins([{ spec: pluginPath, options: {}, source: "file", deprecated: false }])
-    const toolsResult = extractToolsFromPlugins(loadResult.loaded)
+    const toolsResult = await extractToolsFromPlugins(loadResult.loaded)
     const toolSpecs = pluginToolsToToolSpecs(toolsResult.tools)
 
     expect(toolSpecs.length).toBe(1)
@@ -72,7 +72,7 @@ describe("Plugin Tool Adapter", () => {
       }`,
     )
     const loadResult = await loadPlugins([{ spec: pluginPath, options: {}, source: "file", deprecated: false }])
-    const toolsResult = extractToolsFromPlugins(loadResult.loaded)
+    const toolsResult = await extractToolsFromPlugins(loadResult.loaded)
     const result = await executePluginTool(toolsResult.tools[0], { name: "World" })
     expect(result).toBe("Hello, World")
   })
@@ -88,7 +88,7 @@ describe("Plugin Tool Adapter", () => {
       }`,
     )
     const loadResult = await loadPlugins([{ spec: pluginPath, options: {}, source: "file", deprecated: false }])
-    const toolsResult = extractToolsFromPlugins(loadResult.loaded)
+    const toolsResult = await extractToolsFromPlugins(loadResult.loaded)
     const result = await executePluginTool(toolsResult.tools[0], { name: "World" })
 
     const parsed = JSON.parse(result)
@@ -108,7 +108,7 @@ describe("Plugin Tool Adapter", () => {
       }`,
     )
     const loadResult = await loadPlugins([{ spec: pluginPath, options: {}, source: "file", deprecated: false }])
-    const toolsResult = extractToolsFromPlugins(loadResult.loaded)
+    const toolsResult = await extractToolsFromPlugins(loadResult.loaded)
     const result = await executePluginTool(toolsResult.tools[0], {})
 
     const parsed = JSON.parse(result)
@@ -127,7 +127,7 @@ describe("Plugin Tool Adapter", () => {
       }`,
     )
     const loadResult = await loadPlugins([{ spec: pluginPath, options: {}, source: "file", deprecated: false }])
-    const toolsResult = extractToolsFromPlugins(loadResult.loaded)
+    const toolsResult = await extractToolsFromPlugins(loadResult.loaded)
 
     await expect(executePluginTool(toolsResult.tools[0], {})).rejects.toThrow("Tool failed")
   })
@@ -143,7 +143,7 @@ describe("Plugin Tool Adapter", () => {
       }`,
     )
     const loadResult = await loadPlugins([{ spec: pluginPath, options: {}, source: "file", deprecated: false }])
-    const toolsResult = extractToolsFromPlugins(loadResult.loaded)
+    const toolsResult = await extractToolsFromPlugins(loadResult.loaded)
 
     expect(toolsResult.tools[0].name).toBe("my-plugin.bash")
     expect(toolsResult.tools[0].name).not.toBe("bash")
@@ -160,7 +160,7 @@ describe("Plugin Tool Adapter", () => {
       }`,
     )
     const loadResult = await loadPlugins([{ spec: pluginPath, options: {}, source: "file", deprecated: false }])
-    const toolsResult = extractToolsFromPlugins(loadResult.loaded)
+    const toolsResult = await extractToolsFromPlugins(loadResult.loaded)
 
     expect(toolsResult.tools.length).toBe(1)
     expect(toolsResult.tools[0].name).toBe("my-plugin.valid")
@@ -175,7 +175,7 @@ describe("Plugin Tool Adapter", () => {
       }`,
     )
     const loadResult = await loadPlugins([{ spec: pluginPath, options: {}, source: "file", deprecated: false }])
-    const toolsResult = extractToolsFromPlugins(loadResult.loaded)
+    const toolsResult = await extractToolsFromPlugins(loadResult.loaded)
 
     expect(toolsResult.tools.length).toBe(0)
     expect(toolsResult.errors.length).toBe(0)

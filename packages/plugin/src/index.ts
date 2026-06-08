@@ -7,6 +7,12 @@ export type { PluginModule, PluginServer, PluginHooks, PluginLoaded, PluginLoadE
 export { extractToolsFromPlugins, pluginToolsToToolSpecs, executePluginTool } from "./tool-adapter.js"
 export type { PluginTool, PluginToolError, PluginToolResult } from "./tool-adapter.js"
 
+export { definePluginTool, isSchemaAwareTool } from "./define-tool.js"
+export type { SchemaAwarePluginTool, DefinePluginToolOptions } from "./define-tool.js"
+
+export { convertSchemaToJsonSpec, validateSchemaArgs, isStandardSchemaLike } from "./schema-adapter.js"
+export type { StandardSchemaLike, SchemaAwareToolMeta } from "./schema-adapter.js"
+
 export { PluginHookRegistry } from "./hook-adapter.js"
 export type { PluginHookAdapter, HookAdapterError } from "./hook-adapter.js"
 
