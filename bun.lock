@@ -58,6 +58,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@deepicode/security": "workspace:*",
+        "zod": "4.4.3",
       },
     },
     "packages/ink": {
@@ -89,6 +90,7 @@
       "dependencies": {
         "@deepicode/core": "workspace:*",
         "@deepicode/tools": "workspace:*",
+        "zod": "4.4.3",
       },
     },
     "packages/plugin": {
@@ -96,6 +98,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@deepicode/core": "workspace:*",
+        "zod": "4.4.3",
       },
       "devDependencies": {
         "typescript": "^5.8.3",
@@ -131,6 +134,7 @@
         "react": "^19.2.4",
         "string-width": "^8.2.1",
         "strip-ansi": "^7.2.0",
+        "zod": "4.4.3",
       },
     },
   },
@@ -436,6 +440,8 @@
     "yargs": ["yargs@16.2.0", "", { "dependencies": { "cliui": "^7.0.2", "escalade": "^3.1.1", "get-caller-file": "^2.0.5", "require-directory": "^2.1.1", "string-width": "^4.2.0", "y18n": "^5.0.5", "yargs-parser": "^20.2.2" } }, "sha512-D1mvvtDG0L5ft/jGWkLpG1+m0eQxOfaBvTNELraWj22wSVUMWxZUvYgJYcKh6jGGIkJFhH4IZPQhR4TKpc8mBw=="],
 
     "yargs-parser": ["yargs-parser@20.2.9", "", {}, "sha512-y11nGElTIV+CT3Zv9t7VKl+Q3hTQoT9a1Qzezhhl6Rp21gJ/IVTW7Z3y9EWXhuUBC2Shnf+DX0antecpAwSP8w=="],
+
+    "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
 
     "cli-highlight/chalk": ["chalk@4.1.2", "", { "dependencies": { "ansi-styles": "^4.1.0", "supports-color": "^7.1.0" } }, "sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA=="],
 

@@ -4,6 +4,7 @@ import { McpClient } from "./client.js"
 import type { McpTool, McpResource } from "./client.js"
 import type { DiagnosticLogger } from "./diagnostics.js"
 import { noopDiagnosticLogger } from "./diagnostics.js"
+import { McpConfigSchema, McpAuthStoreSchema } from "./schemas.js"
 
 interface McpServerConfig {
   command: string
@@ -57,7 +58,13 @@ export class McpHost {
     for (const p of paths) {
       try {
         const raw = await readFile(p, "utf-8")
-        config = JSON.parse(raw) as McpConfig
+        const parsed = JSON.parse(raw)
+        const result = await McpConfigSchema["~standard"].validate(parsed)
+        if ("value" in result) {
+          config = result.value as McpConfig
+        } else {
+          config = parsed as McpConfig
+        }
         break
       } catch { continue }
     }
@@ -159,7 +166,13 @@ export class McpHost {
 
 async function readAuthStore(): Promise<Record<string, { apiKey: string }>> {
   try {
-    return JSON.parse(await readFile(resolve(process.cwd(), ".deepicode/mcp-auth.json"), "utf8")) as Record<string, { apiKey: string }>
+    const raw = await readFile(resolve(process.cwd(), ".deepicode/mcp-auth.json"), "utf8")
+    const parsed = JSON.parse(raw)
+    const result = await McpAuthStoreSchema["~standard"].validate(parsed)
+    if ("value" in result) {
+      return result.value as Record<string, { apiKey: string }>
+    }
+    return parsed as Record<string, { apiKey: string }>
   } catch {
     return {}
   }

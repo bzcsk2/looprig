@@ -25,6 +25,7 @@
     "marked": "^18.0.4",
     "react": "^19.2.4",
     "string-width": "^8.2.1",
-    "strip-ansi": "^7.2.0"
+    "strip-ansi": "^7.2.0",
+    "zod": "4.4.3"
   }
 }

@@ -15,7 +15,8 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@deepicode/core": "workspace:*"
+    "@deepicode/core": "workspace:*",
+    "zod": "4.4.3"
   },
   "devDependencies": {
     "typescript": "^5.8.3"

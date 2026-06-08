@@ -20,6 +20,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@deepicode/security": "workspace:*"
+    "@deepicode/security": "workspace:*",
+    "zod": "4.4.3"
   }
 }

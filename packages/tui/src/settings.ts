@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { TuiSettingsSchema } from './settings-schema.js';
 
 export interface PersistedSkill {
   name: string;
@@ -23,8 +24,16 @@ function settingsPath(): string {
 export function loadTuiSettings(): TuiSettings {
   try {
     const raw = readFileSync(settingsPath(), 'utf8');
-    const parsed = JSON.parse(raw) as Partial<TuiSettings>;
-    return normalizeSettings(parsed);
+    const parsed = JSON.parse(raw);
+    const result = TuiSettingsSchema["~standard"].validate(parsed);
+    // validate can be sync or async in Standard Schema
+    if (result && typeof result === 'object' && 'then' in result) {
+      return parsed as TuiSettings
+    }
+    if ('value' in (result as { value: unknown })) {
+      return (result as { value: TuiSettings }).value
+    }
+    return parsed as TuiSettings
   } catch {
     return {};
   }
@@ -33,35 +42,11 @@ export function loadTuiSettings(): TuiSettings {
 export function saveTuiSettings(patch: Partial<TuiSettings>): void {
   try {
     const current = loadTuiSettings();
-    const next = normalizeSettings({ ...current, ...patch });
+    const next = { ...current, ...patch };
     const dir = join(process.cwd(), SETTINGS_DIR);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     writeFileSync(settingsPath(), JSON.stringify(next, null, 2), 'utf8');
   } catch {
     // TUI settings persistence must not break interaction.
   }
-}
-
-function normalizeSettings(settings: Partial<TuiSettings>): TuiSettings {
-  const normalized: TuiSettings = {};
-  if (typeof settings.agent === 'string' && settings.agent) {
-    normalized.agent = settings.agent;
-  }
-  if (typeof settings.thinkingMode === 'string' && settings.thinkingMode) {
-    normalized.thinkingMode = settings.thinkingMode;
-  }
-  if (Array.isArray(settings.activeSkills)) {
-    normalized.activeSkills = settings.activeSkills
-      .filter(isPersistedSkill)
-      .map(skill => ({ name: skill.name, description: skill.description, content: skill.content }));
-  }
-  return normalized;
-}
-
-function isPersistedSkill(value: unknown): value is PersistedSkill {
-  if (!value || typeof value !== 'object') return false;
-  const record = value as Record<string, unknown>;
-  return typeof record.name === 'string'
-    && typeof record.description === 'string'
-    && typeof record.content === 'string';
 }

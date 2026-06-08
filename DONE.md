@@ -1216,7 +1216,71 @@ bun test packages/core/__tests__/config.test.ts
 
 ---
 
-## 12. 文档维护规则
+## 12. Zod 4 集成：插件工具 Schema 声明与验证
+
+### 12.1 目标
+
+插件作者可以使用 Zod 4 schema 声明工具参数，Deepicode 自动生成 JSON Schema 发给 LLM，并在执行前验证模型返回的参数。
+
+### 12.2 新增文件
+
+| 文件 | 定位 |
+|------|------|
+| `packages/plugin/src/define-tool.ts` | `definePluginTool()` helper — 接受 `{ description, inputSchema, execute }`，返回带 `deepicodeTool` 元数据的函数 |
+| `packages/plugin/src/schema-adapter.ts` | `StandardSchemaLike` 最小契约类型、`convertSchemaToJsonSpec()`、`validateSchemaArgs()` |
+| `packages/plugin/src/schemas.ts` | `PluginSpecSchema` / `PluginConfigSchema`（Zod schema 定义） |
+| `packages/mcp/src/schemas.ts` | `McpConfigSchema` / `McpAuthStoreSchema` / `McpAuthEntrySchema` |
+| `packages/core/src/schemas/json.ts` | `parseJsonConfig()` — 泛型 JSON 文件加载+验证 helper |
+| `packages/core/src/schemas/config.ts` | `LastConfigSchema` — last-config.json 验证 |
+| `packages/tui/src/settings-schema.ts` | `TuiSettingsSchema` / `LangConfigSchema` |
+| `packages/plugin/__tests__/zod-tool.test.ts` | 23 个 Zod 集成测试 |
+
+### 12.3 关键架构决策
+
+**Standard Schema 优先**：`schema-adapter.ts` 使用 Standard Schema V1 形状（`~standard.validate`）作为运行时契约，而非硬编码 `ZodType`。Zod 4 原生支持，未来其他库也可通过同一接口接入。
+
+**JSON Schema 生成**：
+- 优先调用 `schema["~standard"].jsonSchema.input({ target: "draft-07" })`
+- 回退使用 `z.toJSONSchema(schema, { io: "input", target: "draft-07", unrepresentable: "any" })`
+- 删除全部私有 `_def` 访问（`zodType()`、`zodEnumValues()`、`zodShape()`、`zodInnerType()`、`convertZodToJsonSchema()`）
+
+**执行前验证**：`executePluginTool` → schema-aware tool 的 execute wrapper 调用 `validateSchemaArgs()`，失败时返回结构化错误（`invalid_schema` + `issues`），不调用插件业务函数。
+
+### 12.4 配置验证迁移
+
+| 配置边界 | Schema | 策略 |
+|----------|--------|------|
+| `plugins.json` | `PluginConfigSchema` | 定义了 schema，未替换现有解析器（保留原容错行为） |
+| `mcp.json` | `McpConfigSchema` | loadConfig 中接入验证，失败时降级使用 raw parsed |
+| `mcp-auth.json` | `McpAuthStoreSchema` | readAuthStore 中接入验证 |
+| `last-config.json` | `LastConfigSchema` | loadLastConfig 中接入验证 |
+| `ui-settings.json` | `TuiSettingsSchema` | loadTuiSettings 中接入验证 |
+| `lang.json` | `LangConfigSchema` | loadLang 中接入验证 |
+
+### 12.5 向后兼容策略
+
+- 普通函数插件无需修改即可继续工作
+- `PluginHooks` 仍为 `Record<string, Function>`，loader 无需修改
+- `definePluginTool()` 返回可调用函数，通过 `deepicodeTool` 属性携带元数据
+
+### 12.6 依赖分布
+
+- `packages/plugin/package.json`：`zod: "4.4.3"`
+- `packages/core/package.json`：`zod: "4.4.3"`
+- `packages/mcp/package.json`：`zod: "4.4.3"`
+- `packages/tui/package.json`：`zod: "4.4.3"`
+
+### 12.7 验收
+
+```bash
+bun run typecheck          # 通过
+bun test packages/plugin/  # 64 pass, 0 fail
+bun test                   # 1134 pass, 5 pre-existing fail (mode-selector + bridge, 与本次无关)
+```
+
+---
+
+## 13. 文档维护规则
 
 1. `DONE.md` 只记录已存在且仍然成立的能力。
 2. 未完成事项移入 `TODO.md`，不要在 DONE 中维护第二套待办列表。

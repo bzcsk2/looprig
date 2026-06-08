@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@deepicode/core": "workspace:*",
-    "@deepicode/tools": "workspace:*"
+    "@deepicode/tools": "workspace:*",
+    "zod": "4.4.3"
   }
 }
