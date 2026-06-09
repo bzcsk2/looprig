@@ -14,10 +14,15 @@ export default {
   id: "hello",
 
   server: () => ({
+    /** Personalized greeting */
     greet: async (args: { name: string }) => {
-      return `Hello, ${args.name}! Welcome to deepreef!`
+      if (!args?.name || args.name.trim() === "") {
+        throw new Error("Invalid input: 'name' must be a non-empty string.")
+      }
+      return `Hello, ${args.name.trim()}! Welcome to deepreef!`
     },
 
+    /** Current time in ISO format */
     time: async () => {
       return `Current time: ${new Date().toISOString()}`
     },

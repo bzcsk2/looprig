@@ -6,7 +6,7 @@
  *   - done?: boolean，流式输出是否已完成
  *   - aborted?: boolean，用户是否主动终止了流式输出
  *   - startTs: number，流开始时间戳（毫秒），用于计算经过时间和速率
- *   - expanded?: boolean，是否展开显示更多行（默认显示预览行数）
+ *   - expanded?: boolean，保留的兼容参数；流式输出始终显示全部内容
  * 内部行为：
  *   - 通过 useInterval 每秒触发重渲染，更新速率显示
  *   - 完成回复和未完成的流式输出使用不同的视觉模板
@@ -22,9 +22,6 @@ import { clipToCells } from './text-width.js';
 import { FG, TONE } from './tokens.js';
 import { t } from '../i18n/index.js';
 
-// PREVIEW_LINES: 折叠模式预览行数；EXPANDED_MAX_LINES: 展开模式最大行数
-const PREVIEW_LINES = 4;
-const EXPANDED_MAX_LINES = 60;
 const CHARS_PER_TOKEN = 4;
 const MIN_MS_FOR_RATE = 500;   // 至少要经过 500ms 才开始估算速率，避免短时数据波动
 const MIN_CHARS_FOR_RATE = 20; // 至少累积 20 个字符才开始估算速率，避免样本量过小
@@ -77,7 +74,7 @@ function formatRate(tps: number | null): string {
   return t().tps(`${tps}`);
 }
 
-export function StreamingCard({ text, done = false, aborted = false, startTs, expanded = false, title, doneTitle }: StreamingCardProps): React.ReactElement {
+export function StreamingCard({ text, done = false, aborted = false, startTs, title, doneTitle }: StreamingCardProps): React.ReactElement {
   // 每 1000ms 触发一次重渲染，用于更新经过时间和速率显示
   const [, setTick] = useState(0);
   useInterval(() => setTick(t => t + 1), 1000);
@@ -114,10 +111,6 @@ export function StreamingCard({ text, done = false, aborted = false, startTs, ex
     );
   }
 
-  const cap = expanded ? EXPANDED_MAX_LINES : PREVIEW_LINES;
-  const visible = allLines.slice(-cap);
-  const droppedAbove = Math.max(0, allLines.length - visible.length);
-
   return (
     <Card>
       <CardHeader
@@ -131,13 +124,10 @@ export function StreamingCard({ text, done = false, aborted = false, startTs, ex
           </>
         }
       />
-      {droppedAbove > 0 && (
-        <Text color={FG.faint}>{t().linesDropped(droppedAbove)}</Text>
-      )}
-      {visible.map((line, i) => (
+      {allLines.map((line, i) => (
         <Box key={i} flexDirection="row">
           <Text color={aborted ? FG.meta : FG.body}>{clipToCells(line, lineCells)}</Text>
-          {!aborted && i === visible.length - 1 && <Text color={TONE.ok}>{'\u258A'}</Text>}
+          {!aborted && i === allLines.length - 1 && <Text color={TONE.ok}>{'\u258A'}</Text>}
         </Box>
       ))}
       {aborted && <Text color={FG.faint}>{t().truncatedByEsc}</Text>}

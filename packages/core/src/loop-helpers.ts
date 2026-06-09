@@ -28,11 +28,14 @@ export function resetToolCallSeq(): void {
 // ─── Duplicate Tool-Call Detector ───
 
 export interface DuplicateDetector {
-  check: (tc: ToolCall) => { duplicate: boolean; count: number; warning?: string }
+  check: (tc: ToolCall) => { duplicate: boolean; blocked: boolean; count: number; warning?: string }
 }
 
+export const DUPLICATE_TOOL_WARNING_THRESHOLD = 3
+export const DUPLICATE_TOOL_BLOCK_THRESHOLD = 5
+
 /**
- * CL-51: Tracks tool calls and detects loops (same tool+args called 3+ times).
+ * CL-51: Tracks tool calls and detects loops (same tool+args called repeatedly).
  * Pure data structure — no side effects.
  */
 export function createDuplicateDetector(): DuplicateDetector {
@@ -43,10 +46,23 @@ export function createDuplicateDetector(): DuplicateDetector {
       const key = `${tc.function.name}:${tc.function.arguments}`
       const count = (recentToolCalls.get(key) ?? 0) + 1
       recentToolCalls.set(key, count)
-      if (count >= 3) {
-        return { duplicate: true, count, warning: `Tool call loop detected: ${tc.function.name} called ${count} times with identical arguments` }
+      if (count >= DUPLICATE_TOOL_BLOCK_THRESHOLD) {
+        return {
+          duplicate: true,
+          blocked: true,
+          count,
+          warning: `Tool call loop stopped: ${tc.function.name} called ${count} times with identical arguments`,
+        }
       }
-      return { duplicate: false, count }
+      if (count >= DUPLICATE_TOOL_WARNING_THRESHOLD) {
+        return {
+          duplicate: true,
+          blocked: false,
+          count,
+          warning: `Tool call loop detected: ${tc.function.name} called ${count} times with identical arguments`,
+        }
+      }
+      return { duplicate: false, blocked: false, count }
     },
   }
 }

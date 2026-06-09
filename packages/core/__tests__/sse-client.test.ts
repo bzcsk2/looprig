@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest"
+import { describe, it, expect, afterEach, vi } from "vitest"
 import { MockSseServer } from "../src/test-utils/mock-sse-server.js"
 import { DeepSeekClient, isToolUseFinishReason, type DeepSeekStreamEvent } from "../src/client.js"
 
@@ -194,6 +194,39 @@ describe("SSE Client with MockSseServer", () => {
     expect(events.some((e) => e.type === "text_delta")).toBe(true)
   })
 
+  it("should retry an internal request timeout without exposing AbortError", async () => {
+    server = new MockSseServer().setScenario("normal")
+    await server.start()
+    const realFetch = globalThis.fetch
+    let calls = 0
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      calls++
+      if (calls === 1) {
+        return await new Promise<Response>((_, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("The operation was aborted.", "AbortError")), { once: true })
+        })
+      }
+      return realFetch(input, init)
+    })
+
+    try {
+      const events: DeepSeekStreamEvent[] = []
+      const client = new DeepSeekClient()
+      for await (const event of client.chatCompletionsStream(
+        [{ role: "user", content: "hi" }],
+        { apiKey: "test-key", baseUrl: server.baseUrl, model: "test-model", timeoutMs: 5 },
+      )) {
+        events.push(event)
+      }
+
+      expect(calls).toBeGreaterThanOrEqual(2)
+      expect(events.some((event) => event.type === "text_delta")).toBe(true)
+      expect(events.some((event) => event.type === "error")).toBe(false)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   // ── 13. finish_reason variants ──────────────────────────
 
   it("isToolUseFinishReason: tool_calls→true", () => {
@@ -289,6 +322,20 @@ describe("SSE Client with MockSseServer", () => {
     const events = await collectStream()
     const dones = events.filter((e) => e.type === "done")
     expect(dones).toHaveLength(1)
+  })
+
+  it("should ignore repeated finish_reason chunks from compatible providers", async () => {
+    server = new MockSseServer().setChunks([
+      { data: `data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"read_file","arguments":"{\\"path\\":\\"README.md\\"}"}}]}}]}\n\n` },
+      { data: `data: {"choices":[{"delta":{"content":""},"finish_reason":"tool_calls"}]}\n\n` },
+      { data: `data: {"choices":[{"delta":{"content":""},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":5,"completion_tokens":2,"total_tokens":7}}\n\n` },
+      { data: "data: [DONE]\n\n" },
+    ])
+    await server.start()
+    const events = await collectStream()
+
+    expect(events.filter((e) => e.type === "tool_call_end")).toHaveLength(1)
+    expect(events.filter((e) => e.type === "done")).toHaveLength(1)
   })
 
   // ── TT1: SSE boundary tests ───────────────────────────

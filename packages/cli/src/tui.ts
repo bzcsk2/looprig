@@ -57,31 +57,72 @@ async function main(): Promise<void> {
     shellBackend: `${shellBackend.id} (${shellBackend.executable})`,
   })
 
-  // Initialize plugin runtime (loads executable plugins and content packs)
+  // Render-first startup: plugins/default tools are loaded in the background.
+  // The TUI accepts input immediately; the first submit waits for this promise.
   const pluginRuntime = new PluginRuntime({ hookManager: engine.hookManager })
-  await pluginRuntime.init()
-  const pluginToolAgentTools = pluginToolsToAgentTools(pluginRuntime.getTools())
-  const skillDirs = pluginRuntime.getSkillDirs()
-
-  // Register content pack agents into default registry
-  for (const agent of pluginRuntime.loadAgents()) {
-    defaultAgentRegistry.register(agent)
-  }
-
-  // Inject compiled rules into system prompt
-  const rulesResult = pluginRuntime.compileRules()
-  if (rulesResult.systemPrompt) {
-    baseSystemPrompt += "\n\n" + rulesResult.systemPrompt
-  }
   engine.setSystemPrompt(baseSystemPrompt)
 
-  // Phase C: Initialize memory subsystem (non-blocking, best-effort)
-  // P1-4: Dynamic import — only load @deepreef/memory when enabled
+  // MCP tools are lightweight proxies and can be registered before connections load.
+  engine.registerTool(createListMcpResourcesTool())
+  engine.registerTool(createReadMcpResourceTool())
+  engine.registerTool(createMcpAuthTool())
+  engine.registerTool(createListMcpToolsTool())
+  engine.registerTool(createCallMcpToolTool())
+
+  let mcpConfigCount = 0
+  const pluginReady = deferTask(async () => {
+    try {
+      await pluginRuntime.init()
+      const pluginToolAgentTools = pluginToolsToAgentTools(pluginRuntime.getTools())
+      const skillDirs = pluginRuntime.getSkillDirs()
+
+      for (const agent of pluginRuntime.loadAgents()) {
+        defaultAgentRegistry.register(agent)
+      }
+
+      const rulesResult = pluginRuntime.compileRules()
+      if (rulesResult.systemPrompt) {
+        baseSystemPrompt += "\n\n" + rulesResult.systemPrompt
+        engine.setSystemPrompt(baseSystemPrompt)
+      }
+
+      const preloadedSkills: import('@deepreef/tools').SkillDef[] = []
+      for (const cs of pluginRuntime.loadCommandSkills()) {
+        preloadedSkills.push({ name: cs.name, description: cs.description, content: cs.content })
+      }
+      for (const sd of pluginRuntime.loadSkillDefs()) {
+        preloadedSkills.push({ name: sd.name, description: sd.description, content: sd.content, source: sd.source })
+      }
+      for (const rs of rulesResult.skillRules) {
+        preloadedSkills.push({ name: rs.name, description: rs.description, content: rs.content })
+      }
+
+      for (const tool of createDefaultTools(skillDirs, preloadedSkills)) engine.registerTool(tool)
+      for (const tool of pluginToolAgentTools) engine.registerTool(tool)
+
+      const mcpConfigs = pluginRuntime.loadMcpConfigs()
+      mcpConfigCount = mcpConfigs.length
+      if (mcpConfigs.length > 0) {
+        mcpLoadPromise = mcpLoadPromise.then(() => mcpHost.addSources(mcpConfigs)).then((summary) => {
+          if (summary.failed.length > 0) {
+            errorOutput.write(`[deepreef] Content pack MCP: ${summary.failed.length}/${summary.serverCount} server failure(s)\n`)
+          }
+        })
+      }
+    } catch (e) {
+      errorOutput.write(`[deepreef] Plugin init skipped: ${e instanceof Error ? e.message : String(e)}\n`)
+      // Preserve a usable agent even when plugin discovery fails.
+      for (const tool of createDefaultTools([], [])) engine.registerTool(tool)
+    }
+  })
+
+  // Memory is fully background-loaded and never gates the first model request.
   let memoryService: import("@deepreef/memory").MemoryService | undefined
   let memoryBridge: import("@deepreef/memory").DeepreefMemoryBridge | undefined
   let memoryHookAdapter: ToolCallHooks | undefined
   const enableMemory = process.env.DEEPREEF_MEMORY !== "false"
-  if (enableMemory) {
+  const memoryReady = deferTask(async () => {
+    if (!enableMemory) return
     try {
       const memory = await import("@deepreef/memory")
       // P1-2: Config from env vars with sensible defaults
@@ -106,7 +147,13 @@ async function main(): Promise<void> {
 
       // P0-1: Inject initial memory context into system prompt, then re-set on engine
       if (memoryInjectContext) {
-        const memContext = await memoryService.trigger("mem::context", { sessionId: engine.getSessionId(), maxChars: 2000 }).catch(() => null)
+        // Apply memory context after plugin rules so concurrent prompt updates cannot overwrite it.
+        await pluginReady
+        const memContext = await memoryService.trigger("mem::context", {
+          sessionId: engine.getSessionId(),
+          project: process.cwd(),
+          maxChars: 2000,
+        }).catch(() => null)
         if (memContext && typeof memContext === "object" && "context" in memContext) {
           const ctx = (memContext as { context: string }).context
           if (ctx) baseSystemPrompt += `\n\n<deepreef-memory-context>\n${ctx}\n</deepreef-memory-context>`
@@ -151,68 +198,26 @@ async function main(): Promise<void> {
       memoryService = undefined
       memoryBridge = undefined
     }
-  }
-
-  // Load content pack command skills (when mode=skill)
-  // and rule skills (when rules.mode=skill)
-  const commandSkills = pluginRuntime.loadCommandSkills()
-  const preloadedSkills: import('@deepreef/tools').SkillDef[] = []
-  for (const cs of commandSkills) {
-    preloadedSkills.push({
-      name: cs.name,
-      description: cs.description,
-      content: cs.content,
-    })
-  }
-  // Load ECC skill defs (prevents loadSkillsDirs from bypassing selective install)
-  for (const sd of pluginRuntime.loadSkillDefs()) {
-    preloadedSkills.push({
-      name: sd.name,
-      description: sd.description,
-      content: sd.content,
-      source: sd.source,
-    })
-  }
-  // Add rule skills from compileRules
-  for (const rs of rulesResult.skillRules) {
-    preloadedSkills.push({
-      name: rs.name,
-      description: rs.description,
-      content: rs.content,
-    })
-  }
-
-  // Load content pack MCP servers into McpHost
-  const mcpConfigs = pluginRuntime.loadMcpConfigs()
-  if (mcpConfigs.length > 0) {
-    mcpLoadPromise = mcpLoadPromise.then(() => mcpHost.addSources(mcpConfigs)).then((summary) => {
-      if (summary.failed.length > 0) {
-        errorOutput.write(`[deepreef] Content pack MCP: ${summary.failed.length}/${summary.serverCount} server failure(s)\n`)
-      }
-    })
-  }
-
-  for (const tool of createDefaultTools(skillDirs, preloadedSkills)) {
-    engine.registerTool(tool)
-  }
-  for (const tool of pluginToolAgentTools) {
-    engine.registerTool(tool)
-  }
-  // MCP tools are registered separately (dynamic, discovered at runtime)
-  engine.registerTool(createListMcpResourcesTool())
-  engine.registerTool(createReadMcpResourceTool())
-  engine.registerTool(createMcpAuthTool())
-  engine.registerTool(createListMcpToolsTool())
-  engine.registerTool(createCallMcpToolTool())
+  })
 
   try {
     if (!input.isTTY) {
+      await Promise.all([pluginReady, memoryReady])
       await runPipeMode(engine, memoryBridge)
       return
     }
 
-    await runTUIMode(engine, config, pluginRuntime, mcpConfigs.length, memoryBridge)
+    await runTUIMode(
+      engine,
+      config,
+      pluginRuntime,
+      mcpConfigCount,
+      () => memoryBridge,
+      () => pluginReady,
+      memoryReady,
+    )
   } finally {
+    await Promise.allSettled([pluginReady, memoryReady])
     // P3-3: Drain all pending hook observations before cleanup
     // (engine's void runOnLoopEvent is fire-and-forget; drain waits for all in-flight hooks)
     await engine.hookManager.drain().catch(() => {})
@@ -281,7 +286,15 @@ async function runPipeMode(engine: ReasonixEngine, memoryBridge?: import("@deepr
   }
 }
 
-async function runTUIMode(engine: ReasonixEngine, config: ReturnType<typeof loadConfig>, pluginRuntime: PluginRuntime, mcpConfigCount: number = 0, memoryBridge?: import("@deepreef/memory").DeepreefMemoryBridge): Promise<void> {
+async function runTUIMode(
+  engine: ReasonixEngine,
+  config: ReturnType<typeof loadConfig>,
+  pluginRuntime: PluginRuntime,
+  mcpConfigCount: number = 0,
+  getMemoryBridge?: () => import("@deepreef/memory").DeepreefMemoryBridge | undefined,
+  beforeSubmit?: () => Promise<void>,
+  memoryReady?: Promise<void>,
+): Promise<void> {
   const status = pluginRuntime.getStatus()
   const pluginCount = status.loadedPlugins.length
   const contentPackCount = status.contentPacks.length
@@ -292,12 +305,14 @@ async function runTUIMode(engine: ReasonixEngine, config: ReturnType<typeof load
     warnings: status.diagnostics.filter(d => d.startsWith("[warn]")).length,
   }
   // P0-2: Provide onUserInput callback so bridge can observe user prompts at the real entry point
-  const onUserInput = memoryBridge
-    ? (text: string) => { void memoryBridge!.onPromptSubmit(engine.getSessionId(), text).catch(() => {}) }
-    : undefined
+  const onUserInput = (text: string) => {
+    void (memoryReady ?? Promise.resolve()).then(() =>
+      getMemoryBridge?.()?.onPromptSubmit(engine.getSessionId(), text),
+    ).catch(() => {})
+  }
   try {
     const { waitUntilExit } = await render(
-      React.createElement(App, { engine, config, pluginCount, contentPackCount, assetCounts, diagnosticCounts, onUserInput }),
+      React.createElement(App, { engine, config, pluginCount, contentPackCount, assetCounts, diagnosticCounts, onUserInput, beforeSubmit }),
       { exitOnCtrlC: false }
     );
     await waitUntilExit();
@@ -315,6 +330,10 @@ function readConfiguredMcpCount(): number {
   } catch {
     return 0
   }
+}
+
+function deferTask<T>(task: () => Promise<T>): Promise<T> {
+  return new Promise<void>(resolve => setTimeout(resolve, 0)).then(task)
 }
 
 main()

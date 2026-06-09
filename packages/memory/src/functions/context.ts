@@ -22,8 +22,8 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 3);
 }
 
-function escapeXmlAttr(s: string): string {
-  return s
+function escapeXmlAttr(s: unknown): string {
+  return String(s ?? "")
     .replace(/&/g, "&amp;")
     .replace(/"/g, "&quot;")
     .replace(/</g, "&lt;")

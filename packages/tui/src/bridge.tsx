@@ -90,10 +90,15 @@ function parseArgs(raw: string | undefined): Record<string, unknown> {
   }
 }
 
+function isTransientToolLoopWarning(message: string): boolean {
+  return message.startsWith('Tool call loop detected:');
+}
+
 export function createBridge(
   engine: ReasonixEngine,
   setState: React.Dispatch<React.SetStateAction<BridgeState>>,
   onUserInput?: (text: string) => void,
+  beforeSubmit?: () => Promise<void>,
 ): {
   submit: (text: string) => Promise<void>;
   cancel: () => void;
@@ -104,6 +109,13 @@ export function createBridge(
 
   const updateTimeline = (mutate: (items: TimelineItem[]) => TimelineItem[]) => {
     setState(prev => ({ ...prev, timeline: mutate(prev.timeline) }));
+  };
+
+  const clearTransientWarnings = () => {
+    setState(prev => {
+      const warnings = prev.warnings.filter(warning => !isTransientToolLoopWarning(warning));
+      return warnings.length === prev.warnings.length ? prev : { ...prev, warnings };
+    });
   };
 
   const upsertItem = (item: TimelineItem, update?: (existing: TimelineItem) => TimelineItem) => {
@@ -307,6 +319,7 @@ export function createBridge(
     }));
 
     try {
+      await beforeSubmit?.();
       for await (const event of engine.submit(text)) {
         if (requestId !== activeRequest) continue;
 
@@ -353,6 +366,7 @@ export function createBridge(
           }
 
           case 'reasoning_delta': {
+            clearTransientWarnings();
             reasoningText += event.content ?? '';
             setState(prev => ({ ...prev, reasoningActive: true }));
             upsertItem({
@@ -367,12 +381,14 @@ export function createBridge(
           }
 
           case 'tool_call_delta':
+            clearTransientWarnings();
             if (event.toolCallIndex !== undefined && event.content) {
               toolCallArgs.set(event.toolCallIndex, event.content);
             }
             break;
 
           case 'tool_start': {
+            clearTransientWarnings();
             const key = `${fallbackToolKey(event.toolCallIndex, event.toolName)}_${++toolSequence}`;
             if (event.toolCallIndex !== undefined) activeToolKeys.set(event.toolCallIndex, key);
             const raw = event.toolCallIndex === undefined ? undefined : toolCallArgs.get(event.toolCallIndex);
@@ -387,6 +403,7 @@ export function createBridge(
           }
 
           case 'tool_progress': {
+            clearTransientWarnings();
             const key = event.toolCallIndex === undefined
               ? fallbackToolKey(undefined, event.toolName)
               : activeToolKeys.get(event.toolCallIndex) ?? fallbackToolKey(event.toolCallIndex, event.toolName);
@@ -452,9 +469,16 @@ export function createBridge(
             break;
           }
 
-          case 'warning':
-            setState(prev => ({ ...prev, warnings: [...prev.warnings, event.content ?? t().unknownWarning] }));
+          case 'warning': {
+            const warning = event.content ?? t().unknownWarning;
+            setState(prev => ({
+              ...prev,
+              warnings: isTransientToolLoopWarning(warning)
+                ? [...prev.warnings.filter(item => !isTransientToolLoopWarning(item)), warning]
+                : [...prev.warnings, warning],
+            }));
             break;
+          }
 
           case 'status':
             if (event.metadata?.kind === 'instruction_injected') {

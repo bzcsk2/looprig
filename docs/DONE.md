@@ -1800,3 +1800,205 @@ bun run test:memory-native   # 独立脚本，可接入 CI
 - Subagent start/stop 观察未接入
 - 测试断言强度待加强（advancedTools 注册验证、autoObserve 观察计数、forget 后 recall 验证）
 - CI 集成待完成（test:memory-native 脚本已就绪，需接入 CI pipeline）
+
+---
+
+## 21. CodeGraph MCP Server 内置集成
+
+基于 CodeGraph（`@colbymchenry/codegraph`）项目的分析与评估，将其作为内置 MCP Server 自动接入 deepreef。
+
+### 21.1 背景与决策
+
+CodeGraph 是一个本地代码智能库（tree-sitter 解析 + SQLite 知识图谱），通过 MCP 协议暴露代码符号关系、调用图和影响半径。与 deepreef 通过 MCP 协议集成，不需要代码合并。
+
+**集成方式决策**：
+
+| 方案 | 结论 | 原因 |
+|------|------|------|
+| 代码合并（merge） | ❌ 不适合 | 运行时冲突（Bun vs Node.js）、native addon 依赖（better-sqlite3）、产品边界清晰（独立 npm 包） |
+| MCP 协议集成 | ✅ 采用 | deepreef 已有完整 MCP 客户端系统，CodeGraph 自身就是 MCP Server，零代码修改即可使用 |
+
+**协同价值**：
+
+| 场景 | 没有 CodeGraph | 有 CodeGraph |
+|------|---------------|--------------|
+| "这个函数被谁调用？" | grep → 读多个文件 → 分析调用关系，大量 token | `codegraph_callers` 一次调用，毫秒级返回 |
+| "修改 AuthService 会影响什么？" | Agent 猜测影响范围 | `codegraph_impact` 返回完整影响半径 |
+| Agent 探索性工具调用 | grep + read 循环，每轮消耗 token | 减少约 58% 工具调用 |
+| **对 deepreef 省钱目标** | — | CodeGraph 减少工具调用 × deepreef 减少 cache miss = **双重节省** |
+
+### 21.2 修改内容
+
+**修改文件**：`packages/mcp/src/host.ts`、`packages/mcp/src/index.ts`、`packages/mcp/__tests__/mcp-host.test.ts`
+
+**新增内容**：
+
+1. **`BUILTIN_MCP_SERVERS` 常量**：定义内置 MCP Server 列表，当前仅包含 codegraph：
+   ```typescript
+   const BUILTIN_MCP_SERVERS: Record<string, McpServerConfig> = {
+     codegraph: {
+       command: "codegraph",
+       args: ["serve", "--mcp"],
+     },
+   }
+   ```
+
+2. **`isCommandAvailable()` 辅助函数**（已导出）：异步跨平台检测命令是否在 PATH 上。**不使用 shell**，直接遍历 `PATH` 目录并用 `fs.access()` 检查文件是否存在，完全避免 shell 注入风险。Windows 额外检查 `.cmd` / `.exe` / `.bat` 后缀。
+
+3. **`McpHost` 构造函数扩展**：接受可选 `options` 参数，支持注入 `builtinServers` 和 `checkCommand`，便于测试和未来扩展：
+   ```typescript
+   constructor(
+     logger?: DiagnosticLogger,
+     options?: {
+       builtinServers?: Record<string, McpServerConfig>
+       checkCommand?: (command: string) => Promise<boolean>
+     },
+   )
+   ```
+
+4. **`loadConfig()` 修改**：
+   - 读取用户 `.deepreef/mcp.json` 配置后，自动合并内置 Server
+   - 用户配置优先：如果用户已配置同名 Server，跳过内置
+   - 命令可用性检查：如果 `codegraph` 不在 PATH 上，静默跳过
+   - 内置 Server 连接失败：不计入 `failed` 数组，不计入 `serverCount`，不产生警告日志
+   - 新增 `options.loadBuiltins` 参数：`true` 强制加载（无论是否传了 `configPath`），`false` 强制跳过，省略则保持原有行为（仅默认路径时加载）
+
+5. **`connect()` 方法扩展**：接受可选 `{ silent?: boolean }` 选项。当 `silent: true` 时，为 `McpClient` 注入 `noopDiagnosticLogger`，从根源抑制所有 warn/debug 级别日志（包括 `mcp.server.connect.error`、`mcp.request.timeout`、`mcp.request.fail` 等），而非仅抑制单条日志。
+
+**行为逻辑**：
+
+| 场景 | 结果 |
+|------|------|
+| 用户安装了 codegraph + 没在 mcp.json 里配过 | ✅ 自动连接，Agent 立刻可用 |
+| 用户已经在 mcp.json 里配了 codegraph | ✅ 跳过内置配置，以用户自己的为准 |
+| 用户没安装 codegraph | ✅ 静默跳过，不报错、不打日志 |
+| 用户传了自定义 `configPath` 调用 `loadConfig()` | ✅ 不加载内置，除非传入 `{ loadBuiltins: true }` |
+| 内置服务连接失败 | ✅ 不计入 serverCount / failed，不产生任何警告日志 |
+
+### 21.3 验收
+
+```bash
+bun run typecheck                          # 通过
+bun test packages/mcp                      # 34 pass, 0 fail
+```
+
+**新增测试覆盖**（11 个）：
+
+| 测试 | 覆盖场景 |
+|------|----------|
+| `isCommandAvailable > returns true` | PATH 遍历检测可用命令 |
+| `isCommandAvailable > returns false` | 不存在的命令返回 false |
+| `isCommandAvailable > does not execute shell metacharacters` | 验证 shell 注入不生效 |
+| `auto-loads a built-in server` | loadBuiltins: true + checkCommand 返回 true 时自动加载 |
+| `skips built-in when user config has the same name` | 用户配置同名服务时跳过内置 |
+| `silently skips built-in when command not on PATH` | checkCommand 返回 false 时静默跳过 |
+| `does not load built-ins when loadBuiltins is false` | loadBuiltins: false 时不触发内置加载 |
+| `built-in connection failure excluded from statistics` | 内置服务连接失败不计入 serverCount / failed |
+| `mixed user + built-in failures` | 混合场景下只暴露用户服务失败 |
+| `connect() silent suppresses logs` | silent: true 时 host + client 均不输出任何警告日志 |
+| `connect() non-silent logs on failure` | 默认行为仍输出连接错误日志 |
+
+### 21.4 保留限制
+
+- 用户安装 deepreef 后需额外安装 CodeGraph（`npm i -g @colbymchenry/codegraph`）才能使用
+- CodeGraph 需要在项目中初始化（`codegraph init -i`）才能产生有效的知识图谱数据
+- CodeGraph MCP Server 运行在本机，不涉及网络通信
+
+### 21.5 验收修复记录
+
+#### 第一轮验收（6 个问题，1 个阻断性）
+
+**P0：Linux/macOS 上 CodeGraph 永远不会自动加载（阻断性）**
+
+原因：`isCommandAvailable()` 使用 `execFileSync("command", ["-v", name])`，但 `command` 是 POSIX shell 内建命令，不是可执行文件，实际运行结果为 `ENOENT`。
+
+修复：改为 `promisify(exec)` 异步执行 shell 命令。
+
+**P1：新增功能完全没有测试覆盖**
+
+修复：新增 10 个测试 + `McpHost` 构造函数支持注入 `builtinServers` / `checkCommand`。
+
+**P1："连接失败静默"与实际行为不符**
+
+原因：`connect()` 的 catch 块仍输出 `mcp.server.connect.error` 警告。
+
+修复：`connect()` 新增 `{ silent?: boolean }` 选项。
+
+**P2：失败状态统计不准确**
+
+原因：失败的内置服务计入 `serverCount` 但不计入 `failed`。
+
+修复：新增 `builtinFailedCount`，`serverCount` 和 `connected` 均排除失败的内置服务。
+
+**P2：同步命令检测可能阻塞事件循环**
+
+修复：随 P0 一并改为异步 `execAsync`。
+
+**P2：DONE 第 21 节重复**
+
+修复：删除重复副本。
+
+#### 第二轮验收（5 个问题，1 个阻断性）
+
+**P0：命令检测存在 shell 注入（阻断性）**
+
+原因：第一轮修复后 `isCommandAvailable()` 使用 `execAsync(\`command -v ${command}\`)` 将 `command` 直接拼接到 shell 命令字符串。传入 `node; printf injected-marker` 会执行后面的命令，Windows 的 `where ${command}` 同样存在风险。
+
+修复：完全移除 shell，改为直接遍历 `PATH` 目录检查可执行文件：
+
+```typescript
+// 修复后：纯 fs.access 检查，零 shell
+export async function isCommandAvailable(command: string): Promise<boolean> {
+  const dirs = (process.env.PATH ?? "").split(delimiter).filter(Boolean)
+  for (const dir of dirs) {
+    try { await access(resolve(dir, command)); return true } catch { /* continue */ }
+    if (process.platform === "win32") {
+      for (const ext of WIN_EXTS) {
+        try { await access(resolve(dir, command + ext)); return true } catch { /* continue */ }
+      }
+    }
+  }
+  return false
+}
+```
+
+新增单元测试 `does not execute shell metacharacters` 验证 `node; touch /tmp/injected-marker` 不会产生 marker 文件。
+
+**P1：2 个 CL-10 测试回归是本次修改造成的**
+
+原因：`writeFileSync` 模板字符串中的 `\\n` 被错误写成 `\\\\n`（多了一层转义），导致写入文件的是字面量 `\n`（两个字符：反斜杠 + n）而非换行符，MCP JSONL 消息无法解析，测试稳定超时。
+
+修复：恢复正确的 `\\n` 转义，即模板字符串中写 `\\n`，文件中产生真正的 `\n` 换行。
+
+**P1：4 个新增测试是假覆盖**
+
+原因：这些测试传入了自定义 `configPath`，而 `loadConfig()` 的 `if (!configPath)` 条件禁止自定义路径时加载 built-in。测试虽然通过，但 built-in 分支根本没有执行。
+
+修复：`loadConfig()` 新增第二个参数 `options?: { loadBuiltins?: boolean }`：
+- `true`：无论是否传了 `configPath`，都加载内置服务
+- `false`：不加载内置服务
+- 省略：保持原有行为（仅默认路径时加载）
+
+所有假覆盖测试改为传入 `{ loadBuiltins: true }`，确保 built-in 分支确实执行。
+
+**P1：静默失败仍可能产生警告日志**
+
+原因：`silent` 仅抑制 `host.ts` 中 `mcp.server.connect.error` 一条日志。如果 CodeGraph 初始化超时或返回协议错误，`client.ts` 中的 `mcp.request.timeout`、`mcp.request.fail`、`mcp.request.error` 等警告仍会输出。
+
+修复：当 `options.silent === true` 时，为 `McpClient` 注入 `noopDiagnosticLogger`，从根源抑制所有 warn/debug 级别日志：
+
+```typescript
+const clientLogger: DiagnosticLogger = options?.silent
+  ? noopDiagnosticLogger
+  : this.logger
+const client = new McpClient(name, clientLogger)
+```
+
+测试验证：检查 `warnLogs` 中不包含 `mcp.server.connect.error`、`mcp.request.timeout`、`mcp.request.fail` 任何一项。
+
+### 21.6 修复后验收
+
+```bash
+bun run typecheck                          # 通过
+bun test packages/mcp                      # 34 pass, 0 fail
+```

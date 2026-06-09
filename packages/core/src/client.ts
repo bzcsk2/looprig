@@ -154,11 +154,15 @@ export class DeepSeekClient implements ChatClient {
     let attempt = 0
     while (true) {
       attempt++
+      let timeoutTriggered = false
       try {
         // Per-request timeout via AbortController (freellmapi fetchWithTimeout pattern)
         // Combined with the user-provided signal so we don't override user abort
         const timeoutController = new AbortController()
-        const timeout = setTimeout(() => timeoutController.abort(), timeoutMs)
+        const timeout = setTimeout(() => {
+          timeoutTriggered = true
+          timeoutController.abort()
+        }, timeoutMs)
         const combinedSignal = opts.signal ? combineAbortSignals(opts.signal, timeoutController.signal) : timeoutController.signal
         try {
           resp = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal: combinedSignal, keepalive: false })
@@ -184,13 +188,15 @@ export class DeepSeekClient implements ChatClient {
         await sleep(delay, opts.signal)
         continue
       } catch (e) {
-        if (attempt > maxRetries || isAbortError(e)) {
+        const userAborted = opts.signal?.aborted === true
+        const requestTimedOut = timeoutTriggered && isAbortError(e)
+        if (userAborted || attempt > maxRetries || (isAbortError(e) && !requestTimedOut)) {
           if (diagnosticsEnabled) requestLogger.error("api.request.fetch_error", e, { attempt, durationMs: Date.now() - startedAt })
-          yield { type: "error", message: errorMessage(e) }
+          yield { type: "error", message: requestTimedOut ? `Request timed out after ${timeoutMs}ms` : errorMessage(e) }
           return
         }
         const delay = Math.min(1000 * 2 ** (attempt - 1) + Math.random() * 500, 10_000)
-        if (diagnosticsEnabled) requestLogger.warn("api.request.retry", { attempt, delayMs: Math.round(delay), reason: errorMessage(e) })
+        if (diagnosticsEnabled) requestLogger.warn("api.request.retry", { attempt, delayMs: Math.round(delay), reason: requestTimedOut ? "request_timeout" : errorMessage(e) })
         await sleep(delay, opts.signal)
         continue
       }
@@ -280,7 +286,8 @@ export class DeepSeekClient implements ChatClient {
             // finalize any pending tool calls before done
             if (toolState.size > 0) {
               for (const [index, tc] of toolState.entries()) {
-                if (tc.id && tc.name) {
+                if (!finalized.has(index) && tc.id && tc.name) {
+                  finalized.add(index)
                   yield { type: "tool_call_end", toolCallIndex: index, id: tc.id, name: tc.name, arguments: tc.args }
                 }
               }
@@ -390,7 +397,7 @@ export class DeepSeekClient implements ChatClient {
             }
           }
 
-          if (choice?.finish_reason) {
+          if (choice?.finish_reason && !finishReasonYielded) {
             finishReasonYielded = true
             yield { type: "done", finishReason: choice.finish_reason }
           }

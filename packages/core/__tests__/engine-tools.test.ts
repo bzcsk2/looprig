@@ -73,11 +73,15 @@ describe("ReasonixEngine tool loop regressions", () => {
   })
 
   it("should survive double done event (B1 regression)", async () => {
+    let executions = 0
     const tool: AgentTool = {
       name: "ok", description: "ok",
       parameters: { type: "object", properties: { x: { type: "number" } }, required: ["x"] },
       concurrency: "shared", approval: "read",
-      async execute() { return { content: "done", isError: false } },
+      async execute() {
+        executions++
+        return { content: "done", isError: false }
+      },
     }
 
     mockClient.setGenerators([
@@ -102,6 +106,7 @@ describe("ReasonixEngine tool loop regressions", () => {
 
     const toolResults = events.filter((e) => e.role === "tool")
     expect(toolResults).toHaveLength(1)
+    expect(executions).toBe(1)
 
     const doneEvent = events.find((e) => e.role === "done")
     expect(doneEvent).toBeDefined()
@@ -109,6 +114,34 @@ describe("ReasonixEngine tool loop regressions", () => {
     const finalDelta = events.filter((e) => e.role === "assistant_delta")
     expect(finalDelta).toHaveLength(1)
     expect(finalDelta[0].content).toBe("final")
+  })
+
+  it("stops before executing the fifth identical tool call", async () => {
+    let executions = 0
+    const repeatedToolCall = () => (async function* () {
+      yield { type: "tool_call_end", toolCallIndex: 0, id: crypto.randomUUID(), name: "read_same", arguments: "{\"path\":\"README.md\"}" }
+      yield { type: "done", finishReason: "tool_calls" }
+    })()
+
+    mockClient.setGenerators(Array.from({ length: 5 }, repeatedToolCall))
+
+    const engine = makeEngine()
+    engine.registerTool({
+      name: "read_same", description: "read same file",
+      parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+      concurrency: "shared", approval: "read",
+      async execute() {
+        executions++
+        return { content: "same", isError: false }
+      },
+    })
+
+    const events: LoopEvent[] = []
+    for await (const event of engine.submit("loop")) events.push(event)
+
+    expect(executions).toBe(4)
+    expect(events.some((event) => event.role === "error" && event.metadata?.reason === "toolCallLoop")).toBe(true)
+    expect(events.some((event) => event.role === "done" && event.metadata?.reason === "toolCallLoop")).toBe(true)
   })
 
   it("should mark tool failures as error events and persist is_error=true", async () => {

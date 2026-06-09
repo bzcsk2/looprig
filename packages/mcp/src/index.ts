@@ -1,5 +1,5 @@
 export { McpClient } from "./client.js"
-export { McpHost } from "./host.js"
+export { McpHost, isCommandAvailable } from "./host.js"
 export { setMcpHost } from "./mcp-host-global.js"
 export { createListMcpResourcesTool } from "./list-resources.js"
 export { createReadMcpResourceTool } from "./read-resource.js"

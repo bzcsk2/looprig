@@ -190,15 +190,22 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
           yield { role: "assistant_final", content: fullContent, metadata: { reasoning: fullReasoning || undefined } }
 
           if (isToolUse) {
+            // Some OpenAI-compatible providers repeat the same finish_reason
+            // chunk after usage. Never execute a completed tool batch twice.
+            if (finishedWithToolUse) break
             if (toolCalls.length === 0) {
               yield { role: "warning", content: "API returned tool_calls finish_reason but no tool calls found", severity: "warning" as const }
               break
             }
             // CL-51: duplicate tool call detection
+            let blockedToolCall: { name: string; count: number } | null = null
             for (const tc of toolCalls) {
-              const { warning } = recentToolCalls.check(tc)
+              const { warning, blocked, count } = recentToolCalls.check(tc)
               if (warning) {
                 yield { role: "warning", content: warning, severity: "warning" as const }
+              }
+              if (blocked && !blockedToolCall) {
+                blockedToolCall = { name: tc.function.name, count }
               }
             }
 
@@ -206,6 +213,18 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
             ctx.log.append({ role: "assistant", content: fullContent || null, reasoning_content: fullReasoning || undefined, tool_calls: toolCalls })
             sessionWriter?.enqueue({ ts: Date.now(), type: "messages", payload: ctx.buildMessages() })
             totalToolCalls += toolCalls.length
+
+            if (blockedToolCall) {
+              const content = `Stopped repeated tool-call loop: ${blockedToolCall.name} was requested ${blockedToolCall.count} times with identical arguments.`
+              for (const tc of toolCalls) {
+                appendToolResult(tc, { content, isError: true, metadata: { reason: "toolCallLoop" } })
+              }
+              yield { role: "error", content, severity: "error" as const, metadata: { reason: "toolCallLoop", toolName: blockedToolCall.name, count: blockedToolCall.count } }
+              yield { role: "done", metadata: { reason: "toolCallLoop" } }
+              sessionWriter?.enqueue({ ts: Date.now(), type: "messages", payload: ctx.buildMessages() })
+              sessionWriter?.enqueue({ ts: Date.now(), type: "event", payload: { role: "done", metadata: { reason: "toolCallLoop" } } })
+              return
+            }
 
             try {
               for await (const toolEvent of toolExecutor.run(toolCalls, signal, appendToolResult, diagnosticsEnabled ? { submitId, turnCount } : undefined)) {

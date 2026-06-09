@@ -81,6 +81,35 @@ async function waitFor(check: () => boolean): Promise<void> {
 }
 
 describe('TUI bridge turn state', () => {
+  it('accepts and displays input before background startup finishes', async () => {
+    let releaseStartup!: () => void;
+    const startupReady = new Promise<void>(resolve => { releaseStartup = resolve; });
+    const engine = mockEngine([
+      async function* () {
+        yield { role: 'assistant_final', content: 'ready' };
+        yield { role: 'done' };
+      },
+    ]);
+    const harness = stateHarness();
+    const bridge = createBridge(
+      engine as unknown as ReasonixEngine,
+      harness.setState,
+      undefined,
+      () => startupReady,
+    );
+
+    const pending = bridge.submit('typed during startup');
+    expect(harness.state.isLoading).toBe(true);
+    expect(harness.state.timeline.some(item => item.kind === 'message' && item.message.content === 'typed during startup')).toBe(true);
+    expect(engine.submitted).toEqual([]);
+
+    releaseStartup();
+    await pending;
+
+    expect(engine.submitted).toEqual(['typed during startup']);
+    expect(harness.state.isLoading).toBe(false);
+  });
+
   it('keeps final reasoning metadata when a provider emits no reasoning deltas', async () => {
     const engine = mockEngine([
       async function* () {
@@ -143,6 +172,60 @@ describe('TUI bridge turn state', () => {
     const item = harness.state.timeline[0];
     if (item?.kind !== 'turn') throw new Error('Expected turn');
     expect(item.turn.tools.map(tool => tool.args.command)).toEqual(['pwd', 'ls']);
+  });
+
+  it('clears a repeated tool-call warning when the next reasoning event arrives', async () => {
+    const engine = mockEngine([
+      async function* () {
+        yield { role: 'warning', content: 'Tool call loop detected: read_file called 3 times with identical arguments' };
+        yield { role: 'warning', content: 'Keep this warning' };
+        yield { role: 'reasoning_delta', content: 'Trying another approach' };
+        yield { role: 'done' };
+      },
+    ]);
+    const harness = stateHarness();
+    const bridge = createBridge(engine as unknown as ReasonixEngine, harness.setState);
+
+    await bridge.submit('continue');
+
+    expect(harness.state.warnings).toEqual(['Keep this warning']);
+  });
+
+  it('shows only the latest repeated tool-call warning while waiting for new activity', async () => {
+    const engine = mockEngine([
+      async function* () {
+        yield { role: 'warning', content: 'Tool call loop detected: read_file called 3 times with identical arguments' };
+        yield { role: 'warning', content: 'Tool call loop detected: read_file called 4 times with identical arguments' };
+        yield { role: 'done' };
+      },
+    ]);
+    const harness = stateHarness();
+    const bridge = createBridge(engine as unknown as ReasonixEngine, harness.setState);
+
+    await bridge.submit('continue');
+
+    expect(harness.state.warnings).toEqual([
+      'Tool call loop detected: read_file called 4 times with identical arguments',
+    ]);
+  });
+
+  it('replaces repeated tool-call warnings and clears them on the next tool call', async () => {
+    const engine = mockEngine([
+      async function* () {
+        yield { role: 'warning', content: 'Tool call loop detected: read_file called 3 times with identical arguments' };
+        yield { role: 'warning', content: 'Tool call loop detected: read_file called 4 times with identical arguments' };
+        yield { role: 'tool_call_delta', toolName: 'search', toolCallIndex: 0, content: '{"query":"next"}' };
+        yield { role: 'tool_start', toolName: 'search', toolCallIndex: 0 };
+        yield { role: 'tool', toolName: 'search', toolCallIndex: 0, content: 'done' };
+        yield { role: 'done' };
+      },
+    ]);
+    const harness = stateHarness();
+    const bridge = createBridge(engine as unknown as ReasonixEngine, harness.setState);
+
+    await bridge.submit('continue');
+
+    expect(harness.state.warnings).toEqual([]);
   });
 
   it('queues a new submit until the active generator exits after cancel', async () => {
