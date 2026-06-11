@@ -9,8 +9,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@opentui/react": "file:../../../../opentui/packages/react",
-    "@opentui/core": "file:../../../../opentui/packages/core",
+    "@opentui/react": "link:@opentui/react",
+    "@opentui/core": "link:@opentui/core",
     "react": "^19.2.6"
   },
   "devDependencies": {

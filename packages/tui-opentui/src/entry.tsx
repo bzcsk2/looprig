@@ -36,7 +36,10 @@ export function OpenTUIApp(_props: OpenTUIAppProps) {
 }
 
 export async function startOpenTUI(options: OpenTUIAppProps = {}): Promise<void> {
-  const cliRenderer = await createCliRenderer()
+  const cliRenderer = await createCliRenderer({
+    exitOnCtrlC: true,
+    targetFps: 30,
+  })
   const root = createRoot(cliRenderer)
   root.render(<OpenTUIApp {...options} />)
 }

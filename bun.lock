@@ -51,9 +51,13 @@
       "dependencies": {
         "@deepreef/core": "workspace:*",
         "@deepreef/mcp": "workspace:*",
+        "@deepreef/memory": "workspace:*",
         "@deepreef/plugin": "workspace:*",
         "@deepreef/tools": "workspace:*",
         "@deepreef/tui": "workspace:*",
+        "@deepreef/tui-opentui": "workspace:*",
+        "@opentui/core": "link:@opentui/core",
+        "@opentui/react": "link:@opentui/react",
       },
     },
     "packages/core": {
@@ -163,6 +167,18 @@
         "zod": "4.4.3",
       },
     },
+    "packages/tui-opentui": {
+      "name": "@deepreef/tui-opentui",
+      "version": "0.1.0",
+      "dependencies": {
+        "@opentui/core": "link:@opentui/core",
+        "@opentui/react": "link:@opentui/react",
+        "react": "^19.2.6",
+      },
+      "devDependencies": {
+        "@types/react": "^19.2.15",
+      },
+    },
   },
   "packages": {
     "@alcalzone/ansi-tokenize": ["@alcalzone/ansi-tokenize@0.3.0", "https://registry.npmmirror.com/@alcalzone/ansi-tokenize/-/ansi-tokenize-0.3.0.tgz", { "dependencies": { "ansi-styles": "^6.2.1", "is-fullwidth-code-point": "^5.0.0" } }, "sha512-p+CMKJ93HFmLkjXKlXiVGlMQEuRb6H0MokBSwUsX+S6BRX8eV5naFZpQJFfJHjRZY0Hmnqy1/r6UWl3x+19zYA=="],
@@ -187,6 +203,8 @@
 
     "@deepreef/tui": ["@deepreef/tui@workspace:packages/tui"],
 
+    "@deepreef/tui-opentui": ["@deepreef/tui-opentui@workspace:packages/tui-opentui"],
+
     "@emnapi/core": ["@emnapi/core@1.10.0", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.1", "tslib": "^2.4.0" } }, "sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw=="],
 
     "@emnapi/runtime": ["@emnapi/runtime@1.10.0", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-ewvYlk86xUoGI0zQRNq/mC+16R1QeDlKQy21Ki3oSYXNgLb45GV1P6A0M+/s6nyCuNDqe5VpaY84BzXGwVbwFA=="],
@@ -198,6 +216,10 @@
     "@mixmark-io/domino": ["@mixmark-io/domino@2.2.0", "", {}, "sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw=="],
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.1.4", "", { "dependencies": { "@tybys/wasm-util": "^0.10.1" }, "peerDependencies": { "@emnapi/core": "^1.7.1", "@emnapi/runtime": "^1.7.1" } }, "sha512-3NQNNgA1YSlJb/kMH1ildASP9HW7/7kYnRI2szWJaofaS1hWmbGI4H+d3+22aGzXXN9IJ+n+GiFVcGipJP18ow=="],
+
+    "@opentui/core": ["@opentui/core@link:@opentui/core", {}],
+
+    "@opentui/react": ["@opentui/react@link:@opentui/react", {}],
 
     "@oxc-project/types": ["@oxc-project/types@0.133.0", "", {}, "sha512-KzkdCd6Uxqnf6l3HOw1xfatAlUURA0g14cvBYFyJ5SaNOQbOUvBr9PKArcPcrNIeRsBdgcUzOGrhKveVpvOIGA=="],
 
