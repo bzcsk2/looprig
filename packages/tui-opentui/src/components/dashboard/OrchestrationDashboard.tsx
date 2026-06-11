@@ -14,7 +14,7 @@
 import React from "react";
 import { colors } from "../../theme/colors.js";
 import { layout } from "../../theme/layout.js";
-import { tuiStore, selectors, useStore } from "../../store/index.js"; // 注意：需在 index.ts 导出
+import { tuiStore, selectors, useStore } from "../../store/index.js";
 
 export interface OrchestrationDashboardProps {
   terminalWidth: number;
