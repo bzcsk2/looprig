@@ -1,137 +1,153 @@
 /**
- * OpenTUI 渲染入口（使用本地 /vol4/Agent/opentui 源码）
+ * OpenTUI 渲染入口
  *
- * 注意：本地 @opentui/react 的 API 与 npm 0.2.x 版本不同。
- * 正确用法是：createCliRenderer() + createRoot()
+ * 功能：
+ * - 使用本地 /vol4/Agent/opentui 源码
+ * - 多页面切换（Chat/Orchestration/Workers/Supervisor/Loop/System）
+ * - 键盘快捷键支持（1-6 切换页面，Esc/q 返回）
+ * - 终端状态恢复（防止鼠标乱码）
  *
- * 重要：由于 @opentui/react 使用自己的 React 实例，本包不能使用任何 React Hook。
- * 所有状态通过外部订阅管理，通过 props 传递给组件。
+ * 中文注释：
+ * - 开发阶段 useMouse: false，最终测试时改为 true
+ * - 所有 Hook 已移除，避免多 React 实例冲突
  */
 
-import { createCliRenderer, CliRenderEvents } from "@opentui/core"
-import { createRoot } from "@opentui/react"
-import type { TuiState } from "./store/types.js"
-import { tuiStore, replayEvents, sampleOrchestrationFixture } from "./store/index.js"
-import { OrchestrationDashboard } from "./components/dashboard/OrchestrationDashboard.js"
+import { createCliRenderer, CliRenderEvents } from "@opentui/core";
+import { createRoot } from "@opentui/react";
+import { MainLayout } from "./components/layout/MainLayout.js";
+import { tuiStore, replayEvents, sampleOrchestrationFixture } from "./store/index.js";
+import { uiStore, switchPage, closeDetail, pageKeyMap } from "./store/ui-store.js";
+import type { PageId } from "./store/ui-store.js";
 
-export interface OpenTUIAppProps {
-  state: TuiState;
-}
+/**
+ * 恢复终端状态（防止鼠标跟踪乱码）
+ */
+function restoreTerminal(): void {
+  const stdout = process.stdout;
+  if (!stdout) return;
 
-// 纯函数组件，不包含任何 Hook
-export function OpenTUIApp({ state }: OpenTUIAppProps) {
-  const terminalWidth = process.stdout.columns || 120
-
-  return (
-    <box style={{ flexDirection: "column", height: "100%" }}>
-      <box style={{ padding: 1, backgroundColor: "#24283b" }}>
-        <text bold color="#c0caf5">Deepreef · OpenTUI (本地源码模式)</text>
-      </box>
-      <OrchestrationDashboard terminalWidth={terminalWidth} state={state} />
-      <box style={{ padding: 1 }}>
-        <text color="#787c99">按 Ctrl+C 退出</text>
-      </box>
-    </box>
-  )
+  stdout.write("\x1b[?1000l");  // X10 鼠标
+  stdout.write("\x1b[?1002l");  // 按钮事件
+  stdout.write("\x1b[?1003l");  // 任意事件
+  stdout.write("\x1b[?1006l");  // SGR 扩展鼠标
+  stdout.write("\x1b[?1049l");  // 退出备用屏幕
+  stdout.write("\x1b[?25h");    // 恢复光标
+  stdout.write("\x1b[0m");      // 重置属性
+  stdout.write("\r\n");
 }
 
 /**
- * 手动恢复终端状态（防止鼠标跟踪乱码）
- * 这些序列必须在程序退出时发送，无论正常退出还是异常退出
+ * 设置键盘处理
  */
-function restoreTerminal(): void {
-  const stdout = process.stdout
-  if (!stdout) return
+function setupKeyHandlers(renderer: any): void {
+  // 页面切换快捷键（1-6）
+  for (let i = 1; i <= 6; i++) {
+    const key = String(i);
+    renderer.keyInput?.on?.(key, () => {
+      const page = pageKeyMap[key];
+      if (page) {
+        switchPage(page);
+      }
+    });
+  }
 
-  // 禁用鼠标跟踪（所有常见模式）
-  stdout.write('\x1b[?1000l')  // X10 鼠标模式
-  stdout.write('\x1b[?1002l')  // 按钮事件跟踪
-  stdout.write('\x1b[?1003l')  // 任意事件跟踪
-  stdout.write('\x1b[?1006l')  // SGR 扩展鼠标模式
+  // Esc/q 关闭详情或返回
+  renderer.keyInput?.on?.("escape", () => {
+    const ui = uiStore.getState();
+    if (ui.showDetail) {
+      closeDetail();
+    }
+  });
 
-  // 退出备用屏幕缓冲区
-  stdout.write('\x1b[?1049l')
-
-  // 恢复光标
-  stdout.write('\x1b[?25h')
-
-  // 重置所有属性
-  stdout.write('\x1b[0m')
-
-  stdout.write('\r\n')  // 换行确保提示符在新行
+  renderer.keyInput?.on?.("q", () => {
+    const ui = uiStore.getState();
+    if (ui.showDetail) {
+      closeDetail();
+    }
+  });
 }
 
 export async function startOpenTUI(): Promise<void> {
-  // 捕获异常确保终端恢复
+  // 注册退出清理
   const cleanup = () => {
     try {
-      restoreTerminal()
-    } catch {
-      // 忽略恢复时的错误
-    }
-  }
+      restoreTerminal();
+    } catch {}
+  };
 
-  // 注册多种退出方式的清理
-  process.once('exit', cleanup)
-  process.once('SIGINT', () => {
-    cleanup()
-    process.exit(0)
-  })
-  process.once('SIGTERM', () => {
-    cleanup()
-    process.exit(0)
-  })
-  process.once('uncaughtException', (err) => {
-    console.error('Uncaught exception:', err)
-    cleanup()
-    process.exit(1)
-  })
+  process.once("exit", cleanup);
+  process.once("SIGINT", () => {
+    cleanup();
+    process.exit(0);
+  });
+  process.once("SIGTERM", () => {
+    cleanup();
+    process.exit(0);
+  });
+  process.once("uncaughtException", (err) => {
+    console.error("Uncaught exception:", err);
+    cleanup();
+    process.exit(1);
+  });
 
   try {
     // 初始化 fixture 数据
-    replayEvents(sampleOrchestrationFixture)
+    replayEvents(sampleOrchestrationFixture);
 
-    // 开发阶段配置：禁用鼠标，简化调试
-    // TODO: 最终测试前将 useMouse 改为 true 启用鼠标支持
+    // 创建 renderer（开发阶段禁用鼠标）
     const cliRenderer = await createCliRenderer({
       exitOnCtrlC: true,
       targetFps: 30,
       useMouse: false,
       enableMouseMovement: false,
-    })
+    });
 
-    const root = createRoot(cliRenderer)
+    const root = createRoot(cliRenderer);
 
-    // 监听 renderer 销毁事件进行额外清理
-    cliRenderer.once(CliRenderEvents.DESTROY, () => {
-      cleanup()
-    })
+    // 设置键盘处理
+    setupKeyHandlers(cliRenderer);
 
-    // 外部订阅：状态变化时重新渲染整个 App
-    let currentState = tuiStore.getState()
+    // 监听销毁事件
+    cliRenderer.once(CliRenderEvents.DESTROY, cleanup);
+
+    // 状态订阅与渲染
+    let currentTuiState = tuiStore.getState();
+    let currentUiState = uiStore.getState();
 
     const renderApp = () => {
-      root.render(<OpenTUIApp state={currentState} />)
-    }
+      root.render(
+        <MainLayout
+          tuiState={currentTuiState}
+          uiState={currentUiState}
+          onSwitchPage={switchPage}
+          onCloseDetail={closeDetail}
+        />
+      );
+    };
 
     // 首次渲染
-    renderApp()
+    renderApp();
 
-    // 订阅后续更新
+    // 订阅 TuiStore 更新
     tuiStore.subscribe((newState) => {
-      currentState = newState
-      renderApp()
-    })
+      currentTuiState = newState;
+      renderApp();
+    });
 
-    // 保持程序运行，直到显式退出
-    // 在 SSH 环境中，renderer 可能会立即完成，需要阻塞等待
+    // 订阅 UiStore 更新
+    uiStore.subscribe((newState) => {
+      currentUiState = newState;
+      renderApp();
+    });
+
+    // 保持运行
     await new Promise<void>((resolve) => {
       cliRenderer.once(CliRenderEvents.DESTROY, () => {
-        resolve()
-      })
-    })
+        resolve();
+      });
+    });
 
   } finally {
-    cleanup()
+    cleanup();
   }
 }
