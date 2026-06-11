@@ -21,6 +21,8 @@ export type LoopEventRole =
   | "question_ask"
   | "question_replied"
   | "question_rejected"
+  // TUI-OT-60: 多 Agent 编排事件（结构化状态同步）
+  | "orchestration"
 
 export interface LoopEvent {
   role: LoopEventRole
@@ -29,7 +31,73 @@ export interface LoopEvent {
   toolCallIndex?: number
   severity?: "info" | "warning" | "error"
   metadata?: Record<string, unknown>
+  // TUI-OT-60: orchestration 事件时携带结构化数据
+  orchestration?: OrchestrationEventPayload
 }
+
+/* ── OrchestrationEvent — TUI-OT-60 多 Agent 编排可视化 ── */
+
+export type OrchestrationKind =
+  | "worker_upsert"      // Worker 创建或更新
+  | "worker_remove"      // Worker 移除
+  | "supervisor_upsert"  // Supervisor 创建或更新
+  | "supervisor_advice"  // Supervisor 给出建议
+  | "loop_transition"    // Loop 阶段转换
+  | "runtime_signal"     // 运行时信号
+  | "agent_tree_upsert"  // Agent 树节点更新
+  | "checkpoint"         // Checkpoint 保存
+
+export interface WorkerSnapshot {
+  id: string
+  modelTarget: string
+  status: "queued" | "starting" | "running" | "waiting_permission" | "waiting_question" | "waiting_supervisor" | "verifying" | "paused" | "completed" | "failed" | "cancelled" | "idle"
+  currentTask?: string
+  elapsedMs: number
+  parentAgentId?: string
+}
+
+export interface SupervisorSnapshot {
+  id: string
+  modelTarget: string
+  status: "disabled" | "idle" | "queued" | "reviewing" | "cooldown" | "unavailable" | "error"
+  reviewingWorkerId?: string
+  cooldownRemainingMs?: number
+}
+
+export interface LoopTransition {
+  from: "observe" | "plan" | "act" | "verify" | "reflect" | "retry" | "paused" | "done" | "failed"
+  to: "observe" | "plan" | "act" | "verify" | "reflect" | "retry" | "paused" | "done" | "failed"
+  attempt: number
+  timestamp: number
+}
+
+export interface RuntimeSignal {
+  kind: "no-progress" | "repeated-error" | "verification-failed" | "checkpoint-saved"
+  message?: string
+}
+
+export interface AgentTreeNode {
+  id: string
+  kind: "main" | "worker" | "supervisor" | "subagent"
+  label: string
+  status: string
+  parentId?: string
+}
+
+export interface CheckpointSnapshot {
+  runId: string
+  savedAt: number
+}
+
+export type OrchestrationEventPayload =
+  | { kind: "worker_upsert"; worker: WorkerSnapshot }
+  | { kind: "worker_remove"; workerId: string }
+  | { kind: "supervisor_upsert"; supervisor: SupervisorSnapshot }
+  | { kind: "supervisor_advice"; supervisorId: string; workerId: string; advice: string; adopted: boolean }
+  | { kind: "loop_transition"; transition: LoopTransition }
+  | { kind: "runtime_signal"; signal: RuntimeSignal }
+  | { kind: "agent_tree_upsert"; node: AgentTreeNode }
+  | { kind: "checkpoint"; checkpoint: CheckpointSnapshot }
 
 /* ── Permission tiers ── */
 

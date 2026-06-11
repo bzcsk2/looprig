@@ -9,3 +9,13 @@ export * from "./create-store.js";
 export * from "./tui-store.js";
 export * from "./fixture-replay.js";
 export * from "./ui-store.js";
+
+// TUI-OT-60: 重新导出 Core 类型（供适配器使用）
+export type {
+  WorkerSnapshot,
+  SupervisorSnapshot,
+  LoopTransition,
+  RuntimeSignalSnapshot as RuntimeSignal,
+  AgentNodeSnapshot as AgentNode,
+  CheckpointSnapshot,
+} from "./types.js";

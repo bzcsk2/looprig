@@ -24,6 +24,17 @@ export type { AgentDefinition } from "./agent.js"
 export type { DeepreefConfig, ProviderInfo, ProviderModel } from "./config.js"
 export type { ChatMessage, ToolCall, ToolSpec, Usage, Role } from "./types.js"
 export type { CoreEngine, AgentConfig, AgentTool, LoopEvent, AgentState, SessionStats, ToolContext, ToolResult, LoopEventRole, ToolTier, ToolConcurrency, ToolProgressUpdate, ChatClient } from "./interface.js"
+// TUI-OT-60: 多 Agent 编排事件类型（供 TUI 消费）
+export type {
+  OrchestrationKind,
+  OrchestrationEventPayload,
+  WorkerSnapshot,
+  SupervisorSnapshot,
+  LoopTransition,
+  RuntimeSignal,
+  AgentTreeNode,
+  CheckpointSnapshot,
+} from "./interface.js"
 export { SessionLoader } from "./session.js"
 export type { SessionSummary } from "./session.js"
 
