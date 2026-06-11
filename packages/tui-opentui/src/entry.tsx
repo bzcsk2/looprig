@@ -91,9 +91,13 @@ export async function startOpenTUI(): Promise<void> {
     // 初始化 fixture 数据
     replayEvents(sampleOrchestrationFixture)
 
+    // 开发阶段配置：禁用鼠标，简化调试
+    // TODO: 最终测试前将 useMouse 改为 true 启用鼠标支持
     const cliRenderer = await createCliRenderer({
       exitOnCtrlC: true,
       targetFps: 30,
+      useMouse: false,
+      enableMouseMovement: false,
     })
 
     const root = createRoot(cliRenderer)
