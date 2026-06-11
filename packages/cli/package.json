@@ -25,6 +25,8 @@
     "@deepreef/tui": "workspace:*",
     "@deepreef/plugin": "workspace:*",
     "@deepreef/memory": "workspace:*",
-    "@deepreef/tui-opentui": "workspace:*"
+    "@deepreef/tui-opentui": "workspace:*",
+    "@opentui/core": "file:../../../../opentui/packages/core",
+    "@opentui/react": "file:../../../../opentui/packages/react"
   }
 }
