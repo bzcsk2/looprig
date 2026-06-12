@@ -34,6 +34,7 @@ import {
 import { resolveDefaultHarness } from "./model-profile/resolver.js"
 import { resolveHarnessStrictness, resolveEffectiveHarnessPolicy, readProjectHarnessConfig } from "./harness/index.js"
 import type { EffectiveHarnessPolicy, HarnessStrictness } from "./harness/index.js"
+import { ReadTracker } from "./read-before-write.js"
 import type { VerificationGateState } from "./governance/verification-gate.js"
 import {
   createSupervisorGuidanceState,
@@ -586,6 +587,15 @@ export class ReasonixEngine implements CoreEngine {
     if (this.effectivePolicy.shellPolicy === "dual-track" || this.effectivePolicy.shellPolicy === "dual-track-conservative") {
       const { createBashTool } = await import("@deepreef/tools")
       this.tools.set("bash", createBashTool({ dualTrack: true }))
+    }
+
+    // ADV-HAR-05: 根据 effectivePolicy.readBeforeWrite 配置 ReadTracker
+    if (this.effectivePolicy.readBeforeWrite === "block") {
+      this.toolExecutor.setReadTracker(new ReadTracker({ strict: true }))
+    } else if (this.effectivePolicy.readBeforeWrite === "warn") {
+      this.toolExecutor.setReadTracker(new ReadTracker({ strict: false }))
+    } else {
+      this.toolExecutor.setReadTracker(undefined)
     }
 
     this.verificationGateState = { continuationCount: 0 }
