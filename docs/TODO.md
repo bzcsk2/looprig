@@ -180,7 +180,7 @@ git diff --check
 | ~~3~~ | ~~`RM-30` 删除 Token 用量预估专项代码~~ | RM-20 | ✅ 已完成 |
 | ~~4~~ | ~~`QST-10` 复制适配 OpenCode Question 完整交互闭环~~ | RM-30 | ✅ 已完成 |
 | ~~5~~ | ~~`PERM-10` 复制适配 OpenCode 权限规则、Auto Accept 与子 Agent 冒泡~~ | QST-10 | ✅ 已完成 |
-| 6 | `DRF-00` 基线与复制台账 | RM-10、RM-20、RM-30、QST-10、PERM-10 | 在简化后的内核上建立融合基线 |
+| ~~6~~ | ~~`DRF-00` 基线与复制台账~~ | RM-10、RM-20、RM-30、QST-10、PERM-10 | ✅ 已完成 |
 | 7 | `DRF-10` ModelTarget 与角色化 client resolver | DRF-00 | Worker/Supervisor 可使用不同端点 |
 | 8 | `DRF-11` ModelProfile 与 HarnessProfile | DRF-10 | 本地小模型启动时加载优化配置 |
 | 9 | `DRF-20` 小模型基础护栏 | DRF-11 | read guard、early-stop、最小工具集 |

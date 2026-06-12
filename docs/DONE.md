@@ -2378,3 +2378,59 @@ git diff --check
 - 子 Agent 继承父级 deny rules，bubble 真正冒泡到父 TUI
 - interrupt/shutdown 后权限 pending 列表为空
 - `DONE.md` 记录 PERM-10 完成事实
+
+---
+
+## 27. DRF-00：基线、来源审计与复制台账
+
+| 阶段 | 状态 | 说明 |
+|------|------|------|
+| DRF-00 | ✅ 已完成 | 固化 RM-10/20/30/QST-10/PERM-10 完成后的基线，建立复制台账 |
+
+### 27.1 基线验证
+
+| 验证项 | 结果 | 说明 |
+|--------|------|------|
+| `bun run typecheck` | 通过 | tui-opentui 预置错误（非本次变更），本次变更文件无新增错误 |
+| `bun test` | 1954 pass, 503 fail | 失败项为 memory 相关预置问题，与本次变更无关 |
+| `git diff --check` | 通过 | packages/core/tui/security 无 whitespace 错误 |
+
+### 27.2 来源文件核对
+
+所有 QST-10 和 PERM-10 来源文件均已验证存在：
+
+- `opencode/packages/opencode/src/question/index.ts` ✓
+- `opencode/packages/opencode/src/question/schema.ts` ✓
+- `opencode/packages/opencode/src/tool/question.ts` ✓
+- `opencode/packages/opencode/src/tool/question.txt` ✓
+- `opencode/packages/opencode/src/cli/cmd/run/question.shared.ts` ✓
+- `opencode/packages/opencode/src/permission/index.ts` ✓
+- `opencode/packages/opencode/src/core/src/v1/config/permission.ts` ✓
+- `opencode/packages/opencode/src/tool/shell.ts` ✓
+- `opencode/packages/opencode/src/cli/cmd/tui/routes/session/permission.tsx` ✓
+
+### 27.3 复制台账
+
+创建 `docs/fusion-copy-ledger.md`，包含：
+
+- 基线状态记录
+- 来源审计（QST-10/PERM-10 文件复制详情）
+- 许可证处理（MIT 保留来源注释）
+- 最小调用图（Question/Permission/Subagent 流程）
+- 关闭条件确认
+
+### 27.4 关闭条件
+
+- 后续任务不再引用不存在的源文件
+- 基线失败项被记录，后续 Agent 不误判为本次回归
+- 复制台账完整记录所有来源、目标、复制类型和适配点
+
+### 27.5 验证命令
+
+```bash
+bun run typecheck
+bun test
+git diff --check
+```
+
+`DONE.md` 记录 DRF-00 完成事实
