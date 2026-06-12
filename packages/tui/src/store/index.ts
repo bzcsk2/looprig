@@ -17,3 +17,5 @@ export {
   usePermissionQuestion,
   useBridgeFeedback,
 } from './BridgeRuntimeContext.js';
+export { OrchestrationStore } from './orchestration-store.js';
+export type { OrchestrationState, LoopPhase, AgentActivityEvent } from './orchestration-store.js';

@@ -71,16 +71,21 @@ describe("checkSubagentPermission", () => {
       expect(checkSubagentPermission("write_file", "acceptEdits").allowed).toBe(true)
     })
 
-    it("should allow exec tools", () => {
-      expect(checkSubagentPermission("bash", "acceptEdits").allowed).toBe(true)
+    it("should require parent approval for exec tools (PERM-10)", () => {
+      const result = checkSubagentPermission("bash", "acceptEdits")
+      expect(result.allowed).toBe(false)
+      expect(result.bubble).toBe(true)
+      expect(result.reason).toContain("acceptEdits")
     })
   })
 
   describe("bubble mode", () => {
-    it("should allow all tools (bubble to parent)", () => {
-      expect(checkSubagentPermission("read_file", "bubble").allowed).toBe(true)
-      expect(checkSubagentPermission("write_file", "bubble").allowed).toBe(true)
-      expect(checkSubagentPermission("bash", "bubble").allowed).toBe(true)
+    it("should require parent approval for all tools (PERM-10)", () => {
+      for (const tool of ["read_file", "write_file", "bash"]) {
+        const result = checkSubagentPermission(tool, "bubble")
+        expect(result.allowed).toBe(false)
+        expect(result.bubble).toBe(true)
+      }
     })
   })
 })

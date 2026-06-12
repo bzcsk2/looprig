@@ -12,6 +12,7 @@ export interface TuiSettings {
   agent?: string;
   thinkingMode?: string;
   activeSkills?: PersistedSkill[];
+  theme?: string;
 }
 
 const SETTINGS_DIR = '.deepreef';
@@ -55,6 +56,7 @@ function normalizeSettings(settings: Partial<TuiSettings>): TuiSettings {
     ...(typeof settings.agent === 'string' && settings.agent ? { agent: settings.agent } : {}),
     ...(typeof settings.thinkingMode === 'string' && settings.thinkingMode ? { thinkingMode: settings.thinkingMode } : {}),
     ...(Array.isArray(settings.activeSkills) ? { activeSkills: settings.activeSkills.filter(isPersistedSkill).map(s => ({ name: s.name, description: s.description, content: s.content })) } : {}),
+    ...(typeof settings.theme === 'string' && settings.theme ? { theme: settings.theme } : {}),
   }
 }
 

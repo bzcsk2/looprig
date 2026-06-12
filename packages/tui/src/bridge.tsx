@@ -139,6 +139,7 @@ export function createBridge(
   setState: React.Dispatch<React.SetStateAction<BridgeState>>,
   onUserInput?: (text: string) => void,
   beforeSubmit?: () => Promise<void>,
+  orchestrationStore?: import('./store/orchestration-store.js').OrchestrationStore,
 ): {
   submit: (text: string) => Promise<void>;
   cancel: () => void;
@@ -810,6 +811,12 @@ export function createBridge(
           }
 
           case 'done':
+            break;
+
+          case 'orchestration':
+            if (event.orchestration && orchestrationStore) {
+              orchestrationStore.apply(event.orchestration);
+            }
             break;
 
           default: {

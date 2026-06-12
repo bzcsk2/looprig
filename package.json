@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "bun run packages/cli/src/index.ts",
     "test": "bun test",
+    "benchmark:fusion": "bun run packages/core/scripts/benchmark-matrix.ts",
     "test:memory-native": "bun test packages/memory/test/deepreef-*.test.ts packages/cli/src/__tests__/memory-integration.test.ts",
     "typecheck": "tsc --noEmit --project tsconfig.json"
   },
@@ -20,6 +21,7 @@
     "@types/react-reconciler": "^0.33.0",
     "@types/semver": "^7.7.1",
     "@types/stack-utils": "^2.0.3",
+    "@types/tinycolor2": "^1.4.6",
     "@types/turndown": "^5.0.6",
     "typescript": "^5.7.0",
     "vitest": "^4.1.8",

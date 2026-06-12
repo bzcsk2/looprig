@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs"
 import { resolve, join } from "node:path"
 import { LastConfigSchema } from "./schemas/config.js"
 import { DEEPSEEK_BASE_URL, DEEPSEEK_MODEL } from "./types.js"
+import type { ModelTarget } from "./model-target.js"
 
 export interface DeepreefConfig {
   apiKey: string
@@ -12,6 +13,8 @@ export interface DeepreefConfig {
   maxContextRounds?: number
   contextWindow?: number
   provider?: string
+  /** DRF-10: 项目级 ModelTarget 覆盖 */
+  modelTargets?: Record<string, Partial<ModelTarget>>
 }
 
 export interface ProviderModel {
@@ -131,6 +134,17 @@ function getModelEnvVar(provider: string): string {
 }
 
 const LAST_CONFIG_FILE = ".deepreef/last-config.json"
+const MODEL_TARGETS_FILE = ".deepreef/model-targets.json"
+
+function loadModelTargets(): Record<string, Partial<ModelTarget>> | undefined {
+  try {
+    const raw = readFileSync(resolve(process.cwd(), MODEL_TARGETS_FILE), "utf8")
+    const parsed = JSON.parse(raw) as { targets?: Record<string, Partial<ModelTarget>> }
+    return parsed.targets
+  } catch {
+    return undefined
+  }
+}
 
 export function saveLastConfig(cfg: { provider: string; model: string; baseUrl: string }): void {
   try {
@@ -228,6 +242,7 @@ export function loadConfig(): DeepreefConfig {
     maxContextRounds: 20,
     contextWindow,
     provider,
+    modelTargets: loadModelTargets(),
   }
 }
 

@@ -241,6 +241,30 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
     )
     if (!decision.blocking) return false
 
+    // ADV-HAR-08: 根据 verificationPolicy 决定行为
+    // - "block": 硬阻断，必须验证
+    // - "require-or-waive": 要求验证或用户豁免
+    // - "warn": 仅警告，不阻断
+    const effectivePolicy = opts.effectivePolicy
+    const verificationMode = effectivePolicy?.verification ?? "block"
+
+    if (verificationMode === "warn") {
+      // warn 模式：仅发出警告，不阻断
+      const warnEvt: LoopEvent = {
+        role: "status",
+        content: "verification_gate_warning",
+        severity: "warning",
+        metadata: {
+          verificationPending: taskLedger.verificationPending,
+          changedFiles: taskLedger.changedFiles.length,
+          message: "Verification pending but not blocking (loose mode)",
+        },
+      }
+      yield warnEvt
+      sessionWriter?.enqueue({ ts: Date.now(), type: "event", payload: warnEvt })
+      return false  // 不阻断
+    }
+
     gateState.continuationCount++
     ctx.log.append({ role: "user", content: decision.prompt })
     sessionWriter?.enqueue({ ts: Date.now(), type: "messages", payload: ctx.buildMessages() })
@@ -254,6 +278,7 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
         changedFiles: taskLedger.changedFiles.length,
         continuationCount: gateState.continuationCount,
         requiresUser: decision.requiresUser,
+        verificationMode,
       },
     }
     yield evt

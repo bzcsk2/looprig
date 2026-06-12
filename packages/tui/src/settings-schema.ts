@@ -10,6 +10,7 @@ export const TuiSettingsSchema = z.object({
   agent: z.string().optional(),
   thinkingMode: z.string().optional(),
   activeSkills: z.array(PersistedSkillSchema).optional(),
+  theme: z.string().optional(),
 })
 
 export const LangConfigSchema = z.object({

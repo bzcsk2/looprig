@@ -1,264 +1,464 @@
 # Deepreef 开发审核意见与下一步动作
 
-最后整理：2026-06-11
-
-本文是审核 Agent 面向开发 Agent 的交接入口，用于记录：
-
-- 对最近一次实现的审核结论。
-- 必须修复的问题、风险和缺失证据。
-- 当前唯一允许领取的下一步动作。
-- 下一轮审核需要提交的材料。
-
-本文不是技术方案、任务清单或完成记录：
-
-- 目标架构和不可破坏边界见 [Deepreef后续开发计划.md](Deepreef后续开发计划.md)。
-- 任务顺序、实施范围和关闭条件见 [TODO.md](TODO.md)。
-- 已落地事实、历史实现和保留限制见 [DONE.md](DONE.md)。
+> 更新日期：2026-06-12
+> 本文用途：指导开发 Agent 完成下一阶段开发与验收。
+> 本轮范围：Harness 三档严格度、融合功能运行时接线、此前 TODO 验收问题。TUI 暂不在本轮处理范围内。
 
 ---
 
-## 1. 文档职责
+## 一、审核结论
 
-### 1.1 谁维护本文
+当前新增模块的单元测试质量尚可，但多个功能仍停留在“模块存在、测试通过”的阶段，没有真正接入 `ReasonixEngine` 的执行主链，因此不能按已完成功能验收。
 
-本文由审核 Agent 维护。
+本轮验证结果：
 
-开发 Agent 完成任务后，应提交实现摘要、变更范围和验证证据，等待审核 Agent 检查。审核 Agent 根据代码、测试和架构边界更新本文，给出明确结论与下一步动作。
+- `bun run typecheck`：通过。
+- RM/QST/PERM/Core 聚焦测试：204 pass / 0 fail。
+- 融合功能聚焦测试：164 pass / 0 fail。
+- `git diff --check`：通过。
+- 全量 `bun test`：2323 pass / 18 skip / 476 fail / 21 errors。
+- 当前 benchmark 是确定性模拟器，不是真实模型与工具链验收。
 
-开发 Agent 不得自行把审核状态改为“通过”，也不得自行领取本文未授权的后续任务。
+开发 Agent 不得仅凭新增模块的单元测试通过就将任务标记为 DONE。必须提供运行时接线证据、端到端测试和全量测试结果。
 
-### 1.2 审核结论
+### 当前可验收
 
-每轮审核只能给出以下一种结论：
+- RM-20 核心部分。
+- QST-10。
+- PERM-10。
+- DRF-10。
+- DRF-31。
 
-| 结论 | 含义 | 开发 Agent 动作 |
-|---|---|---|
-| `通过` | 当前任务满足关闭条件，可以更新 DONE 并领取指定下一项 | 只执行“下一步动作” |
-| `有条件通过` | 核心目标完成，只剩明确的低风险收尾 | 先完成指定收尾，不得越过依赖任务 |
-| `退回修改` | 存在必须修复的问题或验证证据不足 | 只修复审核问题，不领取新任务 |
-| `阻塞` | 缺少负责人决策、外部条件或无法安全继续 | 停止实现，等待阻塞解除 |
-| `未审核` | 尚未收到可审核实现 | 按当前授权任务开发并提交证据 |
+### 当前部分完成
 
-### 1.3 审核意见优先级
+- RM-10：缺少旧 `free-auto` 配置迁移处理。
+- RM-30：Token 估算相关代码仍未完全删除。
+- DRF-11、DRF-20、DRF-40、DRF-50、DRF-60：已有模块或测试，但运行时接线、策略落地或真实验收不完整。
 
-| 等级 | 定义 | 处理要求 |
-|---|---|---|
-| `P0` | 安全、数据损坏、架构方向错误或违反明确产品决策 | 必须立即修复，禁止继续后续任务 |
-| `P1` | 任务核心行为错误、兼容迁移缺失、主要验收失败 | 必须在本轮修复 |
-| `P2` | 边界处理、可观测性、测试覆盖或维护性问题 | 原则上本轮修复；延后需审核 Agent 明确批准 |
-| `P3` | 非阻塞优化或文档细节 | 可记录到 TODO，但不得伪装为已完成 |
+### 当前不能验收
+
+- DRF-30：Harness Profile 多数字段没有进入实际执行路径。
+- DRF-32：默认 Bash 工具没有启用双轨 Shell。
+- DRF-51：未显式配置 Supervisor 时仍会装载默认候选。
+- DRF-70：融合组件没有在主链形成闭环。
+- DRF-80：benchmark 使用硬编码结果模拟成功。
 
 ---
 
-## 2. 审核流程
+## 二、Harness 三档严格度设计
 
-### 2.1 开发 Agent 开工前
+### 2.1 设计目标
 
-开发 Agent 必须：
+新增用户可选择的 Harness 严格度：
 
-1. 读取本文“当前审核结论”和“唯一下一步动作”。
-2. 从 `TODO.md` 读取对应任务的目标、删除/修改范围、禁止事项、验收命令和关闭条件。
-3. 阅读 `Deepreef后续开发计划.md` 中相关架构边界。
-4. 检查工作区已有修改，禁止覆盖或回退其他 Agent 与用户的变更。
-5. 只领取一个闭环，不得顺手实现后续任务。
+```ts
+export type HarnessStrictness = "strict" | "normal" | "loose"
+```
 
-若本文与 `TODO.md` 冲突：
+三档严格度用于控制 Deepreef 对执行 Agent 的约束、纠错、检查和监督程度，使新增融合功能按档位分段开启或关闭。
 
-- 实施范围与关闭条件以 `TODO.md` 为准。
-- 是否允许开始任务、是否退回修复、下一步做什么以本文为准。
-- 架构边界以 `Deepreef后续开发计划.md` 为准。
+严格度不等于模型能力，也不等于权限模式：
 
-### 2.2 开发 Agent 提交审核材料
+- 不得用严格度自动更换模型、Provider、温度或推理强度。
+- 不得用 `loose` 绕过 PermissionEngine、危险命令拦截和敏感路径保护。
+- Supervisor 只能使用用户显式配置的免费或便宜模型；严格度只决定何时寻求监督，不能决定偷偷使用哪个模型。
+- `HarnessMode` 当前的 `free / adaptive / forced / strict` 与新严格度语义混杂，应逐步拆分，不能继续增加重叠含义。
 
-开发 Agent 完成实现后，必须在回复中提交以下内容，不要直接改写本文的审核结论：
+### 2.2 配置来源与优先级
+
+推荐支持以下配置入口：
+
+```json
+{
+  "strictness": "normal",
+  "modelOverrides": {
+    "local/qwen-small": "strict"
+  }
+}
+```
+
+配置优先级：
+
+1. 当前会话或 CLI 显式选择，例如 `--harness strict`。
+2. 项目配置 `.deepreef/harness.json`。
+3. 模型 Profile 推荐档位。
+4. 默认使用 `normal`。
+
+默认推荐：
+
+- 未知本地模型、小模型：`strict`。
+- 已适配的本地中型模型、免费模型、便宜远程模型：`normal`。
+- `loose` 仅由用户显式选择，不自动启用。
+
+最终策略生成顺序：
 
 ```text
-任务编号：
-实现摘要：
+模型能力基线
+  → 用户严格度预设
+  → 经校验的项目覆盖项
+  → 最后强制应用不可绕过的安全底线
+```
+
+### 2.3 `/harness` 手动切换菜单
+
+`/harness` 必须是用户可随时打开的选择菜单，用于查看当前有效档位并手动切换：
+
+```text
+Harness strictness
+
+  strict   强约束，适合本地小模型和不稳定工具调用
+› normal   默认，在可靠性与自主执行之间平衡
+  loose    少干预，保留权限、安全和真实性底线
+
+Current: normal
+Source: project (.deepreef/harness.json)
+Applies from: next submission
+```
+
+实现要求：
+
+- 优先复制并适配项目中现有 `/model`、权限菜单或 Question/Select 组件，不得为 `/harness` 单独重写菜单框架。
+- 打开菜单时必须显示当前有效档位、配置来源和简短差异说明。
+- 支持键盘选择、确认和取消；取消不得修改任何状态。
+- 选择后默认只切换当前会话，立即更新会话配置和状态栏可读状态。
+- 提供明确的“设为项目默认”动作，将选择写入 `.deepreef/harness.json`；不得在普通切换时偷偷修改项目文件。
+- 正在执行的提交不得热切换策略。用户切换后，新档位从下一次 `submit()` 开始生效。
+- 切换必须生成审计事件，至少记录旧档位、新档位、来源、作用域和生效时间。
+- 菜单只能修改 Harness 严格度，不得顺带修改模型、Provider、权限模式、温度或推理强度。
+- 允许保留 `/harness strict|normal|loose` 作为脚本和熟练用户的快捷命令，但无参数 `/harness` 必须打开菜单。
+- 如果项目默认值无效，菜单应展示回退后的有效档位和错误来源，不得静默显示错误值。
+
+推荐命令行为：
+
+| 命令 | 行为 |
+|---|---|
+| `/harness` | 打开三档选择菜单 |
+| `/harness strict` | 将当前会话切换为 `strict` |
+| `/harness normal` | 将当前会话切换为 `normal` |
+| `/harness loose` | 将当前会话切换为 `loose` |
+| `/harness status` | 显示当前有效档位、来源及关键策略摘要 |
+| `/harness project strict\|normal\|loose` | 显式修改项目默认值 |
+
+若当前任务仍在执行，菜单允许用户选择新档位，但必须明确提示“从下一次提交生效”，不能让同一次执行中的组件获得不一致策略。
+
+### 2.4 不可绕过的安全底线
+
+以下能力在三个档位中始终开启：
+
+- PermissionEngine 和用户明确设置的权限规则。
+- 危险 Shell 命令拦截。
+- 敏感路径保护。
+- stale-read 检测，避免基于旧内容覆盖文件。
+- 截断写入和明显损坏写入的拒绝机制。
+- 用户中断、会话恢复和最低限度 Checkpoint。
+- 硬性最大轮数，防止无限循环。
+- Hooks 和审计事件。
+- 未显式配置 Supervisor 时不得发起 Supervisor 请求。
+
+`loose` 的含义是减少过程干预，不是关闭安全系统。
+
+### 2.5 不要继续堆积布尔字段
+
+现有 `HarnessProfile` 包含大量布尔值，继续扩展会导致组合不可控。下一步应引入结构化的最终策略：
+
+```ts
+interface EffectiveHarnessPolicy {
+  strictness: HarnessStrictness
+  source: "session" | "project" | "model-profile" | "default"
+
+  toolset: ToolsetSize
+  maxParallelTools: number
+  maxTurns: number
+
+  readBeforeWrite: "block" | "warn" | "off"
+  textToolSalvage: "always" | "on-native-failure" | "off"
+  branchBudget: "enforce" | "recover" | "observe"
+  checkpoint: "frequent" | "safe-point" | "minimal"
+  verification: "block" | "require-or-waive" | "warn"
+  earlyStop: "aggressive" | "standard" | "critical-only"
+  toolRouting: "two-stage" | "auto" | "direct"
+  executionMode: "forced" | "adaptive" | "free"
+  shellPolicy: "dual-track-conservative" | "dual-track"
+  supervisorPolicy: "on-failure" | "critical-only" | "off"
+}
+```
+
+可以暂时保留现有字段并提供兼容适配器，但运行时只能消费一份不可变的 `EffectiveHarnessPolicy`，不得让各模块自行再次解释档位。
+
+---
+
+## 三、三档功能开关矩阵
+
+| 能力 | strict | normal | loose |
+|---|---|---|---|
+| 适用场景 | 小型、本地、工具调用不稳定模型 | 默认；已适配便宜模型和中型模型 | 用户明确选择的高自主模式 |
+| Execution Mode | `forced` | `adaptive` | `free` |
+| Toolset | `minimal/coding` | 按任务选择 `coding/full` | `full` |
+| 最大并行工具数 | 1-2 | 3 | 5 |
+| 建议最大轮数 | 30 | 50 | 80，仍受硬上限限制 |
+| Read Before Write | 未读文件禁止写入 | 首次警告并要求读取 | 关闭过程约束，保留 stale-read 底线 |
+| Text Tool Salvage | 始终开启 | 原生工具调用失败或模型可靠性不足时开启 | 默认关闭 |
+| Branch Budget | 强制限制，超限后阻断并恢复 | 软限制，恢复失败后阻断 | 仅观测和记录 |
+| Checkpoint | 写入、失败、监督建议后频繁保存 | 批量写入、失败和安全点保存 | 中断、退出和恢复所需的最小保存 |
+| Verification Gate | 未验证不得声明完成 | 必须验证，或由用户明确豁免 | 给出未验证警告，不静默冒充成功 |
+| Early Stop | 激进检测重复、空转和无进展 | 标准检测 | 只处理严重重复和硬上限 |
+| Tool Routing | 小模型强制两阶段路由 | 超过 Schema/上下文阈值时自动两阶段 | 默认直接路由 |
+| Shell | 保守双轨，长任务必须可查询和取消 | 双轨执行 | 双轨执行 |
+| Supervisor | 失败时请求已配置 Supervisor | 多次失败或关键失败时请求 | 默认关闭，用户可显式请求 |
+| Task Ledger | 编辑、调试、重构、测试任务始终开启 | 复杂任务开启 | 仅长任务或用户显式开启 |
+
+### 档位行为补充
+
+#### strict
+
+- 面向小模型时，必须减少一次暴露的工具 Schema 和上下文噪声。
+- 工具调用失败后，先通过 Salvage、工具结果反馈和 Supervisor 建议继续，而不是直接替换执行模型。
+- Supervisor 给出建议后，仍由原执行 Agent 继续完成任务。
+- 超出 Branch Budget、连续无进展或验证失败时，必须进入恢复流程。
+
+#### normal
+
+- 作为默认档位，在可靠性和自主性之间平衡。
+- 允许模型先自主执行；检测到工具调用异常、上下文压力或重复失败后再升级约束。
+- Supervisor 必须满足“用户已配置”和“触发条件成立”两个条件。
+
+#### loose
+
+- 减少强制流程，但保留审计、权限、安全和真实性约束。
+- 不得因为 Verification Gate 变为警告，就允许 Agent 声称未执行的测试已经通过。
+- 不得关闭 Shell 可取消能力、会话恢复和硬性循环上限。
+
+---
+
+## 四、必须采用的运行时架构
+
+当前问题是 Profile 被解析后，只消费了少量字段。`ReasonixEngine.submit()` 必须成为策略接线入口：
+
+```text
+resolveHarnessStrictness()
+  → resolveEffectiveHarnessPolicy()
+  → 为本次 submit 固化不可变策略
+  → 初始化并连接各 Harness 组件
+  → 执行
+  → Verification Gate
+  → 保存结果和审计事件
+```
+
+以下组件必须在主链中被真实实例化并调用，而不是仅存在模块和单元测试：
+
+- `ReadTracker`
+- `EarlyStopDetector`
+- `BranchBudgetTracker`
+- `CheckpointEngine`
+- `ModeDecisionEngine`
+- `resolveToolRouting`
+- Verification Gate
+- 双轨 Shell 生命周期管理
+- Supervisor Pool
+
+每次提交开始时解析一次最终策略。执行中不得因模型输出而偷偷改变严格度；允许 `normal` 内部按既定策略触发恢复流程，但必须记录审计事件。
+
+---
+
+## 五、结合审核结果的下一步开发任务
+
+### P0：先完成真实运行时接线
+
+#### ADV-HAR-01：实现三档严格度解析器
+
+开发内容：
+
+- 新增 `HarnessStrictness`。
+- 新增 `EffectiveHarnessPolicy`。
+- 实现会话、项目、模型推荐和默认值的优先级。
+- 实现 `/harness` 菜单、快捷命令和 `status` 查询。
+- 复用现有命令菜单与 Question/Select 组件，不新增独立交互框架。
+- 支持仅当前会话切换，以及用户显式选择后写入项目默认值。
+- 将旧 Harness Profile 映射到新策略，保留兼容性。
+- 未知本地模型默认 `strict`；其他未知模型默认 `normal`。
+
+验收：
+
+- 三档完整表格测试。
+- 配置优先级测试。
+- 非法配置回退测试。
+- `/harness` 菜单确认、取消、会话切换和项目持久化测试。
+- 执行中切换只影响下一次提交的测试。
+- 证明严格度不会改变模型、Provider 和推理强度。
+
+#### ADV-HAR-02：在 Engine 中集中接线
+
+开发内容：
+
+- 在 `ReasonixEngine.submit()` 入口生成并固化最终策略。
+- 连接 ReadTracker、EarlyStop、Branch Budget、Checkpoint、Mode Decision、Tool Routing 和 Verification Gate。
+- 将策略传给工具执行层和 Shell 生命周期管理。
+- 删除散落在模块内的重复默认值，避免同一档位出现不同行为。
+
+验收：
+
+- 使用 spy 或事件断言证明每个组件在主链中实际被调用。
+- 不接受只测试策略解析器或单独组件。
+
+#### ADV-HAR-03：修复 Shell 双轨未启用
+
+审核发现：
+
+- 默认工具仍调用无参数 `createBashTool()`，导致 `dualTrack` 默认关闭。
+
+开发内容：
+
+- 由 `EffectiveHarnessPolicy.shellPolicy` 创建 Bash 工具。
+- 三档都保留可查询、可取消、可清理的双轨生命周期。
+- `strict` 使用更保守的前后台分类和更严格的残留进程清理。
+
+验收：
+
+- 长命令进入后台后可查询、可取消。
+- 会话结束后没有残留进程。
+- 前台短命令行为不回归。
+
+#### ADV-HAR-04：修复 Supervisor 显式配置原则
+
+审核发现：
+
+- `SupervisorPool` 当前会在无配置或无效配置时装载默认 Zen/Mimo 候选。
+- `model-target.ts` 存在 `supervisor.zen-free`，但缺少 Pool 引用的 `supervisor.mimo-free`。
+
+开发内容：
+
+- 无用户配置时，Supervisor Pool 必须为空且禁用。
+- 删除自动注入默认免费模型的行为。
+- 补齐并校验所有显式 Supervisor target，或删除无效引用。
+- 严格度仅控制触发时机，不得自动选择未配置 Provider。
+
+验收：
+
+- 无配置时三个档位均不会发起 Supervisor 网络请求。
+- 配置后，`strict`、`normal` 按矩阵触发，`loose` 默认不触发。
+- Provider 不可用时返回可解释错误，不静默切换。
+
+### P1：按档位落地融合功能
+
+#### ADV-HAR-05：Read Before Write 与 stale-read 分离
+
+- `strict`：未读取目标文件时阻断写入。
+- `normal`：首次警告并引导读取；重复忽略后阻断。
+- `loose`：不要求预读，但 stale-read 检测始终开启。
+
+#### ADV-HAR-06：Branch Budget、Early Stop、Checkpoint 联动
+
+- `strict`：超限后立即进入恢复流程，恢复失败则阻断。
+- `normal`：先提示和恢复，再决定是否阻断。
+- `loose`：Branch Budget 只记录；严重重复和硬上限仍停止。
+- 所有恢复动作必须写入 Checkpoint 和审计事件。
+
+#### ADV-HAR-07：Tool Routing 与 Text Tool Salvage 分档
+
+- `strict`：小模型使用两阶段工具路由，Salvage 始终可用。
+- `normal`：根据 Schema 大小、上下文压力、原生调用失败动态启用。
+- `loose`：直接路由，Salvage 默认关闭。
+- 优先复制并适配 iceCoder、smallcode 中已验证的实现，不重新发明同类解析逻辑。
+
+#### ADV-HAR-08：Verification Gate 分档
+
+- `strict`：验证失败或未运行验证时，不得提交完成状态。
+- `normal`：要求验证；无法验证时必须获得用户明确豁免。
+- `loose`：允许结束，但必须明确报告未验证项目。
+- 三档都禁止伪造测试结果。
+
+### P2：清理此前未完成任务
+
+#### ADV-FIX-01：完成 RM-10
+
+- 旧配置中的 `free-auto` 必须迁移或回退到合法的用户选择。
+- 不得在加载历史配置后重新激活 `free-auto`。
+
+#### ADV-FIX-02：完成 RM-30
+
+删除仍残留的 Token 用量估算实现和测试，包括：
+
+- `packages/core/src/context/token-estimator.ts`
+- `CHARS_PER_TOKEN`
+- `token-estimator.test.ts`
+- TokenizerPool 相关 Mock
+- Token 估算 benchmark
+
+仅删除估算系统；上下文窗口硬限制和 Provider 返回的真实 usage 数据可以保留。
+
+#### ADV-FIX-03：替换模拟 Benchmark
+
+当前 simulator 将“指导后完成率更高、付费模型未调用、Checkpoint 未损坏、后台进程未泄漏”等结果硬编码，不能作为验收依据。
+
+开发内容：
+
+- 将 simulator 降级为纯单元测试辅助工具。
+- 新增真实场景 Runner，至少执行一次 Engine、工具调用、失败恢复和验证流程。
+- 记录真实事件，而不是预设结论。
+
+#### ADV-FIX-04：处理全量测试基线
+
+- 分类处理当前全量测试的 476 fail / 21 errors。
+- 与本轮无关的历史失败也必须建立明确基线文件，不能继续报告“全量 0 fail”。
+- DONE 中写入准确命令、日期和结果。
+
+---
+
+## 六、端到端验收场景
+
+开发 Agent 完成后，至少补充以下端到端测试：
+
+1. `strict` 对未读取文件的写入进行阻断，读取后允许继续。
+2. `normal` 首次未读写入产生警告，后续流程按策略恢复。
+3. `loose` 不要求预读，但 stale-read 写入仍被拒绝。
+4. `strict` 超出 Branch Budget 后进入恢复或阻断。
+5. `normal` 超限先恢复，`loose` 只记录事件。
+6. 三档长 Shell 命令均可查询、取消，并在结束后无残留进程。
+7. `strict` 未验证不能完成；`normal` 需要验证或用户豁免；`loose` 明确报告未验证。
+8. 未配置 Supervisor 时，三档均无 Supervisor 网络调用。
+9. 配置 Supervisor 后，只有满足对应档位触发条件时才请求建议。
+10. 小模型在 `strict` 下实际使用两阶段工具路由和 Salvage。
+11. 三档均不会自动改变模型、Provider、温度或推理强度。
+12. Engine 主链事件证明所有启用组件被真实调用。
+13. `/harness` 菜单正确显示当前档位、来源和三档说明。
+14. 菜单取消不修改状态；普通选择只修改当前会话。
+15. 用户显式选择“设为项目默认”后，配置可在新会话恢复。
+16. 执行过程中切换档位时，当前提交策略不变，下一次提交使用新档位。
+
+---
+
+## 七、完成标准与报告格式
+
+每个任务进入 DONE 前必须同时满足：
+
+- 功能已接入真实运行时路径。
+- 有对应单元测试和至少一个端到端测试。
+- `bun run typecheck` 通过。
+- 相关聚焦测试通过。
+- `git diff --check` 通过。
+- 全量测试结果被如实记录；存在失败时不得写成 0 fail。
+- 文档中的行为与代码一致。
+
+开发 Agent 的完成报告必须包含：
+
+```text
+任务 ID：
 修改文件：
-删除内容：
-保留内容：
-兼容迁移：
-新增或修改测试：
-实际运行的验证命令及结果：
-未运行的验证及原因：
-已知限制：
-与 TODO/技术方案的偏差：
+复制/适配来源：
+运行时接线位置：
+测试命令与真实结果：
+仍存在的问题：
 ```
 
-涉及从 iceCoder 或 SmallCode 复制适配时，还必须提交：
+下一步开发顺序固定为：
 
 ```text
-来源项目与文件：
-复制的类、函数或代码块：
-Deepreef 适配点：
-无法直接复制而新写的部分及原因：
-许可证与来源注释处理：
+ADV-HAR-01
+  → ADV-HAR-02
+  → ADV-HAR-03 / ADV-HAR-04
+  → ADV-HAR-05 至 ADV-HAR-08
+  → ADV-FIX-01 至 ADV-FIX-04
+  → 全量端到端验收
 ```
 
-### 2.3 审核 Agent 检查顺序
-
-审核 Agent 按以下顺序检查：
-
-1. **范围**：是否只实现已授权任务，是否混入无关重构。
-2. **架构**：是否违反 Core/TUI、权限、工具执行、ModelTarget、Supervisor 等边界。
-3. **行为**：目标行为是否真正成立，旧行为是否完整删除或安全迁移。
-4. **兼容**：历史配置、Session、用户设置是否安全处理。
-5. **测试**：是否覆盖成功、失败、迁移和禁止行为。
-6. **证据**：验证命令是否实际运行，结果是否完整可信。
-7. **文档**：`DONE.md` 是否只记录事实，`TODO.md` 是否正确关闭或保留任务。
-
-审核不能只看开发 Agent 的摘要，必须读取实际 diff 和相关测试。
-
-### 2.4 审核 Agent 更新格式
-
-每轮审核后，在本文第 3 节更新：
-
-```markdown
-### 审核轮次：<任务编号> / <日期>
-
-结论：通过 | 有条件通过 | 退回修改 | 阻塞
-
-审核范围：
-- ...
-
-发现：
-- [P1] `path/to/file.ts:line` 问题、影响和必须修改方式
-
-验证：
-- `command`：通过/失败/未运行
-
-必须动作：
-1. ...
-
-关闭条件：
-- ...
-```
-
-没有发现问题时，必须明确写“未发现阻塞问题”，并说明剩余测试缺口或残余风险。
-
----
-
-## 3. 当前审核结论
-
-### 审核轮次：RM-10 完成记录后的任务顺序审查 / 2026-06-11
-
-结论：`未审核`
-
-审核范围：
-
-- 已明确融合升级目标架构。
-- 已整理 `TODO.md` 的任务顺序与逐项关闭条件。
-- 已整理 `DONE.md` 的当前有效、历史待删除和部分完成状态。
-- `DONE.md` 已记录 `RM-10` 完成；本轮未重新审核其代码 diff。
-- 尚未收到 `RM-20` 的实现变更，因此没有当前代码审核结论。
-
-审核意见：
-
-- 当前继续删除自动推理与 StrategyTier，不得在旧自动切换能力上叠加新 runtime。
-- `RM-20`、`RM-30`、`QST-10` 与 `PERM-10` 完成前，不得开始 ModelTarget、ModelProfile、Runtime Governance、Supervisor 或 TaskGraph 实现。
-- `RM-30` 删除独立 Token 用量预估系统，但必须保留真实 usage/cache 和 Context 超窗保护。
-- `PERM-10` 必须保证 yolo 仅自动批准 ask，不能覆盖显式 deny、Hook deny、工具内联安全拒绝或父级限制。
-- 本轮文档整理没有运行代码测试，历史测试数字不能作为 `RM-20` 的验收证据。
-
-当前没有可关闭的实现任务。
-
----
-
-## 4. 唯一下一步动作
-
-开发 Agent 当前只允许领取：
-
-```text
-RM-20：删除自动推理强度调节
-```
-
-执行依据：
-
-- [TODO.md：RM-20](TODO.md#rm-20删除自动推理强度调节)
-- [Deepreef后续开发计划.md：删除自动推理强度调节](Deepreef后续开发计划.md#32-删除自动推理强度调节)
-- [DONE.md：自动推理模式切换历史](DONE.md#38-自动推理模式切换历史已实现待删除)
-
-不得同时开始 `RM-30`、`QST-10`、`PERM-10` 或任何 `DRF-*` 任务。
-
-### 4.1 本轮审核重点
-
-审核 Agent 将重点检查：
-
-1. `/thinking auto`、ModeSelector、ModeStats 和自动切换事件是否完整删除。
-2. StrategyTier、动态推荐及其对 model/temperature/reasoning/maxTurns 的覆盖是否完整删除。
-3. 用户显式 `/thinking off|open|high` 是否保留并可持久化。
-4. 历史 `thinkingMode: "auto"` 是否安全迁移为 `off`。
-5. Provider、model、temperature 和 thinking 是否不再被运行时自动改变。
-6. 成本与真实 token/cache 统计是否仍只用于展示。
-7. `DONE.md` 是否保留历史实现并新增删除事实，而不是篡改历史。
-
-### 4.2 必须提交的验证证据
-
-开发 Agent 必须实际运行并报告：
-
-```bash
-bun test packages/core/__tests__/provider-thinking.test.ts packages/core/__tests__/engine-tools.test.ts
-bun test packages/tui/__tests__/commands.test.ts
-bun run typecheck
-bun test
-git diff --check
-rg '"auto"|thinking_mode_switch|tier_recommendation|STRATEGY_TIERS|recommendTier' packages/core packages/tui
-```
-
-`rg` 残留需人工判读；与推理无关的普通 auto 字样可以保留，每个相关残留必须在审核材料中解释。
-
-### 4.3 RM-20 通过后的下一步
-
-只有审核结论更新为 `通过` 后，开发 Agent 才可领取：
-
-```text
-RM-30：删除 Token 用量预估专项代码
-```
-
-`RM-30` 通过后领取 `QST-10`，`QST-10` 通过后领取 `PERM-10`，`PERM-10` 通过后才开始 `DRF-00`。审核未通过时，下一步始终是修复本文列出的审核问题，不得自行越过。
-
----
-
-## 5. 长期审核门禁
-
-以下门禁适用于后续所有 `DRF-*` 任务。
-
-### 5.1 架构门禁
-
-- Core 不得 import React/Ink，TUI 不得承载核心决策。
-- 新工具能力必须继续通过 `StreamingToolExecutor`、权限和 `ToolContext`。
-- 不得建立第二套 Session、Context、MCP、memory、权限或 ToolRegistry。
-- ModelTarget 必须整体解析 provider/model/baseUrl/key policy，不能只替换模型字符串。
-- Supervisor 只能输出 `SupervisorAdvice`，首版不得执行工具、修改文件或接管任务。
-- 免费模型和 Supervisor 均由用户显式配置，不得恢复自动主模型路由。
-- thinking/model/temperature/tier 不得被运行时自动改变。
-
-### 5.2 实现门禁
-
-- iceCoder 或 SmallCode 有可直接搬用的实现时，必须复制后适配，不得凭印象重写。
-- 复制代码必须记录来源、适配点和许可证处理。
-- 工作区已有修改不得被回退。
-- 代码改动后必须经过 Verification Gate；模型声称完成不构成完成。
-- 远程免费接口 smoke test 必须默认跳过，CI 不得依赖免费接口稳定性。
-
-### 5.3 完成门禁
-
-任务只有同时满足以下条件才可审核为“通过”：
-
-1. `TODO.md` 的目标、范围、禁止事项和关闭条件全部满足。
-2. 没有未解释的 P0/P1 问题。
-3. 目标测试、typecheck、全量测试和 `git diff --check` 已实际运行。
-4. 未运行或失败的验证被明确披露并有可接受原因。
-5. `DONE.md` 记录真实落地事实、来源、适配、验证和限制。
-6. `TODO.md` 只移除真正关闭的任务，不隐藏未完成工作。
-
----
-
-## 6. 审核记录归档规则
-
-- 第 3 节只保留当前有效审核结论，避免开发 Agent 误读旧意见。
-- 历史通过结论中的实现事实归入 `DONE.md`。
-- 未关闭问题和后续任务归入 `TODO.md`。
-- 被否决的架构方向归入 `Deepreef后续开发计划.md` 的“明确不做”。
-- 本文不再保存 AGENT-90、Context、FG 等专项设计稿；其已完成事实和剩余任务分别以 `DONE.md`、`TODO.md` 为准。
+在 `ADV-HAR-02` 完成前，不应继续将新的独立 Harness 模块标记为已完成；当前首要问题不是缺少更多模块，而是现有模块没有形成可运行闭环。

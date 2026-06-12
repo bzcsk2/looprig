@@ -17,6 +17,7 @@ export type SlashCommand =
   | { name: "status" }
   | { name: "context" }
   | { name: "harness"; subcommand?: "status" | "strict" | "normal" | "loose" | "project"; arg?: string }
+  | { name: "theme"; themeName?: string }
 
 const THINKING_MODES = ["off", "open", "high"]
 
@@ -37,6 +38,11 @@ export function parseSlashCommand(text: string): SlashCommand | null {
   if (trimmed === "/lang") return { name: "lang" }
   if (trimmed === "/status") return { name: "status" }
   if (trimmed === "/context") return { name: "context" }
+  if (trimmed.startsWith("/theme")) {
+    const parts = trimmed.split(/\s+/)
+    const themeName = parts[1]
+    return { name: "theme", themeName }
+  }
 
   if (trimmed.startsWith("/thinking")) {
     const parts = trimmed.split(/\s+/)
@@ -123,6 +129,7 @@ export function buildHelpText(activeAgent: string, cmdStrings: HelpCommandString
     `  /lang        — ${cmdStrings.cmdLang}`,
     `  /status      — ${cmdStrings.cmdStatus}`,
     `  /context     — ${cmdStrings.cmdContext}`,
+    `  /theme       — list or switch theme`,
     `  /thinking    — set thinking mode`,
     "",
     "Agents:",

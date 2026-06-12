@@ -37,6 +37,15 @@ import {
 // TUI-GM: Gemini CLI 风格组件
 import { OrchestrationSummary } from './components/orchestration/OrchestrationSummary.js';
 import { LoadingIndicator } from './components/shared/LoadingIndicator.js';
+import { AgentGroupDisplay } from './components/agents/AgentGroupDisplay.js';
+import { WorkerActivityPanel } from './components/workers/WorkerActivityPanel.js';
+import { DialogManager } from './components/dialogs/DialogManager.js';
+// TUI-FIX-20: 编排状态存储
+import { OrchestrationStore } from './store/orchestration-store.js';
+// TUI-FIX-30: 编排状态 hooks
+import { OrchestrationStoreProvider, useOrchestrationWorkers, useOrchestrationSupervisors, useOrchestrationLoop } from './components/orchestration/OrchestrationContext.js';
+// TUI-FIX-60: 主题管理器
+import { themeManager } from './theme/theme-manager.js';
 
 // ---- 模块级中断/退出状态（由 SIGINT 处理器和 useInput \x03 处理器共享） ----
 
@@ -209,8 +218,63 @@ interface AppProps {
  * @param engine - ReasonixEngine 实例，驱动 LLM 通信
  * @param config - DeepreefConfig 配置对象（provider / model / contextWindow 等）
  */
+/**
+ * 内部组件：从 OrchestrationStore 读取实时数据并渲染 OrchestrationSummary。
+ * 必须在 OrchestrationStoreProvider 内部使用。
+ */
+function OrchestrationSummaryFromStore({ terminalWidth }: { terminalWidth: number }) {
+  const workers = useOrchestrationWorkers();
+  const supervisors = useOrchestrationSupervisors();
+  const loop = useOrchestrationLoop();
+  return (
+    <OrchestrationSummary
+      workers={workers}
+      supervisors={supervisors}
+      loopPhase={loop.phase}
+      loopAttempt={loop.attempt}
+      terminalWidth={terminalWidth}
+    />
+  );
+}
+
+/**
+ * 内部组件：从 OrchestrationStore 读取 Worker 数据并渲染 AgentGroupDisplay。
+ */
+function AgentGroupDisplayFromStore({ terminalWidth }: { terminalWidth: number }) {
+  const workers = useOrchestrationWorkers();
+  if (workers.length === 0) return null;
+  return (
+    <AgentGroupDisplay
+      workers={workers}
+      terminalWidth={terminalWidth}
+    />
+  );
+}
+
 export function App({ engine, config, pluginCount = 0, contentPackCount = 0, assetCounts, diagnosticCounts, onUserInput, beforeSubmit }: AppProps) {
+  // TUI-FIX-20: 编排状态存储（引擎生命周期内持久）
+  const [orchestrationStore] = useState(() => new OrchestrationStore());
+
+  // TUI-FIX-20: 连接引擎编排事件发射器
+  useEffect(() => {
+    engine.setOnOrchestrationEvent?.((event) => {
+      if (event.orchestration) {
+        orchestrationStore.apply(event.orchestration);
+      }
+    });
+    return () => {
+      engine.setOnOrchestrationEvent?.(() => {});
+    };
+  }, [engine, orchestrationStore]);
+
   const persistedSettings = useMemo(() => loadTuiSettings(), []);
+
+  // TUI-FIX-60: 启动时恢复已持久化的主题
+  useEffect(() => {
+    if (persistedSettings.theme) {
+      themeManager.setActiveTheme(persistedSettings.theme);
+    }
+  }, [persistedSettings.theme]);
   const persistedThinkingMode = persistedSettings.thinkingMode && !validateThinkingMode(persistedSettings.thinkingMode)
     ? persistedSettings.thinkingMode
     : undefined;
@@ -219,7 +283,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
     : undefined;
   const [thinkingMode, setThinkingMode] = useState(persistedThinkingMode ?? 'off');
   const [bridgeState, setBridgeState] = useState<BridgeState>(() => ({ ...initialState }));
-  const bridge = useMemo(() => createBridge(engine, setBridgeState, onUserInput, beforeSubmit), [engine, onUserInput, beforeSubmit]);
+  const bridge = useMemo(() => createBridge(engine, setBridgeState, onUserInput, beforeSubmit, orchestrationStore), [engine, onUserInput, beforeSubmit, orchestrationStore]);
   const transcriptReader = useMemo(() => bridge.getTranscriptReader(), [bridge]);
   const bridgeRuntime = useMemo(() => bridge.getBridgeRuntime(), [bridge]);
   const bridgeSplit = isBridgeRuntimeSplitEnabled();
@@ -335,6 +399,9 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
   const [inputHistory, setInputHistory] = useState<string[]>([]);                // 输入历史记录（最多 MAX_INPUT_HISTORY 条）
   const [inputInjection, setInputInjection] = useState<{ id: number; text: string } | undefined>(undefined); // 外部注入到输入框的文本
   const [contextPolicy, setContextPolicy] = useState(engine.getContextPolicy()); // 当前上下文策略
+  // TUI-FIX-40: Worker 详情面板状态
+  const [showWorkerDetail, setShowWorkerDetail] = useState(false);
+  const [selectedWorkerId, setSelectedWorkerId] = useState<string | undefined>();
 
   useEffect(() => {
     if (persistedAgent) {
@@ -473,6 +540,35 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
       setShowHarnessMenu(true);
       return;
     }
+    // TUI-FIX-60: /theme 命令 — 列出并切换主题（持久化）
+    if (command?.name === 'theme') {
+      if (command.themeName) {
+        const success = themeManager.setActiveTheme(command.themeName);
+        if (success) {
+          saveTuiSettings({ theme: command.themeName });
+          appendMessage({
+            role: 'assistant' as const,
+            content: `Theme switched to: ${command.themeName}`,
+          });
+        } else {
+          appendMessage({
+            role: 'assistant' as const,
+            content: `Unknown theme: ${command.themeName}. Use /theme to list available themes.`,
+          });
+        }
+      } else {
+        const themes = themeManager.getAvailableThemes();
+        const active = themeManager.getActiveTheme();
+        const themeList = themes.map(t =>
+          t.name === active.name ? `  * ${t.name} (${t.type})` : `    ${t.name} (${t.type})`
+        ).join('\n');
+        appendMessage({
+          role: 'assistant' as const,
+          content: `Available themes:\n${themeList}\n\nActive: ${active.name}\nUsage: /theme <name>`,
+        });
+      }
+      return;
+    }
     const taggedSkillNames = extractSkillTags(submitted);
     if (taggedSkillNames.length === 0) {
       scrollRef.current?.scrollToBottom();
@@ -563,8 +659,10 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
     });
     bridgeRef.current.resetBridgeRuntime();
     bridgeRef.current.replaceTranscript(recoveredTimeline);
+    // TUI-FIX-20: 重置编排状态
+    orchestrationStore.reset();
     appendMessage({ role: 'assistant' as const, content: t().resumedSession(sessionId.slice(0, 8), msgs.length) });
-  }, [appendMessage]);
+  }, [appendMessage, orchestrationStore]);
 
   /** 会话选择取消回调：关闭选择器覆盖层 */
   const handleSessionCancel = useCallback(() => {
@@ -659,7 +757,6 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
         title="Thinking"
         subtitle="选择推理档位"
         items={[
-          { value: "auto", label: "auto", description: "auto switching (AS0-AS6)" },
           { value: "off", label: "off", description: "disable reasoning" },
           { value: "open", label: "open", description: "enable reasoning" },
           { value: "high", label: "high", description: "strong reasoning (DeepSeek)" },
@@ -744,13 +841,10 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
         isOpen={showSearch}
         onClose={() => setShowSearch(false)}
       />
-      {/* TUI-GM: 编排概览三栏（Workers / Supervisor / Loop），目前无数据时显示空状态 */}
-      <OrchestrationSummary
-        workers={[]}
-        supervisors={[]}
-        loopPhase="observe"
-        terminalWidth={process.stdout.columns ?? 80}
-      />
+      {/* TUI-GM / TUI-FIX-30: 编排概览三栏（Workers / Supervisor / Loop），实时数据 */}
+      <OrchestrationSummaryFromStore terminalWidth={process.stdout.columns ?? 80} />
+      {/* TUI-FIX-40: Agent 活动组（展开时显示详细进度） */}
+      <AgentGroupDisplayFromStore terminalWidth={process.stdout.columns ?? 80} />
       <DeepiMessages
         timeline={timelineProp}
         scrollRef={scrollRef}
@@ -777,6 +871,15 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
           diagnosticCounts={diagnosticCounts ?? { errors: 0, warnings: 0 }}
         />
       </WelcomeWhenEmpty>
+      {/* TUI-FIX-50: DialogManager 集中管理权限和追问弹窗 */}
+      <DialogManager
+        permissionRequest={bridgeSplit ? null : bridgeState.permissionPrompt}
+        questionRequest={bridgeSplit ? null : bridgeState.questionPrompt}
+        onPermissionReply={handlePermissionSelect}
+        onQuestionReply={handleQuestionReply}
+        onQuestionReject={handleQuestionReject}
+        terminalWidth={process.stdout.columns ?? 80}
+      />
       <BridgeScrollAlerts
         onPermissionSelect={handlePermissionSelect}
         onQuestionReply={handleQuestionReply}
@@ -784,8 +887,8 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
         legacy={bridgeSplit ? undefined : {
           warnings: bridgeState.warnings,
           error: bridgeState.error,
-          permissionPrompt: bridgeState.permissionPrompt,
-          questionPrompt: bridgeState.questionPrompt,
+          permissionPrompt: null,  // handled by DialogManager
+          questionPrompt: null,    // handled by DialogManager
         }}
       />
     </>
@@ -853,6 +956,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
     return (
       <BridgeRuntimeProvider runtime={bridgeRuntime}>
         <TranscriptProvider reader={transcriptReader}>
+          <OrchestrationStoreProvider store={orchestrationStore}>
           {/* 禁用 mouseTracking，让终端原生支持文本选取（用户明确不需要鼠标交互） */}
           <AlternateScreen mouseTracking={false}>
             <FullscreenLayout
@@ -861,6 +965,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
               bottom={bottomContent}
             />
           </AlternateScreen>
+          </OrchestrationStoreProvider>
         </TranscriptProvider>
       </BridgeRuntimeProvider>
     );
@@ -869,8 +974,10 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
   return (
     <BridgeRuntimeProvider runtime={bridgeRuntime}>
       <TranscriptProvider reader={transcriptReader}>
+        <OrchestrationStoreProvider store={orchestrationStore}>
         {scrollableContent}
         {bottomContent}
+        </OrchestrationStoreProvider>
       </TranscriptProvider>
     </BridgeRuntimeProvider>
   );

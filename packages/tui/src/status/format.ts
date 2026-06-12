@@ -101,6 +101,16 @@ export function formatStatusCodex(snapshot: EngineStatusSnapshot, options: Forma
     box.content(`API Calls:  ${snapshot.stats.apiCalls}`),
     box.content(`Tool Calls: ${snapshot.stats.toolCalls}`),
     box.content(`Cost:       ${formatCost(snapshot.stats.totalCost)}`),
+    ...(snapshot.sessionWriter ? [
+      box.separator(),
+      box.content("SESSION WRITER"),
+      box.content(`Queue:      ${snapshot.sessionWriter.queueSize}`),
+      box.content(`Dropped:    ${snapshot.sessionWriter.droppedCount}`),
+      box.content(`Flushing:   ${snapshot.sessionWriter.flushing ? "Yes" : "No"}`),
+      ...(snapshot.sessionWriter.lastError
+        ? [box.content(`Last Error: ${snapshot.sessionWriter.lastError.slice(0, 40)}`)]
+        : []),
+    ] : []),
     box.separator(),
     box.content(snapshot.timestamp),
     box.bottomBorder(),

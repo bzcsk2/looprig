@@ -1,6 +1,6 @@
 # Deepreef 融合升级 TODO 与开发交接指南
 
-最后更新：2026-06-11
+最后更新：2026-06-12
 
 本文是后续 Agent 的唯一待办入口。目标是把 Deepreef 升级为：
 
@@ -44,13 +44,13 @@ Deepreef 不做另一个 SmallCode，也不整仓合并 iceCoder。
 ### 0.2 已确认的关键现状
 
 1. ~~Deepreef 当前有 `free-auto` 虚拟 provider，但项目负责人决定删除。~~ 已于 `RM-10` 删除。Zen、Kilo 等免费 provider/model 保留，用户手动选择。
-2. Deepreef 当前有两套自动推理强度机制：`/thinking auto` 的轮间模式切换，以及 strategy tier 对 model/temperature/reasoning 的覆盖和推荐；两套都应删除。
-3. Deepreef 已有 subagent，但 child engine 当前共享父级 `client`。`SubagentRunOptions.model` 只能覆盖 model 字符串，不能可靠切换 provider、base URL 或 API key。
-4. 因此必须先实现 `ModelTarget` / client resolver，再谈“本地 Worker + 免费 Supervisor”。这是融合主线的第一项架构前置。
+2. ~~Deepreef 当前有两套自动推理强度机制~~ 已于 `RM-20` 删除；用户仅可显式选择 `off/open/high`。
+3. ~~child engine 共享父级 `client`~~ 已于 `DRF-10` 修复；`SubagentRunOptions.target` 可按角色切换 provider/baseUrl/client。
+4. ~~必须先实现 ModelTarget~~ 已于 `DRF-10` 完成；Supervisor 指导闭环见 `DRF-50`–`DRF-60`。
 5. Deepreef 已有 stale-read 和编辑安全边界。搬 SmallCode read-before-write 时必须复用现有路径规范化与工具执行入口，不能建立第二套写文件实现。
 6. Deepreef 已有 Context trim/compact 和 immutable prefix。小模型运行态、计划和 SupervisorAdvice 应注入可变任务状态区，不能频繁修改 immutable system prefix。
 7. `stepfun/step-3.7-flash:free` 曾在小输出预算下只返回 reasoning。用户期望的 StepFun 3.5 必须先通过真实 smoke test，再加入 Supervisor 候选池；计划中不得假定模型 ID、免费额度或工具能力稳定。
-8. Deepreef 当前权限为 deny-first 工具规则：read/write 默认允许、exec 默认询问；TUI “始终允许”按整个工具名放行且仅当前 Engine 生效。子 Agent `bubble` 尚未真正冒泡，父级权限规则也未完整继承，必须在启动后台 Worker/Supervisor 前修复。
+8. ~~子 Agent `bubble` 未真正冒泡、权限按工具名无限放行~~ 已于 `PERM-10` 修复；`safe/balanced/yolo` 与 pattern-based `once/always/reject` 已落地。
 
 ### 0.3 Supervisor 与升级边界
 
@@ -181,20 +181,20 @@ git diff --check
 | ~~4~~ | ~~`QST-10` 复制适配 OpenCode Question 完整交互闭环~~ | RM-30 | ✅ 已完成 |
 | ~~5~~ | ~~`PERM-10` 复制适配 OpenCode 权限规则、Auto Accept 与子 Agent 冒泡~~ | QST-10 | ✅ 已完成 |
 | ~~6~~ | ~~`DRF-00` 基线与复制台账~~ | RM-10、RM-20、RM-30、QST-10、PERM-10 | ✅ 已完成 |
-| 7 | `DRF-10` ModelTarget 与角色化 client resolver | DRF-00 | Worker/Supervisor 可使用不同端点 |
-| 8 | `DRF-11` ModelProfile 与 HarnessProfile | DRF-10 | 本地小模型启动时加载优化配置 |
-| 9 | `DRF-20` 小模型基础护栏 | DRF-11 | read guard、early-stop、最小工具集 |
-| 10 | `DRF-30` BranchBudget 与 Runtime Checkpoint v2 | DRF-20 | 长任务防循环、可恢复 |
-| 11 | `DRF-31` 参数与文本 tool-call salvage | DRF-20 | 小模型畸形工具调用可恢复 |
-| 12 | `DRF-32` Shell 双轨执行 | DRF-20 | 长测试/build 不阻塞 |
-| 13 | `DRF-40` TaskLedger 与 Verification Gate | DRF-30 | 有状态执行和真实完成判定 |
-| 14 | `DRF-50` SupervisorAdvice 协议与触发器 | DRF-40 | 小模型失败后可请求指导 |
-| 15 | `DRF-51` 显式 Supervisor 池与配额/冷却 | DRF-50 | DeepSeek/MiMo/StepFun 等可配置监督池 |
-| 16 | `DRF-60` 监督指导回注与继续执行 | DRF-51 | 完整 supervisor-guided loop |
-| 17 | `DRF-70` 两阶段工具路由与 free/forced | DRF-60 | 进一步降低小模型上下文压力 |
-| 18 | `DRF-80` Benchmark、overnight 与发布门禁 | 全部 | 可量化验收和长跑稳定性 |
+| ~~7~~ | ~~`DRF-10` ModelTarget 与角色化 client resolver~~ | DRF-00 | ✅ 已完成 |
+| ~~8~~ | ~~`DRF-11` ModelProfile 与 HarnessProfile~~ | DRF-10 | ✅ 已完成 |
+| ~~9~~ | ~~`DRF-20` 小模型基础护栏~~ | DRF-11 | ✅ 已完成 |
+| ~~10~~ | ~~`DRF-30` BranchBudget 与 Runtime Checkpoint v2~~ | DRF-20 | ✅ 已完成 |
+| ~~11~~ | ~~`DRF-31` 参数与文本 tool-call salvage~~ | DRF-20 | ✅ 已完成 |
+| ~~12~~ | ~~`DRF-32` Shell 双轨执行~~ | DRF-20 | ✅ 已完成 |
+| ~~13~~ | ~~`DRF-40` TaskLedger 与 Verification Gate~~ | DRF-30 | ✅ 已完成 |
+| ~~14~~ | ~~`DRF-50` SupervisorAdvice 协议与触发器~~ | DRF-40 | ✅ 已完成 |
+| ~~15~~ | ~~`DRF-51` 显式 Supervisor 池与配额/冷却~~ | DRF-50 | ✅ 已完成 |
+| ~~16~~ | ~~`DRF-60` 监督指导回注与继续执行~~ | DRF-51 | ✅ 已完成 |
+| ~~17~~ | ~~`DRF-70` 两阶段工具路由与 free/forced~~ | DRF-60 | ✅ 已完成 |
+| ~~18~~ | ~~`DRF-80` Benchmark、overnight 与发布门禁~~ | 全部 | ✅ 已完成 |
 
-不要并行实现 `RM-30`、`QST-10`、`PERM-10`、`DRF-10`、`DRF-50`、`DRF-60`。它们会修改 Context、Engine/Loop 的暂停、恢复、权限或模型调用边界，必须顺序完成。
+> **融合主线已全部顺序完成**（RM-10 → DRF-80）。上述并行禁令仅适用于历史开发阶段，后续新任务不得破坏已落地产物。
 
 ---
 
@@ -248,7 +248,7 @@ git diff --check
 
 > 已完成于 2026-06-11，详见 `DONE.md` 的 `RM-10` 章节。
 
-### RM-20：删除自动推理强度调节
+### ~~RM-20：删除自动推理强度调节~~ ✅ 已完成
 
 优先级：`P0 / 立即执行`，依赖 `RM-10`。
 
@@ -302,7 +302,7 @@ git diff --check
 - 用户选择 `off/open/high` 后，运行时不会自动改变。
 - provider/model/temperature 不再被 strategy tier 覆盖。
 
-### RM-30：删除 Token 用量预估专项代码
+### ~~RM-30：删除 Token 用量预估专项代码~~ ✅ 已完成
 
 优先级：`P0`，依赖 `RM-20`。
 
@@ -540,7 +540,7 @@ git diff --check
 - interrupt/shutdown 后 `QuestionService.list()` 为空，没有悬挂 Promise。
 - 复制来源、适配点和 MIT 处理已记录到 `docs/fusion-copy-ledger.md`。
 
-### PERM-10：复制适配 OpenCode 权限规则、Auto Accept 与子 Agent 冒泡
+### ~~PERM-10：复制适配 OpenCode 权限规则、Auto Accept 与子 Agent 冒泡~~ ✅ 已完成
 
 优先级：`P0`，依赖 `QST-10`。
 
@@ -721,7 +721,7 @@ git diff --check
 - interrupt/shutdown 后权限 pending 列表为空。
 - 复制来源、适配点、测试和 MIT 处理已记录到 `docs/fusion-copy-ledger.md`。
 
-### DRF-00：基线、来源审计与复制台账
+### ~~DRF-00：基线、来源审计与复制台账~~ ✅ 已完成
 
 优先级：`P0`。
 
@@ -746,7 +746,7 @@ git diff --check
 - 后续任务不再引用不存在的源文件。
 - 基线失败项被记录，后续 Agent 不误判为本次回归。
 
-### DRF-10：ModelTarget 与角色化 client resolver
+### ~~DRF-10：ModelTarget 与角色化 client resolver~~ ✅ 已完成
 
 优先级：`P0`。
 
@@ -797,7 +797,7 @@ interface ModelTarget {
 - target 切换同时改变 client/provider/baseUrl/model，不是只改 model 字符串。
 - 未配置 target 时行为与当前一致。
 
-### DRF-11：ModelProfile 与 HarnessProfile
+### ~~DRF-11：ModelProfile 与 HarnessProfile~~ ✅ 已完成
 
 优先级：`P0`。
 
@@ -856,7 +856,7 @@ interface HarnessProfile {
 - 未知本地模型使用保守 `local-small-strict`，未知远程模型使用 `remote-adaptive`。
 - profile 只影响可变 runtime policy，不频繁改变 immutable prefix。
 
-### DRF-20：小模型基础护栏
+### ~~DRF-20：小模型基础护栏~~ ✅ 已完成
 
 优先级：`P0`。
 
@@ -883,7 +883,7 @@ interface HarnessProfile {
 - 不复制 SmallCode 同步写文件或 shell 实现。
 - 不因 early-stop 直接宣告任务失败；先产生 recovery signal。
 
-### DRF-30：BranchBudget 与 Runtime Checkpoint v2
+### ~~DRF-30：BranchBudget 与 Runtime Checkpoint v2~~ ✅ 已完成
 
 优先级：`P0`。
 
@@ -919,7 +919,7 @@ Checkpoint 增加但不替换 `.deepreef/sessions/*.jsonl`，保存：
 - 最近 SupervisorAdvice 摘要与 evidence hash。
 - 免费 Supervisor cooldown/配额摘要。
 
-### DRF-31：工具参数与文本 tool-call salvage
+### ~~DRF-31：工具参数与文本 tool-call salvage~~ ✅ 已完成
 
 优先级：`P0/P1`。
 
@@ -944,7 +944,7 @@ Checkpoint 增加但不替换 `.deepreef/sessions/*.jsonl`，保存：
 - 不完整写入不会落盘。
 - 原生 tool_calls 行为不退化。
 
-### DRF-32：Shell 双轨执行
+### ~~DRF-32：Shell 双轨执行~~ ✅ 已完成
 
 优先级：`P1`。
 
@@ -967,7 +967,7 @@ Checkpoint 增加但不替换 `.deepreef/sessions/*.jsonl`，保存：
 - Deepreef `task-manager.ts`
 - Deepreef 平台 backend、危险命令检查、权限、进程树终止。
 
-### DRF-40：TaskLedger 与 Verification Gate
+### ~~DRF-40：TaskLedger 与 Verification Gate~~ ✅ 已完成
 
 优先级：`P0/P1`。
 
@@ -999,7 +999,7 @@ interface TaskLedger {
 - final 前若 verification pending，模型必须继续验证或明确请求用户豁免。
 - 验证失败是 Supervisor 触发信号，不是自动反复重跑同一命令。
 
-### DRF-50：SupervisorAdvice 协议、EvidenceBundle 与触发器
+### ~~DRF-50：SupervisorAdvice 协议、EvidenceBundle 与触发器~~ ✅ 已完成
 
 优先级：`P0`。
 
@@ -1044,7 +1044,7 @@ interface EvidenceBundle {
 
 Supervisor 输出必须用 schema 验证；解析失败可重试一次，仍失败则记录 unavailable 并回到 Worker/用户。
 
-### DRF-51：显式 Supervisor 池、能力目录和预算
+### ~~DRF-51：显式 Supervisor 池、能力目录和预算~~ ✅ 已完成
 
 优先级：`P0/P1`。
 
@@ -1088,7 +1088,7 @@ interface SupervisorCandidate {
 - 单次 evidence 输入上限 8k tokens，输出上限 800 tokens。
 - 付费 Oracle 默认 0 次，必须用户配置。
 
-### DRF-60：Supervisor 指导回注与 Worker 继续执行
+### ~~DRF-60：Supervisor 指导回注与 Worker 继续执行~~ ✅ 已完成
 
 优先级：`P0/P1`。
 
@@ -1119,7 +1119,7 @@ Worker 失败
 - Supervisor 不可用时任务可保存、降级和继续，不崩溃。
 - crash/restart 后不重复询问同一 evidence hash。
 
-### DRF-70：两阶段工具路由与 free/forced 模式
+### ~~DRF-70：两阶段工具路由与 free/forced 模式~~ ✅ 已完成
 
 优先级：`P2`，依赖完整闭环稳定。
 
@@ -1138,7 +1138,7 @@ Worker 失败
 
 暂不引入完整 TaskGraph 和 L1/L2 takeover。只有 benchmark 证明 TaskLedger 不足时再新建任务。
 
-### DRF-80：Benchmark、overnight 模式与发布门禁
+### ~~DRF-80：Benchmark、overnight 模式与发布门禁~~ ✅ 已完成
 
 优先级：`P1/P2`。
 
@@ -1183,7 +1183,7 @@ Worker 失败
 
 仍需独立收尾：
 
-### FG-60-R：best-effort 日志收尾
+### ~~FG-60-R：best-effort 日志收尾~~ ✅ 已完成
 
 优先级：`P2`。
 
@@ -1191,7 +1191,7 @@ Worker 失败
 - 为临时文件清理失败补低噪音日志，不覆盖原始错误。
 - runtime logger 清理失败只记录 debug。
 
-### CTX-70：Context 文档和人工验收
+### ~~CTX-70：Context 文档和人工验收~~ ✅ 文档已完成（人工验收待项目负责人）
 
 优先级：`P1`。
 
@@ -1238,16 +1238,20 @@ Worker 失败
 
 ## 8. 当前下一步
 
-~~下一位 Agent 应只领取：~~
+> **状态摘要（2026-06-12）**：融合主线 `RM-10` → `DRF-80` 全部代码落地；收尾项 `FG-60-R` 完成、`CTX-70` 文档完成。测试基线 `1406 pass / 0 fail / 18 skip`（100 文件）。
+
+✅ **融合主线** `RM-10` → `DRF-80`、**收尾项** `FG-60-R` / `CTX-70`（文档）均已代码落地。
+
+唯一待办（需人工，非代码任务）：
 
 ```text
-~~RM-10：删除 free-auto 自动免费模型路由~~
+OS-12/13-R：macOS 与 Windows 原生体验验收
+  - 真实终端验证 PTY/ConPTY、中文路径、通知、剪贴板、进程树
+  - CI 自动化已覆盖，此项不能由 Agent 代劳
 ```
 
-✅ `RM-10`、`RM-20`、`RM-30`、`QST-10` 已完成。下一位 Agent 应只领取：
+可选后续（不在当前 TODO 阻塞项）：
 
-```text
-PERM-10：复制适配 OpenCode 权限规则、Auto Accept 与子 Agent 冒泡
-```
-
-完成 `PERM-10` 并更新 `DONE.md` 后，再领取 `DRF-00`。Question 交互闭环和统一权限升级完成前，不要开始融合、Supervisor 或 TaskGraph。
+- `CTX-70` 人工验收：长会话 trim/compact、summarizer fallback、重启后配置持久化
+- Supervisor 真实 smoke test：`DEEPREEF_SUPERVISOR_SMOKE=1` 验证免费池候选
+- StepFun 3.5 通过 smoke 后再启用 `supervisor.stepfun` 候选

@@ -6,6 +6,7 @@ import { evaluateRules, fromConfig, createSessionRule } from "./permission/index
 import { maybePersistResult, type ResultPersistenceConfig } from "./result-persistence.js"
 import { type RuntimeLogger } from "./runtime-logger.js"
 import { repairToolArguments } from "./context/repair.js"
+import { normalizeToolArguments } from "./tool-arguments/normalizer.js"
 
 // ─── Permission Decision Helper ───
 
@@ -16,22 +17,26 @@ export type ParsedToolCallArgs =
   | { ok: false; error: string }
 
 export function parseToolCallArgs(raw: string, toolName: string): ParsedToolCallArgs {
+  let args: Record<string, unknown>
+  let repaired = false
   try {
     const parsed = JSON.parse(raw) as unknown
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return { ok: false, error: `Invalid JSON arguments for tool ${toolName}: arguments must be a JSON object` }
     }
-    return { ok: true, args: parsed as Record<string, unknown>, repaired: false }
+    args = parsed as Record<string, unknown>
   } catch {
-    const repaired = repairToolArguments(raw)
-    if (!repaired.success) {
+    const repairResult = repairToolArguments(raw)
+    if (!repairResult.success) {
       return { ok: false, error: `Invalid JSON arguments for tool ${toolName}: failed all repair stages` }
     }
-    if (repaired.partial) {
+    if (repairResult.partial) {
       return { ok: false, error: `Invalid JSON arguments for tool ${toolName}: partial repair is unsafe` }
     }
-    return { ok: true, args: repaired.args, repaired: true }
+    args = repairResult.args
+    repaired = true
   }
+  return { ok: true, args: normalizeToolArguments(args), repaired }
 }
 
 /**
@@ -139,7 +144,26 @@ export async function evaluatePermission(
   if (hookDecision === "allow") return "allow"
   if (hookDecision === "deny") return "deny"
   if (requestPermission) return "ask"
+  // 无权限基础设施时默认允许（测试/无头模式）
+  if (!permissionEngine && !permissionService) return "allow"
   return "deny"
+}
+
+/**
+ * 解析权限拒绝时的错误消息，优先使用 PermissionEngine 返回的 reason。
+ */
+export function resolveDenyMessage(
+  tc: ToolCall,
+  tools: Map<string, AgentTool>,
+  permissionEngine?: PermissionEngine,
+  args?: Record<string, unknown>,
+): string {
+  const handler = tools.get(tc.function.name)
+  if (permissionEngine && handler && args) {
+    const check = permissionEngine.decide(tc.function.name, args, handler.approval)
+    if (check?.decision === "deny") return check.reason ?? "Permission denied"
+  }
+  return `Tool call denied: ${tc.function.name} requires manual approval`
 }
 
 // ─── Settle Ledger ───

@@ -5,6 +5,11 @@ import type { DeepreefConfig } from "../config.js"
 import { agentConfigFor } from "../agent.js"
 import { SubagentRegistry } from "./registry.js"
 import { checkSubagentPermission } from "./permission.js"
+import {
+  resolveModelTarget,
+  targetToConfig,
+  createClientForTarget,
+} from "../model-target.js"
 import type {
   SubagentDefinition,
   SubagentRun,
@@ -45,11 +50,23 @@ export class SubagentRunner {
     const def = this.resolveDefinition(options.subagentType)
     const runId = `subagent_${randomUUID().slice(0, 8)}`
 
+    // DRF-10: 按 target 解析独立 client，不再共享父级 client
+    const targetId = options.target ?? def.target
+    const resolvedTarget = targetId
+      ? resolveModelTarget(targetId, this.config, this.config.modelTargets)
+      : null
+    const childConfig = resolvedTarget
+      ? targetToConfig(resolvedTarget)
+      : this.config
+    const childClient = resolvedTarget
+      ? createClientForTarget(resolvedTarget, parentLogger?.child?.({ delegate: true, subagentType: def.name }))
+      : parentEngine["client"]
+
     const child = new ReasonixEngine(
-      this.config,
+      childConfig,
       undefined,
       undefined,
-      parentEngine["client"],
+      childClient,
       parentLogger?.child?.({ delegate: true, subagentType: def.name, subagentRunId: runId }),
     )
 

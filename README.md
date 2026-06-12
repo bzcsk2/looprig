@@ -445,6 +445,17 @@ deepreef 支持以下斜杠命令：
 | `/lang` | 切换语言 |
 | `/thinking` | 设置思考模式 |
 | `/status` | 显示状态 |
+| `/context` | 配置上下文 trim/compact 策略 |
+
+### /context 命令
+
+输入 `/context` 打开上下文策略面板，可配置：
+
+- **mode**：`trim`（截断旧消息）或 `compact`（摘要压缩后截断）
+- **triggerRatio**：触发压缩的窗口占用比例（默认 0.85）
+- **targetRatio**：压缩后目标占用比例（默认 0.70）
+
+策略持久化到 `.deepreef/context-policy.json`，重启后自动加载。长会话中当上下文接近窗口上限时，引擎会在安全点自动执行 trim 或 compact；compact 失败时回退到 trim。
 
 ### /status 命令
 
@@ -452,7 +463,8 @@ deepreef 支持以下斜杠命令：
 
 - Session ID
 - 当前 Agent
-- Context 使用情况
+- Context 使用情况（prefix/log/scratch 分项）
+- Session Writer 队列状态（queue/dropped/flushing）
 - API 调用统计
 - Token 用量和费用
 

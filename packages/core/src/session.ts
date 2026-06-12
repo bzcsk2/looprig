@@ -165,7 +165,15 @@ export class SessionLoader {
     const toDelete = withStats.slice(maxSessions)
     let deleted = 0
     for (const { path } of toDelete) {
-      try { await unlink(path); deleted++ } catch {}
+      try {
+        await unlink(path)
+        deleted++
+      } catch (err) {
+        // FG-60-R: 低噪音日志，不覆盖原始错误语义
+        if (process.env.DEEPREEF_DEBUG?.includes("session")) {
+          console.debug(`[session] cleanup unlink failed: ${path}`, err)
+        }
+      }
     }
     return deleted
   }

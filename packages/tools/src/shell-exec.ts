@@ -2,42 +2,29 @@ import { spawn } from "node:child_process"
 import { resolve } from "node:path"
 import type { AgentTool, ToolProgressUpdate } from "@deepreef/core"
 import { safeStringify, hasBinaryEncoding } from "./safe-stringify.js"
-import { isSensitive } from "./sensitive.js"
 import { normalizePlatform } from "./platform/capabilities.js"
 import { terminateProcessTree } from "./platform/process-tree.js"
 import { resolveShellBackend, type ShellBackendId } from "./platform/shell-backend.js"
+import { matchDeniedShellPattern, validateShellCommand } from "./shell-dual-track/shell-security.js"
+import { createDualTrackBashTool } from "./shell-dual-track/bash-dual-track.js"
 
-const POSIX_DENY_PATTERNS = [
-  /\brm\s+(?:-[A-Za-z]*r[A-Za-z]*\s+.*\/\*|.*-[A-Za-z]*r[A-Za-z]*\s+\/)/,
-  /\bsudo\b/,
-  /\bmkfs\b/,
-  /\bdd\s+if=/,
-  /\bchmod\s+-R\s+777\s+\//,
-  /\bdd\b/,
-  /\bfdisk\b/,
-  /\bmkfs\.\w+\b/,
-  /\bgit\s+push\b/,
-  /\bgit\s+commit\b/,
-]
-
-const POWERSHELL_DENY_PATTERNS = [
-  /\b(?:Remove-Item|rm)\b[^;\n]*(?:-Recurse\b[^;\n]*)?(?:[A-Za-z]:\\|\/)\s*(?:-\w+\s*)*$/i,
-  /\b(?:Remove-Item|rm)\b[^;\n]*-[FRS]\b/i,
-  /\bFormat-Volume\b/i,
-  /\bClear-Disk\b/i,
-  /\bInitialize-Disk\b/i,
-  /\bStart-Process\b[^;\n]*-Verb\s+RunAs\b/i,
-]
-
-function isDenied(command: string, backend: ShellBackendId): string | null {
-  const patterns = backend === "bash" ? POSIX_DENY_PATTERNS : POWERSHELL_DENY_PATTERNS
-  for (const p of patterns) {
-    if (p.test(command.trim())) return p.source
-  }
-  return null
+export interface BashToolOptions {
+  /** 启用 Shell 双轨执行（short 前台 / long 后台 / auto 软超时升级） */
+  dualTrack?: boolean
 }
 
-export function createBashTool(): AgentTool {
+/**
+ * 创建 bash 工具。默认前台单轨；`dualTrack: true` 启用双轨执行。
+ */
+export function createBashTool(options: BashToolOptions = {}): AgentTool {
+  if (options.dualTrack) {
+    return createDualTrackBashTool()
+  }
+  return createForegroundBashTool()
+}
+
+/** 前台单轨 bash 工具（原有行为） */
+function createForegroundBashTool(): AgentTool {
   return {
     name: "bash",
     description: "Run a command using the current platform shell. The historical tool name remains bash for compatibility. Returns stdout+stderr (truncated).",
@@ -64,29 +51,26 @@ export function createBashTool(): AgentTool {
       } catch (error) {
         return { content: safeStringify({ error: error instanceof Error ? error.message : String(error) }), isError: true }
       }
-      const denied = isDenied(command, backend.id)
-      if (denied) {
-        return { content: safeStringify({ error: `Command denied: matches dangerous pattern /${denied}/` }), isError: true }
-      }
-      const pathRe = /\b([\w./-]*(?:\.\w{1,10}))\b|\b([\w./-]*\/?\.[\w.-]+)\b|\b([\w./-]*(?:id_rsa|id_ed25519|credentials\.json|service-account\.json|token\.json))\b/g
-      let pathMatch: RegExpExecArray | null
-      while ((pathMatch = pathRe.exec(command)) !== null) {
-        const fp = pathMatch[1] || pathMatch[2] || pathMatch[3]
-        if (fp && isSensitive(fp)) {
-          return { content: safeStringify({ error: `Command references sensitive file: ${fp}` }), isError: true }
-        }
-      }
       const cwd = typeof args.cwd === "string" ? resolve(ctx.cwd, args.cwd) : ctx.cwd
+      const security = validateShellCommand(command, backend.id, cwd)
+      if (!security.ok) {
+        return { content: safeStringify({ error: security.error }), isError: true }
+      }
       const timeoutMs = typeof args.timeout_ms === "number" ? Math.max(0, Math.floor(args.timeout_ms)) : 30_000
       const maxChars = typeof args.max_chars === "number" ? Math.max(0, Math.floor(args.max_chars)) : 200_000
 
       const out = await runShell(command, cwd, timeoutMs, maxChars, ctx.signal, ctx.reportProgress, backend)
       if (hasBinaryEncoding(out.stdout) || hasBinaryEncoding(out.stderr)) {
-        ;(out as any).encoding_warning = "output contains non-UTF-8 binary data"
+        ;(out as Record<string, unknown>).encoding_warning = "output contains non-UTF-8 binary data"
       }
       return { content: safeStringify(out), isError: out.exitCode !== 0, metadata: { exitCode: out.exitCode } }
     },
   }
+}
+
+/** @deprecated 内部使用 validateShellCommand；保留导出供测试 */
+export function isDenied(command: string, backend: ShellBackendId): string | null {
+  return matchDeniedShellPattern(command, backend)
 }
 
 interface BoundedBuffer {
@@ -120,7 +104,6 @@ function finalizeBounded(buf: BoundedBuffer): { text: string; dropped: number } 
   return { text: buf.text, dropped: 0 }
 }
 
-// Rate-limiter: only emit progress if content changed significantly or 200ms elapsed
 function createProgressThrottle(report?: (update: ToolProgressUpdate) => void): (update: ToolProgressUpdate) => void {
   if (!report) return () => {}
   let lastContent = ""
@@ -128,7 +111,6 @@ function createProgressThrottle(report?: (update: ToolProgressUpdate) => void): 
   const MIN_INTERVAL = 200
   return (update) => {
     const now = Date.now()
-    // Always emit if content changed and enough time elapsed
     if (update.content !== lastContent && now - lastTs >= MIN_INTERVAL) {
       lastContent = update.content
       lastTs = now
@@ -146,7 +128,7 @@ async function runShell(command: string, cwd: string, timeoutMs: number, maxChar
   exitCode: number
   timedOut: boolean
 }> {
-  return await new Promise((resolve, reject) => {
+  return await new Promise((resolvePromise, reject) => {
     const platform = normalizePlatform()
     const child = spawn(backend.executable, [...backend.args, command], {
       cwd, detached: platform !== "win32",
@@ -193,7 +175,7 @@ async function runShell(command: string, cwd: string, timeoutMs: number, maxChar
       cleanup()
       const stdoutFinal = finalizeBounded(stdoutBuf)
       const stderrFinal = finalizeBounded(stderrBuf)
-      resolve({
+      resolvePromise({
         backend: backend.id,
         command,
         cwd,
@@ -234,7 +216,7 @@ async function runShell(command: string, cwd: string, timeoutMs: number, maxChar
     child.on("error", (e) => {
       clearTimeout(timer)
       cleanup()
-      reject(e) // spawn error — reject, not resolve
+      reject(e)
     })
     child.on("close", (code) => {
       clearTimeout(timer)

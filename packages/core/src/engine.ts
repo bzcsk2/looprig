@@ -140,6 +140,9 @@ export class ReasonixEngine implements CoreEngine {
   /** DRF-60: Supervisor 指导状态（单 submit 生命周期） */
   private supervisorGuidanceState = createSupervisorGuidanceState()
 
+  /** TUI-FIX-10: 编排事件发射回调（供 TUI Bridge 消费） */
+  private emitOrchestration?: (event: LoopEvent) => void
+
   /** ADV-HAR-01: 当前会话的 Harness 严格度（可通过 /harness 切换） */
   private sessionStrictness?: HarnessStrictness
   /** ADV-HAR-02: 当前 submit 解析后的不可变策略（每次 submit 刷新） */
@@ -158,6 +161,11 @@ export class ReasonixEngine implements CoreEngine {
   /** 流式执行器内部调用，等待 TUI 返回确认结果 */
   private requestPermission = async (toolName: string, args: Record<string, unknown>): Promise<boolean> => {
     return new Promise(resolve => { this.pendingPermission = { resolve, toolName, args } })
+  }
+
+  /** TUI-FIX-10: 设置编排事件发射回调 */
+  setOnOrchestrationEvent(handler: (event: LoopEvent) => void): void {
+    this.emitOrchestration = handler
   }
 
   /** TUI 调用以响应权限确认提示 */
@@ -563,6 +571,9 @@ export class ReasonixEngine implements CoreEngine {
     const abortController = new AbortController()
     this.activeAbortController = abortController
 
+    // TUI-FIX-10: clear stale workers from previous submit
+    this.emitOrchestration?.({ role: "orchestration", orchestration: { kind: "worker_remove", workerId: "*" } })
+
     // 合并 agent 配置：优先使用传入的 agentConfig，否则用当前 agent 的默认配置
     const ac = agentConfig ?? agentConfigFor(this.currentAgent)
     const baseSystemPrompt = ac.systemPrompt ?? this.ctx.prefix.messages[0]?.content ?? ""
@@ -635,6 +646,15 @@ export class ReasonixEngine implements CoreEngine {
     }
     this.sessionWriter?.enqueue({ ts: Date.now(), type: "messages", payload: this.ctx.buildMessages() })
     if (diagnosticsEnabled) submitLogger.info("submit.start", { agent: this.currentAgent, inputLength: userInput.length })
+
+    // TUI-FIX-10: emit loop_transition at submit start
+    yield {
+      role: "orchestration",
+      orchestration: {
+        kind: "loop_transition",
+        transition: { from: "observe", to: "observe", attempt: 1, timestamp: Date.now() },
+      },
+    }
 
     try {
       const toolSpecs: ToolSpec[] = []
@@ -725,6 +745,28 @@ export class ReasonixEngine implements CoreEngine {
         void this.hookManager.runOnLoopEvent(event as unknown as Record<string, unknown>).catch(() => {})
       }
     } finally {
+      // TUI-FIX-10: emit loop_transition at submit end
+      yield {
+        role: "orchestration",
+        orchestration: {
+          kind: "loop_transition",
+          transition: {
+            from: "observe",
+            to: this._interrupted ? "paused" : "done",
+            attempt: 1,
+            timestamp: Date.now(),
+          },
+        },
+      }
+      if (this._interrupted) {
+        yield {
+          role: "orchestration",
+          orchestration: {
+            kind: "runtime_signal",
+            signal: { kind: "no-progress", message: "submit_interrupted" },
+          },
+        }
+      }
       if (diagnosticsEnabled) {
         submitLogger.info("submit.done", {
           durationMs: Date.now() - submitStartedAt,
@@ -766,6 +808,22 @@ export class ReasonixEngine implements CoreEngine {
 
   async spawnSubagent(options: SubagentRunOptions): Promise<SubagentRunResult> {
     const def = this.subagentRegistry.resolve(options.subagentType ?? "general-purpose")
+    const workerId = `worker_${randomUUID().slice(0, 8)}`
+
+    // TUI-FIX-10: emit worker_upsert (starting)
+    this.emitOrchestration?.({
+      role: "orchestration",
+      orchestration: {
+        kind: "worker_upsert",
+        worker: {
+          id: workerId,
+          modelTarget: options.target ?? def.target ?? "default",
+          status: "starting",
+          currentTask: options.description,
+          elapsedMs: 0,
+        },
+      },
+    })
 
     const child = new ReasonixEngine(
       this.config,
@@ -808,6 +866,23 @@ export class ReasonixEngine implements CoreEngine {
       let output = ""
       const warnings: string[] = []
       let usage = { promptTokens: 0, completionTokens: 0 }
+      let workerFailed = false
+      let workerCancelled = false
+
+      // TUI-FIX-10: emit worker_upsert (running)
+      this.emitOrchestration?.({
+        role: "orchestration",
+        orchestration: {
+          kind: "worker_upsert",
+          worker: {
+            id: workerId,
+            modelTarget: options.target ?? def.target ?? "default",
+            status: "running",
+            currentTask: options.description,
+            elapsedMs: 0,
+          },
+        },
+      })
 
       for await (const event of child.submit(options.prompt, agentCfg)) {
         if (event.role === "assistant_delta") output += event.content ?? ""
@@ -819,11 +894,91 @@ export class ReasonixEngine implements CoreEngine {
         }
         if (event.role === "error") {
           warnings.push(event.content ?? "unknown error")
+          workerFailed = true
+        }
+        // TUI-FIX-10: detect waiting states from subagent events
+        if (event.role === "permission_ask") {
+          this.emitOrchestration?.({
+            role: "orchestration",
+            orchestration: {
+              kind: "worker_upsert",
+              worker: {
+                id: workerId,
+                modelTarget: options.target ?? def.target ?? "default",
+                status: "waiting_permission",
+                currentTask: options.description,
+                elapsedMs: 0,
+              },
+            },
+          })
+        }
+        if (event.role === "question_ask") {
+          this.emitOrchestration?.({
+            role: "orchestration",
+            orchestration: {
+              kind: "worker_upsert",
+              worker: {
+                id: workerId,
+                modelTarget: options.target ?? def.target ?? "default",
+                status: "waiting_question",
+                currentTask: options.description,
+                elapsedMs: 0,
+              },
+            },
+          })
+        }
+        if (event.role === "status" && event.content === "interrupted") {
+          workerCancelled = true
         }
       }
 
+      // TUI-FIX-10: emit final worker status (keep visible, don't remove)
+      if (workerCancelled) {
+        this.emitOrchestration?.({
+          role: "orchestration",
+          orchestration: {
+            kind: "worker_upsert",
+            worker: {
+              id: workerId,
+              modelTarget: options.target ?? def.target ?? "default",
+              status: "cancelled",
+              currentTask: options.description,
+              elapsedMs: 0,
+            },
+          },
+        })
+      } else if (workerFailed) {
+        this.emitOrchestration?.({
+          role: "orchestration",
+          orchestration: {
+            kind: "worker_upsert",
+            worker: {
+              id: workerId,
+              modelTarget: options.target ?? def.target ?? "default",
+              status: "failed",
+              currentTask: options.description,
+              elapsedMs: 0,
+            },
+          },
+        })
+      } else {
+        this.emitOrchestration?.({
+          role: "orchestration",
+          orchestration: {
+            kind: "worker_upsert",
+            worker: {
+              id: workerId,
+              modelTarget: options.target ?? def.target ?? "default",
+              status: "completed",
+              currentTask: options.description,
+              elapsedMs: 0,
+            },
+          },
+        })
+      }
+
       return {
-        status: "completed",
+        status: "completed" as const,
         id: `subagent_${randomUUID().slice(0, 8)}`,
         subagent_type: def.name,
         description: options.description,
@@ -833,6 +988,8 @@ export class ReasonixEngine implements CoreEngine {
         warnings,
       }
     } finally {
+      // Keep worker visible for a while so React can render final state
+      // worker_remove will be emitted on next submit or session switch
       await child.shutdown()
     }
   }

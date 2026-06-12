@@ -3,7 +3,9 @@ import type { ToolCall } from "./types.js"
 import type { PermissionEngine, HookManager } from "@deepreef/security"
 import { type ResultPersistenceConfig } from "./result-persistence.js"
 import { noopRuntimeLogger, type RuntimeLogger } from "./runtime-logger.js"
-import { evaluatePermission, createSettleLedger, createProgressQueue, applyResultPersistence, parseToolCallArgs } from "./executor-helpers.js"
+import { evaluatePermission, resolveDenyMessage, createSettleLedger, createProgressQueue, applyResultPersistence, parseToolCallArgs } from "./executor-helpers.js"
+import { shouldBlockSalvagedTruncatedWrite, buildSalvagedTruncatedWriteBlockMessage } from "./tool-arguments/truncation-recovery.js"
+import { ReadTracker, extractFilePath, isWriteTool, isReadTool } from "./read-before-write.js"
 import type { SubagentRunOptions, SubagentRunResult } from "./subagent/types.js"
 import type { QuestionInfo, QuestionAnswer } from "./question/types.js"
 
@@ -20,6 +22,12 @@ export class StreamingToolExecutor {
   private askUser?: (questions: QuestionInfo[]) => Promise<QuestionAnswer[]>
   private resultPersistenceConfig?: ResultPersistenceConfig
   private logger: RuntimeLogger
+  private readTracker?: ReadTracker
+
+  /** DRF-20: 启用 read-before-write 守卫 */
+  setReadTracker(tracker: ReadTracker | undefined): void {
+    this.readTracker = tracker
+  }
 
   setSessionId(id: string): void {
     this.sessionId = id
@@ -85,10 +93,17 @@ export class StreamingToolExecutor {
           yield { role: "error", content: result.content, toolName: tc.function.name, toolCallIndex: index, severity: "error" }
           continue
         }
+        if (shouldBlockSalvagedTruncatedWrite(tc.function.name, argsResult.args)) {
+          const result = makeToolError(buildSalvagedTruncatedWriteBlockMessage(tc.function.name, argsResult.args))
+          settle(tc, index, result)
+          if (diagnosticsEnabled) logger.warn("tool.args.salvage_truncated_write_blocked", { toolName: tc.function.name, toolCallIndex: index })
+          yield { role: "error", content: result.content, toolName: tc.function.name, toolCallIndex: index, severity: "error" }
+          continue
+        }
 
         const permResult = await evaluatePermission(tc, exec.tools, exec.permissionEngine, exec.hookManager, exec.requestPermission, argsResult.args)
         if (permResult === "deny") {
-          const result = makeToolError(`Tool call denied: ${tc.function.name} requires manual approval`)
+          const result = makeToolError(resolveDenyMessage(tc, exec.tools, exec.permissionEngine, argsResult.args))
           settle(tc, index, result)
           yield { role: "error", content: result.content, toolName: tc.function.name, toolCallIndex: index, severity: "error" }
           continue
@@ -221,8 +236,26 @@ export class StreamingToolExecutor {
       if (diagnosticsEnabled) logger.warn("tool.args.invalid_json", { durationMs: Date.now() - startedAt, argumentLength: tc.function.arguments.length })
       return { event: makeErrorEvent(result, tc.function.name, index), result }
     }
+    if (shouldBlockSalvagedTruncatedWrite(tc.function.name, argsResult.args)) {
+      const result = makeToolError(buildSalvagedTruncatedWriteBlockMessage(tc.function.name, argsResult.args))
+      if (diagnosticsEnabled) logger.warn("tool.args.salvage_truncated_write_blocked", { durationMs: Date.now() - startedAt })
+      return { event: makeErrorEvent(result, tc.function.name, index), result }
+    }
     const args = argsResult.args
     if (argsResult.repaired && diagnosticsEnabled) logger.warn("tool.arguments.repaired")
+
+    // DRF-20: read-before-write 守卫
+    if (this.readTracker) {
+      const filePath = extractFilePath(tc.function.name, args)
+      if (filePath && isWriteTool(tc.function.name)) {
+        const guard = this.readTracker.checkWrite(filePath, this.cwd)
+        if (!guard.ok) {
+          const result = makeToolError(guard.reason ?? "Write guard: read file first")
+          if (diagnosticsEnabled) logger.warn("tool.write_guard", { toolName: tc.function.name, filePath })
+          return { event: makeErrorEvent(result, tc.function.name, index), result }
+        }
+      }
+    }
 
     try {
       const check = this.permissionEngine?.decide(tc.function.name, args, handler.approval)
@@ -252,6 +285,16 @@ export class StreamingToolExecutor {
       }
 
       this.hookManager?.runAfterToolCall(tc.function.name, { content: result.content, isError: result.isError, metadata: result.metadata })
+
+      // DRF-20: 记录读/写跟踪
+      if (this.readTracker && !result.isError) {
+        const filePath = extractFilePath(tc.function.name, args)
+        if (filePath) {
+          if (isReadTool(tc.function.name)) this.readTracker.recordRead(filePath, this.cwd)
+          if (isWriteTool(tc.function.name)) this.readTracker.recordWrite(filePath, this.cwd)
+        }
+      }
+
       if (diagnosticsEnabled) logger.info("tool.execute.done", { durationMs: Date.now() - startedAt, isError: result.isError })
       return {
         event: {
@@ -323,9 +366,15 @@ export class StreamingToolExecutor {
       yield { role: "error", content: result.content, toolName: tc.function.name, toolCallIndex: index, severity: "error" }
       return
     }
+    if (shouldBlockSalvagedTruncatedWrite(tc.function.name, argsResult.args)) {
+      const result = makeToolError(buildSalvagedTruncatedWriteBlockMessage(tc.function.name, argsResult.args))
+      settle(tc, index, result)
+      yield { role: "error", content: result.content, toolName: tc.function.name, toolCallIndex: index, severity: "error" }
+      return
+    }
     const permResult = await this.checkAskPermission(tc, index, argsResult.args)
     if (permResult === "deny") {
-      const result = makeToolError(`Tool call denied: ${tc.function.name} requires manual approval`)
+      const result = makeToolError(resolveDenyMessage(tc, this.tools, this.permissionEngine, argsResult.args))
       settle(tc, index, result)
       yield { role: "error", content: result.content, toolName: tc.function.name, toolCallIndex: index, severity: "error" }
       return

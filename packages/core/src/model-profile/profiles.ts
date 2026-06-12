@@ -1,0 +1,176 @@
+/**
+ * 内置 ModelProfile 与 HarnessProfile
+ *
+ * DRF-11: 从 SmallCode profiles.js 和 profiles/*.toml 适配
+ * Source: smallcode/src/model/profiles.js, smallcode/profiles/*.toml (MIT)
+ */
+
+import type { HarnessProfile, ModelProfile } from "./types.js"
+
+/** 从 SmallCode KNOWN_PROFILES + TOML 文件转换的内置模型画像 */
+export const BUILTIN_MODEL_PROFILES: ModelProfile[] = [
+  {
+    id: "qwen3-8b",
+    match: ["qwen3", "qwen3-8b"],
+    sizeClass: "small",
+    contextWindow: 32_768,
+    maxOutputTokens: 8192,
+    toolFormat: "hermes",
+    toolCallReliability: "medium",
+    jsonReliability: "high",
+    strengths: ["reasoning", "code_completion", "instruction_following", "tool_calling"],
+    weaknesses: ["very_long_context", "multi_file_coordination"],
+    defaultHarness: "local-small-strict",
+  },
+  {
+    id: "qwen2.5-coder-14b",
+    match: ["qwen2.5-coder", "qwen2.5-coder-14b"],
+    sizeClass: "medium",
+    contextWindow: 32_768,
+    maxOutputTokens: 8192,
+    toolFormat: "hermes",
+    toolCallReliability: "high",
+    jsonReliability: "high",
+    strengths: ["code_completion", "refactoring", "debugging", "multi_language", "instruction_following"],
+    weaknesses: ["long_planning"],
+    defaultHarness: "local-medium-forced",
+  },
+  {
+    id: "devstral-small",
+    match: ["devstral", "devstral-small"],
+    sizeClass: "small",
+    contextWindow: 32_768,
+    maxOutputTokens: 8192,
+    toolFormat: "native",
+    toolCallReliability: "high",
+    jsonReliability: "high",
+    strengths: ["code_completion", "agentic_coding", "tool_calling", "instruction_following"],
+    weaknesses: ["very_long_planning"],
+    defaultHarness: "local-small-strict",
+  },
+  {
+    id: "deepseek-coder",
+    match: ["deepseek-coder", "deepseek-coder-v2"],
+    sizeClass: "medium",
+    contextWindow: 16_384,
+    maxOutputTokens: 4096,
+    toolFormat: "json",
+    toolCallReliability: "medium",
+    jsonReliability: "medium",
+    strengths: ["code_completion", "debugging"],
+    weaknesses: ["instruction_following", "tool_use_reliability"],
+    defaultHarness: "local-medium-forced",
+  },
+  {
+    id: "gemma-4",
+    match: ["gemma-4", "gemma-4-e4b"],
+    sizeClass: "small",
+    contextWindow: 32_768,
+    maxOutputTokens: 8192,
+    toolFormat: "native",
+    toolCallReliability: "medium",
+    jsonReliability: "medium",
+    strengths: ["code_completion", "instruction_following", "tool_use"],
+    weaknesses: ["very_long_planning"],
+    defaultHarness: "local-small-strict",
+  },
+]
+
+/** 首版内置 Harness 画像 */
+export const BUILTIN_HARNESS_PROFILES: Record<string, HarnessProfile> = {
+  "local-small-strict": {
+    id: "local-small-strict",
+    mode: "forced",
+    toolset: "minimal",
+    maxParallelTools: 2,
+    maxTurns: 30,
+    requireReadBeforeWrite: true,
+    enableTextToolSalvage: true,
+    enableBranchBudget: true,
+    requireVerificationBeforeFinal: true,
+    shellPolicy: "foreground",
+    supervisorPolicy: "on-failure",
+  },
+  "local-medium-forced": {
+    id: "local-medium-forced",
+    mode: "forced",
+    toolset: "coding",
+    maxParallelTools: 3,
+    maxTurns: 40,
+    requireReadBeforeWrite: true,
+    enableTextToolSalvage: true,
+    enableBranchBudget: true,
+    requireVerificationBeforeFinal: true,
+    shellPolicy: "dual-track",
+    supervisorPolicy: "on-failure",
+  },
+  "remote-adaptive": {
+    id: "remote-adaptive",
+    mode: "adaptive",
+    toolset: "full",
+    maxParallelTools: 5,
+    maxTurns: 50,
+    requireReadBeforeWrite: false,
+    enableTextToolSalvage: false,
+    enableBranchBudget: true,
+    requireVerificationBeforeFinal: true,
+    shellPolicy: "dual-track",
+    supervisorPolicy: "on-failure",
+  },
+  "supervisor-advice-only": {
+    id: "supervisor-advice-only",
+    mode: "strict",
+    toolset: "none",
+    maxParallelTools: 0,
+    maxTurns: 3,
+    requireReadBeforeWrite: false,
+    enableTextToolSalvage: false,
+    enableBranchBudget: false,
+    requireVerificationBeforeFinal: false,
+    shellPolicy: "foreground",
+    supervisorPolicy: "off",
+  },
+  "free-chat": {
+    id: "free-chat",
+    mode: "free",
+    toolset: "none",
+    maxParallelTools: 0,
+    maxTurns: 10,
+    requireReadBeforeWrite: false,
+    enableTextToolSalvage: false,
+    enableBranchBudget: false,
+    requireVerificationBeforeFinal: false,
+    shellPolicy: "foreground",
+    supervisorPolicy: "off",
+  },
+}
+
+/** 未知本地模型的保守默认 */
+export const DEFAULT_LOCAL_PROFILE: ModelProfile = {
+  id: "unknown-local",
+  match: [],
+  sizeClass: "small",
+  contextWindow: 32_768,
+  maxOutputTokens: 4096,
+  toolFormat: "native",
+  toolCallReliability: "low",
+  jsonReliability: "low",
+  strengths: [],
+  weaknesses: ["unknown_capabilities"],
+  defaultHarness: "local-small-strict",
+}
+
+/** 未知远程模型的保守默认 */
+export const DEFAULT_REMOTE_PROFILE: ModelProfile = {
+  id: "unknown-remote",
+  match: [],
+  sizeClass: "unknown",
+  contextWindow: 128_000,
+  maxOutputTokens: 8192,
+  toolFormat: "native",
+  toolCallReliability: "medium",
+  jsonReliability: "medium",
+  strengths: [],
+  weaknesses: ["unknown_capabilities"],
+  defaultHarness: "remote-adaptive",
+}
