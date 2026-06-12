@@ -187,6 +187,7 @@ export interface CoreEngine {
   respondQuestion(requestId: string, answers: QuestionAnswer[]): void
   rejectQuestion(requestId: string): void
   getContextWindow?(): number
+  setThinkingMode?(mode: "off" | "open" | "high"): void
 }
 
 export interface AgentConfig {

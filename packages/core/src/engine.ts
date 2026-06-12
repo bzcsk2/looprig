@@ -535,6 +535,15 @@ export class ReasonixEngine implements CoreEngine {
     this.sessionStrictness = strictness
   }
 
+  /** 设置推理档位（off / open / high），传递给 DeepSeek thinking API */
+  private thinkingMode: ThinkingMode = "off"
+  setThinkingMode(mode: ThinkingMode): void {
+    this.thinkingMode = mode
+  }
+  getThinkingMode(): ThinkingMode {
+    return this.thinkingMode
+  }
+
   /** ADV-HAR-01: 获取当前有效 Harness 严格度 */
   getHarnessStrictness(): HarnessStrictness {
     return this.effectivePolicy?.strictness ?? this.sessionStrictness ?? "normal"
@@ -701,6 +710,7 @@ export class ReasonixEngine implements CoreEngine {
         sessionWriter: this.sessionWriter,
         stats: this.stats,
         isInterrupted: () => this._interrupted,
+        thinkingMode: this.thinkingMode,
         appendToolResult: (tc, result) => this.appendToolResult(tc, result),
         takePendingInstruction: () => {
           const content = this.pendingInstructionQueue.shift()

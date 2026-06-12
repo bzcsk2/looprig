@@ -282,6 +282,11 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
     ? persistedSettings.agent
     : undefined;
   const [thinkingMode, setThinkingMode] = useState(persistedThinkingMode ?? 'off');
+
+  // TUI-FIX: 将 TUI 的 thinkingMode 传递给 Engine，控制 DeepSeek API thinking 参数
+  useEffect(() => {
+    engineRef.current.setThinkingMode?.(thinkingMode as 'off' | 'open' | 'high');
+  }, [thinkingMode]);
   const [bridgeState, setBridgeState] = useState<BridgeState>(() => ({ ...initialState }));
   const bridge = useMemo(() => createBridge(engine, setBridgeState, onUserInput, beforeSubmit, orchestrationStore), [engine, onUserInput, beforeSubmit, orchestrationStore]);
   const transcriptReader = useMemo(() => bridge.getTranscriptReader(), [bridge]);
