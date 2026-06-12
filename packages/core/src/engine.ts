@@ -35,6 +35,7 @@ import { resolveDefaultHarness } from "./model-profile/resolver.js"
 import { resolveHarnessStrictness, resolveEffectiveHarnessPolicy, readProjectHarnessConfig } from "./harness/index.js"
 import type { EffectiveHarnessPolicy, HarnessStrictness } from "./harness/index.js"
 import { ReadTracker } from "./read-before-write.js"
+import { EarlyStopDetector } from "./early-stop.js"
 import type { VerificationGateState } from "./governance/verification-gate.js"
 import {
   createSupervisorGuidanceState,
@@ -694,6 +695,12 @@ export class ReasonixEngine implements CoreEngine {
           this.ctx.scratch.reset()
           this.injectTaskLedgerContext(this.taskLedger)
         },
+        // ADV-HAR-06: 根据 effectivePolicy.earlyStop 配置 EarlyStopDetector
+        earlyStop: new EarlyStopDetector({
+          repetitionThreshold: this.effectivePolicy?.earlyStop === "aggressive" ? 2
+            : this.effectivePolicy?.earlyStop === "critical-only" ? 5
+            : 3,
+        }),
         supervisorGuidance: this.effectivePolicy?.supervisorPolicy !== "off"
           ? this.buildSupervisorGuidanceConfig()
           : undefined,
