@@ -623,12 +623,22 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
       });
       scrollRef.current?.scrollToBottom();
       bridge.runWorkflow(command.goal, (phase, iteration) => {
+        const phaseMap: Record<string, { supervisor: WorkflowState['supervisorStatus']; worker: WorkflowState['workerStatus'] }> = {
+          supervisor_analyse: { supervisor: 'analyse', worker: 'idle' },
+          supervisor_check: { supervisor: 'analyse', worker: 'idle' },
+          supervisor_intervene: { supervisor: 'analyse', worker: 'do' },
+          worker_do: { supervisor: 'analyse', worker: 'do' },
+          worker_report: { supervisor: 'waiting', worker: 'report' },
+          waiting_user: { supervisor: 'waiting', worker: 'idle' },
+          blocked: { supervisor: 'blocked', worker: 'blocked' },
+        };
+        const mapped = phaseMap[phase] ?? { supervisor: 'idle' as const, worker: 'idle' as const };
         setWorkflowState(prev => ({
           ...prev,
           phase: phase as WorkflowPhase,
           iteration,
-          supervisorStatus: phase === 'supervisor_analyse' ? 'analyse' : phase === 'supervisor_check' ? 'check' : phase === 'supervisor_intervene' ? 'intervene' : prev.supervisorStatus,
-          workerStatus: phase === 'worker_do' ? 'doing' : phase === 'worker_report' ? 'reporting' : prev.workerStatus,
+          supervisorStatus: mapped.supervisor,
+          workerStatus: mapped.worker,
         }));
       });
       return;

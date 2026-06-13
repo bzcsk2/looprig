@@ -1,5 +1,6 @@
 import type { AgentRole } from "../agent-profile/types.js"
 import type { LoopEvent, ChatClient, AgentTool } from "../interface.js"
+import type { ChatMessage } from "../types.js"
 import { AgentRuntime } from "./runtime.js"
 import type {
   AgentRuntimeState,
@@ -87,7 +88,7 @@ export class DualAgentRuntime {
   }
 
   /** WF-FIX-60: Load session on supervisor engine for dual-runtime session recovery */
-  async loadSupervisorSession(sessionId: string): Promise<import("../interface.js").ChatMessage[]> {
+  async loadSupervisorSession(sessionId: string): Promise<ChatMessage[]> {
     // The supervisor engine must implement loadSession (ReasonixEngine does)
     const engine = (this.supervisor as any).engine as import("../engine.js").ReasonixEngine | undefined
     if (engine?.loadSession) {

@@ -219,11 +219,17 @@ async function main(): Promise<void> {
     supervisorEngine.setSystemPrompt(baseSystemPrompt)
 
     const dualRuntime = new DualAgentRuntime({
-      workerClient: engine,
-      supervisorClient: supervisorEngine,
+      workerClient: engine as unknown as import("@deepreef/core").ChatClient,
+      supervisorClient: supervisorEngine as unknown as import("@deepreef/core").ChatClient,
       workerSystemPrompt: baseSystemPrompt,
       supervisorSystemPrompt: baseSystemPrompt,
-      config: { maxRounds: 9 },
+      config: {
+        maxWorkflowRounds: 9,
+        workerModelTarget: config.model,
+        supervisorModelTarget: config.model,
+        workerThinking: 'off' as const,
+        supervisorThinking: 'off' as const,
+      },
       workerConfig: {
         apiKey: config.apiKey,
         baseUrl: config.baseUrl,

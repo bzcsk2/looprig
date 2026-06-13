@@ -1,7 +1,8 @@
 import type { ChatMessage, ReasonixEngine, QuestionRequest, PermissionRequest, PermissionReply } from '@deepreef/core';
 import type { AgentRole } from '@deepreef/core/agent-profile/types.js';
 import type { DualAgentRuntime } from '@deepreef/core/dual-agent-runtime/dual-runtime.js';
-import type { WorkflowCoordinator, WorkflowEvent } from '@deepreef/core/workflow-coordinator/coordinator.js';
+import type { WorkflowCoordinator } from '@deepreef/core/workflow-coordinator/coordinator.js';
+import type { WorkflowEvent } from '@deepreef/core/workflow-coordinator/types.js';
 import { setTUIState } from './App.js';
 import { DeltaBatcher, resolveDeltaFlushMs } from './delta-batcher.js';
 import { t } from './i18n/index.js';
@@ -913,7 +914,7 @@ export function createBridge(
       const wfEvent = event as WorkflowEvent;
 
       // Track role changes from phase_change events
-      if (wfEvent.type === 'phase_change') {
+      if (wfEvent.type === 'phase_change' && wfEvent.phase && wfEvent.iteration != null) {
         activeRole = wfEvent.phase === 'worker_do' || wfEvent.phase === 'worker_report' ? 'worker' : 'supervisor';
         onPhaseChange?.(wfEvent.phase, wfEvent.iteration);
         // WF-FIX-70: Sync coordinator phase to OrchestrationStore (production main path)
@@ -922,9 +923,9 @@ export function createBridge(
             kind: 'loop_transition',
             transition: {
               from: (orchestrationStore.getSnapshot().loop.phase as any) ?? 'observe',
-              to: wfEvent.phase,
+              to: wfEvent.phase as any,
               attempt: wfEvent.iteration,
-              reason: `WorkflowCoordinator: ${wfEvent.phase}`,
+              timestamp: Date.now(),
             },
           });
         }
