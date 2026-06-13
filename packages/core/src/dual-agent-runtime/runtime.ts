@@ -20,6 +20,7 @@ export interface AgentRuntimeOptions {
     provider?: string
   }
   tools?: AgentTool[]
+  engine?: ReasonixEngine
 }
 
 export class AgentRuntime {
@@ -34,19 +35,22 @@ export class AgentRuntime {
     this.role = options.role
     this.systemPrompt = options.systemPrompt
 
-    const deepreefConfig: DeepreefConfig = {
-      apiKey: options.config.apiKey,
-      baseUrl: options.config.baseUrl,
-      model: options.config.model,
-      maxTokens: options.config.maxTokens,
-      temperature: options.config.temperature,
-      contextWindow: options.contextWindow,
-      maxContextRounds: options.maxContextRounds,
-      provider: options.config.provider,
+    if (options.engine) {
+      this.engine = options.engine
+    } else {
+      const deepreefConfig: DeepreefConfig = {
+        apiKey: options.config.apiKey,
+        baseUrl: options.config.baseUrl,
+        model: options.config.model,
+        maxTokens: options.config.maxTokens,
+        temperature: options.config.temperature,
+        contextWindow: options.contextWindow,
+        maxContextRounds: options.maxContextRounds,
+        provider: options.config.provider,
+      }
+      this.engine = new ReasonixEngine(deepreefConfig)
+      this.engine.setSystemPrompt(options.systemPrompt)
     }
-
-    this.engine = new ReasonixEngine(deepreefConfig)
-    this.engine.setSystemPrompt(options.systemPrompt)
 
     if (options.tools) {
       for (const tool of options.tools) {

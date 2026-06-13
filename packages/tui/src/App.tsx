@@ -7,6 +7,8 @@ import type { ChatMessage, DeepreefConfig } from '@deepreef/core';
 import { PROVIDERS, AGENTS, defaultAgentRegistry, getModelContextWindow, saveLastConfig } from '@deepreef/core';
 import { resolveHarnessStrictness, readProjectHarnessConfig, writeProjectHarnessConfig } from '@deepreef/core';
 import { createBridge, timelineFromMessages, type BridgeState } from './bridge.js';
+import type { DualAgentRuntime } from '@deepreef/core/dual-agent-runtime/dual-runtime.js';
+import type { WorkflowCoordinator } from '@deepreef/core/workflow-coordinator/coordinator.js';
 import { TranscriptProvider } from './store/TranscriptContext.js';
 import { BridgeRuntimeProvider } from './store/BridgeRuntimeContext.js';
 import { isBridgeRuntimeSplitEnabled, isTranscriptStoreEnabled } from './store/feature.js';
@@ -206,6 +208,8 @@ interface AppProps {
   diagnosticCounts?: { errors: number; warnings: number };
   onUserInput?: (text: string) => void;
   beforeSubmit?: () => Promise<void>;
+  dualRuntime?: DualAgentRuntime;
+  workflowCoordinator?: WorkflowCoordinator;
 }
 
 /**
@@ -254,7 +258,7 @@ function AgentGroupDisplayFromStore({ terminalWidth }: { terminalWidth: number }
   );
 }
 
-export function App({ engine, config, pluginCount = 0, contentPackCount = 0, assetCounts, diagnosticCounts, onUserInput, beforeSubmit }: AppProps) {
+export function App({ engine, config, pluginCount = 0, contentPackCount = 0, assetCounts, diagnosticCounts, onUserInput, beforeSubmit, dualRuntime, workflowCoordinator }: AppProps) {
   // TUI-FIX-20: 编排状态存储（引擎生命周期内持久）
   const [orchestrationStore] = useState(() => new OrchestrationStore());
 
@@ -291,7 +295,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
     engineRef.current.setThinkingMode?.(thinkingMode as 'off' | 'open' | 'high');
   }, [thinkingMode]);
   const [bridgeState, setBridgeState] = useState<BridgeState>(() => ({ ...initialState }));
-  const bridge = useMemo(() => createBridge(engine, setBridgeState, onUserInput, beforeSubmit, orchestrationStore), [engine, onUserInput, beforeSubmit, orchestrationStore]);
+  const bridge = useMemo(() => createBridge(engine, setBridgeState, onUserInput, beforeSubmit, orchestrationStore, dualRuntime, workflowCoordinator), [engine, onUserInput, beforeSubmit, orchestrationStore, dualRuntime, workflowCoordinator]);
   const transcriptReader = useMemo(() => bridge.getTranscriptReader(), [bridge]);
   const bridgeRuntime = useMemo(() => bridge.getBridgeRuntime(), [bridge]);
   const bridgeSplit = isBridgeRuntimeSplitEnabled();
@@ -603,7 +607,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
       }
       return;
     }
-    // DA-R6: /run 命令 — 启动 Workflow
+    // DA-R6: /run 命令 — 启动 Workflow（WF-FIX-20: 通过 bridge.runWorkflow）
     if (command?.name === 'run') {
       setWorkflowState({
         phase: 'supervisor_analyse',
@@ -617,9 +621,16 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
         role: 'assistant' as const,
         content: `Starting workflow for: ${command.goal}\nSupervisor analysing...`,
       });
-      // Submit the goal to the supervisor via bridge
       scrollRef.current?.scrollToBottom();
-      bridge.submit(command.goal, false, 'supervisor');
+      bridge.runWorkflow(command.goal, (phase, iteration) => {
+        setWorkflowState(prev => ({
+          ...prev,
+          phase: phase as WorkflowPhase,
+          iteration,
+          supervisorStatus: phase === 'supervisor_analyse' ? 'analyse' : phase === 'supervisor_check' ? 'check' : phase === 'supervisor_intervene' ? 'intervene' : prev.supervisorStatus,
+          workerStatus: phase === 'worker_do' ? 'doing' : phase === 'worker_report' ? 'reporting' : prev.workerStatus,
+        }));
+      });
       return;
     }
     // DA-R6: /talk 命令 — 切换输入目标角色
@@ -724,6 +735,10 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
     const msgs = await engineRef.current.loadSession(sessionId);
     // Guard against post-unmount setState
     if (!mountedRef.current) return;
+    // WF-FIX-60: Also load session on supervisor engine for dual-runtime consistency
+    if (dualRuntime) {
+      dualRuntime.loadSupervisorSession(sessionId).catch(() => {});
+    }
     const recoveredTimeline = timelineFromMessages(msgs);
     setBridgeState({
       ...initialState,
@@ -734,7 +749,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
     // TUI-FIX-20: 重置编排状态
     orchestrationStore.reset();
     appendMessage({ role: 'assistant' as const, content: t().resumedSession(sessionId.slice(0, 8), msgs.length) });
-  }, [appendMessage, orchestrationStore]);
+  }, [appendMessage, orchestrationStore, dualRuntime]);
 
   /** 会话选择取消回调：关闭选择器覆盖层 */
   const handleSessionCancel = useCallback(() => {

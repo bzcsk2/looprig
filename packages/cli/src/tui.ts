@@ -3,6 +3,9 @@ import { readFileSync, writeSync } from "node:fs"
 import { resolve } from "node:path"
 import { loadConfig, ReasonixEngine, SessionLoader, defaultAgentRegistry } from "@deepreef/core"
 import { buildSystemPrompt } from "@deepreef/core"
+import { DualAgentRuntime } from "@deepreef/core/dual-agent-runtime/dual-runtime.js"
+import { WorkflowCoordinator } from "@deepreef/core/workflow-coordinator/coordinator.js"
+import { QuestionService } from "@deepreef/core/question/service.js"
 import { createDefaultTools, clearReadTracker, normalizePlatform, resolveShellBackend } from "@deepreef/tools"
 import { McpHost, createListMcpResourcesTool, createReadMcpResourceTool, createMcpAuthTool, createListMcpToolsTool, createCallMcpToolTool, setMcpHost } from "@deepreef/mcp"
 import { PluginRuntime, pluginToolsToAgentTools } from "@deepreef/plugin"
@@ -210,6 +213,52 @@ async function main(): Promise<void> {
       return
     }
 
+    // WF-FIX-10: Create supervisor engine and wire DualAgentRuntime
+    await Promise.all([pluginReady, memoryReady])
+    const supervisorEngine = new ReasonixEngine(config, clearReadTracker)
+    supervisorEngine.setSystemPrompt(baseSystemPrompt)
+
+    const dualRuntime = new DualAgentRuntime({
+      workerClient: engine,
+      supervisorClient: supervisorEngine,
+      workerSystemPrompt: baseSystemPrompt,
+      supervisorSystemPrompt: baseSystemPrompt,
+      config: { maxRounds: 9 },
+      workerConfig: {
+        apiKey: config.apiKey,
+        baseUrl: config.baseUrl,
+        model: config.model,
+        maxTokens: config.maxTokens,
+        temperature: config.temperature,
+        provider: config.provider,
+      },
+      supervisorConfig: {
+        apiKey: config.apiKey,
+        baseUrl: config.baseUrl,
+        model: config.model,
+        maxTokens: config.maxTokens,
+        temperature: config.temperature,
+        provider: config.provider,
+      },
+      workerEngine: engine,
+      supervisorEngine: supervisorEngine,
+    })
+
+    // WF-FIX-40: QuestionService with timeout wrapper to prevent indefinite blocking
+    const questionService = new QuestionService()
+    const originalAsk = questionService.ask.bind(questionService)
+    questionService.ask = async (input) => {
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Question ask timed out")), 30000)
+      )
+      return Promise.race([originalAsk(input), timeout])
+    }
+
+    const workflowCoordinator = new WorkflowCoordinator({
+      runtime: dualRuntime,
+      questionService,
+    })
+
     await runTUIMode(
       engine,
       config,
@@ -218,6 +267,8 @@ async function main(): Promise<void> {
       () => memoryBridge,
       () => pluginReady,
       memoryReady,
+      dualRuntime,
+      workflowCoordinator,
     )
   } finally {
     await Promise.allSettled([pluginReady, memoryReady])
@@ -297,6 +348,8 @@ async function runTUIMode(
   getMemoryBridge?: () => import("@deepreef/memory").DeepreefMemoryBridge | undefined,
   beforeSubmit?: () => Promise<void>,
   memoryReady?: Promise<void>,
+  dualRuntime?: DualAgentRuntime,
+  workflowCoordinator?: WorkflowCoordinator,
 ): Promise<void> {
   const status = pluginRuntime.getStatus()
   const pluginCount = status.loadedPlugins.length
@@ -316,7 +369,7 @@ async function runTUIMode(
 
   try {
     const { waitUntilExit } = await render(
-      React.createElement(App, { engine, config, pluginCount, contentPackCount, assetCounts, diagnosticCounts, onUserInput, beforeSubmit }),
+      React.createElement(App, { engine, config, pluginCount, contentPackCount, assetCounts, diagnosticCounts, onUserInput, beforeSubmit, dualRuntime, workflowCoordinator }),
       { exitOnCtrlC: false, onFrame: createFrameMetricsHandler() },
     );
     await waitUntilExit();

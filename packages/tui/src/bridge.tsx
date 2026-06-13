@@ -1,5 +1,7 @@
 import type { ChatMessage, ReasonixEngine, QuestionRequest, PermissionRequest, PermissionReply } from '@deepreef/core';
 import type { AgentRole } from '@deepreef/core/agent-profile/types.js';
+import type { DualAgentRuntime } from '@deepreef/core/dual-agent-runtime/dual-runtime.js';
+import type { WorkflowCoordinator, WorkflowEvent } from '@deepreef/core/workflow-coordinator/coordinator.js';
 import { setTUIState } from './App.js';
 import { DeltaBatcher, resolveDeltaFlushMs } from './delta-batcher.js';
 import { t } from './i18n/index.js';
@@ -141,12 +143,16 @@ export function createBridge(
   onUserInput?: (text: string) => void,
   beforeSubmit?: () => Promise<void>,
   orchestrationStore?: import('./store/orchestration-store.js').OrchestrationStore,
+  dualRuntime?: DualAgentRuntime,
+  workflowCoordinator?: WorkflowCoordinator,
 ): {
   submit: (text: string, isQueueResubmit?: boolean, role?: AgentRole) => Promise<void>;
   cancel: () => void;
   respondPermission: (reply: PermissionReply, message?: string) => void;
   respondQuestion: (requestId: string, answers: string[][]) => void;
   rejectQuestion: (requestId: string) => void;
+  /** Run a workflow goal through the WorkflowCoordinator */
+  runWorkflow: (goal: string, onPhaseChange?: (phase: string, iteration: number) => void) => Promise<void>;
   /** Store 路径下用 timeline 全量同步 transcript（session 恢复等） */
   replaceTranscript: (items: TimelineItem[]) => void;
   /** 追加一条消息到 transcript（系统提示 / 模型切换等） */
@@ -555,7 +561,11 @@ export function createBridge(
 
     try {
       await beforeSubmit?.();
-      for await (const event of engine.submit(text, undefined, submitRole)) {
+      // WF-FIX-10: Route through DualAgentRuntime when available
+      const eventStream = dualRuntime && submitRole
+        ? dualRuntime.sendDirect({ role: submitRole, input: text })
+        : engine.submit(text, undefined, submitRole);
+      for await (const event of eventStream) {
         if (requestId !== activeRequest) continue;
 
         switch (event.role) {
@@ -865,6 +875,11 @@ export function createBridge(
       }
       return { permissionPrompt: null, questionPrompt: null };
     });
+    // WF-FIX-10: Interrupt both roles when DualAgentRuntime is active
+    if (dualRuntime) {
+      dualRuntime.interruptRole('worker');
+      dualRuntime.interruptRole('supervisor');
+    }
     engine.interrupt();
   };
 
@@ -883,12 +898,47 @@ export function createBridge(
     commitBridge(() => ({ questionPrompt: null }));
   };
 
+  /** WF-FIX-20: Run a workflow goal through the WorkflowCoordinator */
+  const runWorkflow = async (goal: string, onPhaseChange?: (phase: string, iteration: number) => void) => {
+    if (!workflowCoordinator) {
+      // Fallback: submit as supervisor message
+      await submit(goal, false, 'supervisor');
+      return;
+    }
+
+    workflowCoordinator.startWorkflow({ goal });
+    let activeRole: AgentRole = 'supervisor';
+
+    for await (const event of workflowCoordinator.runWorkflow()) {
+      const wfEvent = event as WorkflowEvent;
+
+      // Track role changes from phase_change events
+      if (wfEvent.type === 'phase_change') {
+        activeRole = wfEvent.phase === 'worker_do' || wfEvent.phase === 'worker_report' ? 'worker' : 'supervisor';
+        onPhaseChange?.(wfEvent.phase, wfEvent.iteration);
+        // WF-FIX-70: Sync coordinator phase to OrchestrationStore (production main path)
+        if (orchestrationStore) {
+          orchestrationStore.apply({
+            kind: 'loop_transition',
+            transition: {
+              from: (orchestrationStore.getSnapshot().loop.phase as any) ?? 'observe',
+              to: wfEvent.phase,
+              attempt: wfEvent.iteration,
+              reason: `WorkflowCoordinator: ${wfEvent.phase}`,
+            },
+          });
+        }
+      }
+    }
+  };
+
   return {
     submit,
     cancel,
     respondPermission,
     respondQuestion,
     rejectQuestion,
+    runWorkflow,
     replaceTranscript,
     appendTimelineMessage,
     getTranscriptReader: () => transcriptReader,

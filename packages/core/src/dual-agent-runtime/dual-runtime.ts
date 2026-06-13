@@ -8,6 +8,8 @@ import type {
   InterruptRoleOptions,
 } from "./types.js"
 
+import type { ReasonixEngine } from "../engine.js"
+
 export interface DualAgentRuntimeOptions {
   workerClient: ChatClient
   supervisorClient: ChatClient
@@ -32,6 +34,8 @@ export interface DualAgentRuntimeOptions {
   }
   workerTools?: AgentTool[]
   supervisorTools?: AgentTool[]
+  workerEngine?: ReasonixEngine
+  supervisorEngine?: ReasonixEngine
 }
 
 export class DualAgentRuntime {
@@ -59,6 +63,7 @@ export class DualAgentRuntime {
       maxContextRounds: 20,
       config: options.workerConfig,
       tools: options.workerTools,
+      engine: options.workerEngine,
     })
 
     this.supervisor = new AgentRuntime({
@@ -69,6 +74,7 @@ export class DualAgentRuntime {
       maxContextRounds: 20,
       config: options.supervisorConfig,
       tools: options.supervisorTools,
+      engine: options.supervisorEngine,
     })
   }
 
@@ -78,6 +84,16 @@ export class DualAgentRuntime {
 
   getSupervisor(): AgentRuntime {
     return this.supervisor
+  }
+
+  /** WF-FIX-60: Load session on supervisor engine for dual-runtime session recovery */
+  async loadSupervisorSession(sessionId: string): Promise<import("../interface.js").ChatMessage[]> {
+    // The supervisor engine must implement loadSession (ReasonixEngine does)
+    const engine = (this.supervisor as any).engine as import("../engine.js").ReasonixEngine | undefined
+    if (engine?.loadSession) {
+      return engine.loadSession(sessionId)
+    }
+    return []
   }
 
   getActiveRole(): AgentRole {

@@ -291,7 +291,7 @@ export class WorkflowCoordinator {
     const supervisorInput = `Analyse the following goal and create a plan:\n\nGoal: ${this.state!.goal}\n\nProvide a structured plan with steps, constraints, and risks.`
 
     for await (const event of this.runtime!.getSupervisor().submit(supervisorInput)) {
-      // Forward events
+      yield event as any
     }
 
     const supervisorState = this.runtime!.getSupervisor().getState()
@@ -308,7 +308,7 @@ export class WorkflowCoordinator {
     let errorCount = 0
 
     for await (const event of this.runtime!.getWorker().submit(workerInput)) {
-      // Forward events
+      yield event as any
       if (event.role === "error") {
         hasError = true
         errorCount++
@@ -330,7 +330,7 @@ export class WorkflowCoordinator {
     const workerInput = "Generate a summary report of what was accomplished."
 
     for await (const event of this.runtime!.getWorker().submit(workerInput)) {
-      // Forward events
+      yield event as any
     }
 
     const workerState = this.runtime!.getWorker().getState()
@@ -344,7 +344,7 @@ export class WorkflowCoordinator {
     const supervisorInput = `Review the following worker report and decide next action:\n\nPlan: ${this.state!.supervisorPlan ?? ""}\n\nReport: ${this.state!.workerReport ?? ""}\n\nDecide: continue, revise, approve, ask_user, or blocked`
 
     for await (const event of this.runtime!.getSupervisor().submit(supervisorInput)) {
-      // Forward events
+      yield event as any
     }
 
     const supervisorState = this.runtime!.getSupervisor().getState()
@@ -393,7 +393,7 @@ Provide brief guidance. Do NOT decide to approve or complete the workflow.
 Return your guidance as structured advice.`
 
     for await (const event of this.runtime!.getSupervisor().submit(supervisorInput)) {
-      // Forward events
+      yield event as any
     }
 
     const supervisorState = this.runtime!.getSupervisor().getState()
