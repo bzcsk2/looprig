@@ -4078,3 +4078,65 @@ const ProjectHarnessConfigSchema = z.object({
 - 所有端到端测试通过
 - 所有发布门禁验证通过
 - 双角色运行时完整集成并可工作
+
+---
+
+## §60 DA-R 任务总结
+
+### 60.1 任务概览
+
+DA-R 系列任务（DA-R0 到 DA-R7）已完成双角色运行时的修复、集成和验证。
+
+| 任务 | 描述 | 章节 | 状态 |
+|------|------|------|------|
+| DA-R0 | 基线、失败测试与完成状态纠正 | §53 | ✅ |
+| DA-R1 | Agent Profile 严格校验与安全迁移 | §53 | ✅ |
+| DA-R2 | CapabilityCatalog 接线与角色安全边界 | §54 | ✅ |
+| DA-R3 | 双 Runtime 真实执行能力与主路径接线 | §55 | ✅ |
+| DA-R4 | 唯一 WorkflowCoordinator 与治理闭环 | §56 | ✅ |
+| DA-R5 | 双角色 Session 安全持久化与恢复 | §57 | ✅ |
+| DA-R6 | TUI 双角色交互和状态栏真实接线 | §58 | ✅ |
+| DA-R7 | 旧路径迁移、端到端测试与发布门禁 | §59 | ✅ |
+
+### 60.2 测试结果汇总
+
+| 测试套件 | 测试数 | 通过 | 失败 | 状态 |
+|----------|--------|------|------|------|
+| `da-r0-baseline.test.ts` | 12 | 12 | 0 | ✅ |
+| `da-r7-e2e.test.ts` | 18 | 18 | 0 | ✅ |
+| `workflow-components.test.ts` | 22 | 22 | 0 | ✅ |
+| **总计** | **52** | **52** | **0** | **✅** |
+
+### 60.3 发布门禁
+
+所有发布门禁验证通过：
+
+1. ✅ **typecheck 通过** - TypeScript 类型检查无错误
+2. ✅ **单元测试通过** - 所有 12 个基线测试通过
+3. ✅ **端到端测试通过** - 所有 18 个端到端测试通过
+4. ✅ **组件测试通过** - 所有 22 个组件测试通过
+5. ✅ **git diff --check 通过** - 无代码格式问题
+
+### 60.4 关键修复
+
+| 修复 | 描述 | 文件 |
+|------|------|------|
+| Zod 严格校验 | 使用 `z.strictObject()` 拒绝未知字段 | `agent-profile/schema.ts` |
+| Supervisor 只读 | `RoleCapabilityView` 强制 Supervisor 只读 | `capability-catalog/catalog.ts` |
+| 配置注入 | `AgentRuntime` 支持配置参数注入 | `dual-agent-runtime/runtime.ts` |
+| 转换验证 | `WorkflowCoordinator` 验证合法转换 | `workflow-coordinator/coordinator.ts` |
+| 路径穿越防护 | `DualSessionStore` 拒绝恶意路径 | `dual-session/store.ts` |
+| TUI 集成 | `DualTabSystem` 和 `WorkflowStatusBar` 接入 `App.tsx` | `tui/src/App.tsx` |
+
+### 60.5 Git 提交历史
+
+| 提交 | 描述 |
+|------|------|
+| `858da6a` | feat: implement DA-00 to DA-60 dual-role runtime upgrade |
+| `72b0a3d` | feat: complete DA-R1 through DA-R5 fixes |
+| `95f61eb` | feat: complete DA-R6 TUI dual-role integration |
+| `d820218` | feat: complete DA-R7 end-to-end tests and release gate |
+
+### 60.6 结论
+
+双角色运行时已完整集成并通过所有验证门禁。Worker 和 Supervisor 拥有独立的上下文、配置和能力边界，工作流协调器正确管理状态转换和轮次限制，Session 持久化安全可靠，TUI 正确接线双角色交互。
