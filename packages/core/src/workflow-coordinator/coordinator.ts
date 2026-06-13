@@ -7,10 +7,16 @@ import type {
   WorkflowEvidence,
   WorkflowSupervisorAdvice,
   WorkflowCheckpoint,
-  StartWorkflowOptions,
   WorkflowEvent,
 } from "./types.js"
 import { DEFAULT_WORKFLOW_CONFIG } from "./types.js"
+
+export interface StartWorkflowOptions {
+  goal: string
+  workflowId?: string
+  maxRounds?: number
+  config?: Partial<WorkflowConfig>
+}
 
 export interface WorkflowCoordinatorOptions {
   config?: Partial<WorkflowConfig>
@@ -40,10 +46,12 @@ export class WorkflowCoordinator {
       throw new Error("Workflow already in progress")
     }
 
+    const maxRounds = options.maxRounds ?? this.config.maxRounds
+
     this.state = {
-      workflowId: randomUUID(),
+      workflowId: options.workflowId ?? randomUUID(),
       iteration: 0,
-      maxRounds: this.config.maxRounds,
+      maxRounds,
       currentPhase: "idle",
       phaseHistory: [],
       ledgerVersion: 0,
@@ -63,12 +71,18 @@ export class WorkflowCoordinator {
     return this.getState()!
   }
 
-  transition(to: WorkflowPhase, reason?: string): void {
+  transition(to: WorkflowPhase, reason?: string): { success: boolean; error?: string } {
     if (!this.state) {
-      throw new Error("No workflow in progress")
+      return { success: false, error: "No workflow in progress" }
     }
 
     const from = this.state.currentPhase
+
+    // Validate transition
+    if (!this.isValidTransition(from, to)) {
+      return { success: false, error: `Invalid transition from ${from} to ${to}` }
+    }
+
     this.state.phaseHistory.push(from)
     this.state.currentPhase = to
     this.state.updatedAt = Date.now()
@@ -118,6 +132,8 @@ export class WorkflowCoordinator {
         timestamp: Date.now(),
       })
     }
+
+    return { success: true }
   }
 
   setSupervisorPlan(plan: string): void {
@@ -173,6 +189,13 @@ export class WorkflowCoordinator {
     if (!this.state) {
       return false
     }
+
+    // Cannot continue if finished or blocked
+    if (this.state.currentPhase === "completed" || this.state.currentPhase === "failed") {
+      return false
+    }
+
+    // Check round limit
     return this.state.iteration < this.state.maxRounds
   }
 
@@ -181,6 +204,22 @@ export class WorkflowCoordinator {
       return false
     }
     return this.state.currentPhase === "completed" || this.state.currentPhase === "failed"
+  }
+
+  private isValidTransition(from: WorkflowPhase, to: WorkflowPhase): boolean {
+    // Define valid transitions
+    const validTransitions: Record<WorkflowPhase, WorkflowPhase[]> = {
+      idle: ["supervisor_analyse", "blocked", "completed", "failed"],
+      supervisor_analyse: ["worker_do", "blocked", "completed", "failed"],
+      worker_do: ["worker_report", "blocked", "completed", "failed"],
+      worker_report: ["supervisor_check", "blocked", "completed", "failed"],
+      supervisor_check: ["supervisor_analyse", "blocked", "completed", "failed"],
+      blocked: ["supervisor_analyse", "completed", "failed"],
+      completed: [],
+      failed: [],
+    }
+
+    return validTransitions[from]?.includes(to) ?? false
   }
 
   saveCheckpoint(): WorkflowCheckpoint {

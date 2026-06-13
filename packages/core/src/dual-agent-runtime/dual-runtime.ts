@@ -17,6 +17,22 @@ export interface DualAgentRuntimeOptions {
   workerSystemPrompt: string
   supervisorSystemPrompt: string
   config: DualAgentRuntimeConfig
+  workerConfig: {
+    apiKey: string
+    baseUrl: string
+    model: string
+    maxTokens: number
+    temperature: number
+    provider?: string
+  }
+  supervisorConfig: {
+    apiKey: string
+    baseUrl: string
+    model: string
+    maxTokens: number
+    temperature: number
+    provider?: string
+  }
 }
 
 export class DualAgentRuntime {
@@ -35,6 +51,7 @@ export class DualAgentRuntime {
       systemPrompt: options.workerSystemPrompt,
       contextWindow: 128_000,
       maxContextRounds: 20,
+      config: options.workerConfig,
     })
 
     this.supervisor = new AgentRuntime({
@@ -43,6 +60,7 @@ export class DualAgentRuntime {
       systemPrompt: options.supervisorSystemPrompt,
       contextWindow: 128_000,
       maxContextRounds: 20,
+      config: options.supervisorConfig,
     })
 
     this.workflow = {

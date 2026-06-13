@@ -1,6 +1,6 @@
 import type { AgentRole } from "../agent-profile/types.js"
 import type { ChatMessage } from "../types.js"
-import type { LoopEvent, ChatClient } from "../interface.js"
+import type { LoopEvent, ChatClient, SessionStats } from "../interface.js"
 import { ContextManager } from "../context/manager.js"
 import type { AgentRuntimeState, AgentRuntimeStatus } from "./types.js"
 
@@ -10,6 +10,14 @@ export interface AgentRuntimeOptions {
   systemPrompt: string
   contextWindow: number
   maxContextRounds: number
+  config: {
+    apiKey: string
+    baseUrl: string
+    model: string
+    maxTokens: number
+    temperature: number
+    provider?: string
+  }
 }
 
 export class AgentRuntime {
@@ -21,9 +29,9 @@ export class AgentRuntime {
   private currentTask?: string
   private startTime: number = 0
   private abortController?: AbortController
-  private messages: ChatMessage[] = []
+  private config: AgentRuntimeOptions["config"]
 
-  private stats = {
+  private stats: SessionStats = {
     promptTokens: 0,
     completionTokens: 0,
     cacheHitTokens: 0,
@@ -37,7 +45,9 @@ export class AgentRuntime {
     this.role = options.role
     this.client = options.client
     this.systemPrompt = options.systemPrompt
+    this.config = options.config
     this.ctx = new ContextManager(options.maxContextRounds, options.contextWindow)
+    this.ctx.prefix.build(this.systemPrompt)
   }
 
   getRole(): AgentRole {
@@ -54,6 +64,7 @@ export class AgentRuntime {
 
   setSystemPrompt(prompt: string): void {
     this.systemPrompt = prompt
+    this.ctx.prefix.build(prompt)
   }
 
   getMessages(): ChatMessage[] {
@@ -86,11 +97,11 @@ export class AgentRuntime {
 
       const messages = this.ctx.buildMessages()
       const stream = this.client.chatCompletionsStream(messages, {
-        apiKey: "",
-        baseUrl: "",
-        model: "default",
-        temperature: 0.3,
-        maxTokens: 8192,
+        apiKey: this.config.apiKey,
+        baseUrl: this.config.baseUrl,
+        model: this.config.model,
+        temperature: this.config.temperature,
+        maxTokens: this.config.maxTokens,
       })
 
       let finalContent = ""
@@ -107,6 +118,12 @@ export class AgentRuntime {
         } else if (event.type === "done") {
           this.ctx.log.append({ role: "assistant", content: finalContent })
           yield { role: "assistant_final", content: finalContent }
+        } else if (event.type === "usage") {
+          this.stats.promptTokens += event.usage.promptTokens ?? 0
+          this.stats.completionTokens += event.usage.completionTokens ?? 0
+          this.stats.cacheHitTokens += event.usage.cacheHitTokens ?? 0
+          this.stats.cacheMissTokens += event.usage.cacheMissTokens ?? 0
+          this.stats.apiCalls++
         }
       }
 
@@ -133,7 +150,8 @@ export class AgentRuntime {
   reset(): void {
     this.status = "idle"
     this.currentTask = undefined
-    this.messages = []
+    this.ctx = new ContextManager(this.ctx.getMaxRounds(), this.ctx.getContextWindow())
+    this.ctx.prefix.build(this.systemPrompt)
     this.stats = {
       promptTokens: 0,
       completionTokens: 0,

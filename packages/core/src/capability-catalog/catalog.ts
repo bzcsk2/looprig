@@ -188,6 +188,11 @@ export class RoleCapabilityView {
 
     tools = this.applyAllowDenyFilter(tools)
 
+    // 强制 Supervisor 只读：移除所有 write 和 exec 级别的工具
+    if (this.options.role === "supervisor") {
+      tools = tools.filter((cap) => cap.tier === "read")
+    }
+
     return tools
   }
 

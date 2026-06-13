@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs"
-import { resolve, join } from "node:path"
+import { resolve, join, normalize } from "node:path"
 import type { DualSessionSnapshot, SessionCheckpoint } from "./types.js"
 import { SESSION_VERSION } from "./types.js"
 import { DualSession } from "./session.js"
@@ -18,7 +18,30 @@ export class DualSessionStore {
     this.sessionDir = options.sessionDir ?? SESSION_DIR
   }
 
+  private validateSessionId(sessionId: string): void {
+    // Check for path traversal attempts
+    if (sessionId.includes("..") || sessionId.includes("/") || sessionId.includes("\\")) {
+      throw new Error(`Invalid session ID: ${sessionId}`)
+    }
+
+    // Check for absolute paths
+    if (sessionId.startsWith("/") || sessionId.match(/^[A-Za-z]:\\/)) {
+      throw new Error(`Invalid session ID: ${sessionId}`)
+    }
+
+    // Check for null bytes
+    if (sessionId.includes("\0")) {
+      throw new Error(`Invalid session ID: ${sessionId}`)
+    }
+
+    // Check for URL-encoded characters
+    if (sessionId.includes("%") || sessionId.includes("&") || sessionId.includes("?")) {
+      throw new Error(`Invalid session ID: ${sessionId}`)
+    }
+  }
+
   private getSessionPath(sessionId: string): string {
+    this.validateSessionId(sessionId)
     return join(this.sessionDir, sessionId, DUAL_SESSION_FILE)
   }
 
@@ -34,6 +57,9 @@ export class DualSessionStore {
       writeFileSync(this.getSessionPath(sessionId), JSON.stringify(checkpoint, null, 2), "utf8")
       return true
     } catch (error) {
+      if (error instanceof Error && error.message.startsWith("Invalid session ID:")) {
+        throw error
+      }
       console.error("[dual-session] Failed to save session:", error)
       return false
     }
@@ -71,6 +97,7 @@ export class DualSessionStore {
 
   delete(sessionId: string): boolean {
     try {
+      this.validateSessionId(sessionId)
       const dir = join(this.sessionDir, sessionId)
       if (existsSync(dir)) {
         const { rmSync } = require("node:fs")

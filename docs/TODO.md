@@ -13,47 +13,45 @@
 
 ## 0. 当前状态
 
-已归档到 `DONE.md`，不得重复领取：
-
-- `RM-10` 至 `RM-30`
-- `QST-10`、`PERM-10`
-- `DRF-00` 至 `DRF-80`
-- `FG-60-R`
-- `CTX-70` 文档部分
-- 已完成的 TUI、Harness、Plugin、MCP、AgentMemory 和滚动修复
-- `DA-00` 永久双角色配置与迁移
-- `DA-10` CapabilityCatalog 与 RoleCapabilityView
-- `DA-20` WorkerRuntime/SupervisorRuntime 长期双运行时
-- `DA-30` 固定 WorkflowCoordinator 与版本化通信
-- `DA-40` 双角色 Session、Workflow checkpoint 与恢复
-- `DA-50` TUI Tab 双向沟通与 Workflow 状态栏
-- `DA-60` 兼容清理、端到端测试与发布门禁
-
 当前开发主线：
 
-> 将现有 Build/Plan 单引擎模式升级为永久 Worker/Supervisor 双角色运行时，并实现固定 Workflow 与 TUI 双向沟通。
+> 修复并接通已经创建但仍处于独立骨架状态的双角色模块，将现有 Build/Plan 单引擎主路径真正升级为永久 Worker/Supervisor 双角色运行时。
 
 固定领取顺序：
 
 ```text
-DA-00 永久双角色配置与迁移
-  → DA-10 CapabilityCatalog 与角色能力视图
-  → DA-20 长期双 Agent Runtime
-  → DA-30 固定 WorkflowCoordinator
-  → DA-40 双角色 Session 与恢复
-  → DA-50 TUI Tab 双向沟通与 Workflow 状态栏
-  → DA-60 兼容清理、端到端验收与发布门禁
+DA-R0 基线与完成状态纠正
+  → DA-R1 Agent Profile 加固
+  → DA-R2 CapabilityCatalog 接线与 Supervisor 强制只读
+  → DA-R3 复用现有执行循环接通双 Runtime
+  → DA-R4 收敛并接通唯一 WorkflowCoordinator
+  → DA-R5 双角色 Session 安全与恢复接线
+  → DA-R6 TUI 双角色交互接线
+  → DA-R7 旧主路径迁移、端到端验收与发布门禁
 ```
 
 | 顺序 | 任务 | 优先级 | 依赖 | 状态 |
 |---|---|---|---|---|
-| 1 | `DA-00` 永久双角色配置与旧配置迁移 | P0 | 无 | ✅ |
-| 2 | `DA-10` CapabilityCatalog 与 RoleCapabilityView | P0 | DA-00 | ✅ |
-| 3 | `DA-20` WorkerRuntime/SupervisorRuntime 长期双运行时 | P0 | DA-10 | ✅ |
-| 4 | `DA-30` 固定 WorkflowCoordinator 与版本化通信 | P0 | DA-20 | ✅ |
-| 5 | `DA-40` 双角色 Session、Workflow checkpoint 与恢复 | P1 | DA-30 | ✅ |
-| 6 | `DA-50` TUI Tab 双向沟通与 Workflow 状态栏 | P1 | DA-40 | ✅ |
-| 7 | `DA-60` 兼容清理、端到端测试与发布门禁 | P1 | DA-50 | ✅ |
+| 1 | `DA-R0` 基线、失败测试与完成状态纠正 | P0 | 无 | ✅ |
+| 2 | `DA-R1` Agent Profile 严格校验与安全迁移 | P0 | DA-R0 | ✅ |
+| 3 | `DA-R2` CapabilityCatalog 接线与角色安全边界 | P0 | DA-R1 | ✅ |
+| 4 | `DA-R3` 双 Runtime 真实执行能力与主路径接线 | P0 | DA-R2 | ✅ |
+| 5 | `DA-R4` 唯一 WorkflowCoordinator 与治理闭环 | P0 | DA-R3 | ✅ |
+| 6 | `DA-R5` 双角色 Session 安全持久化与恢复 | P1 | DA-R4 | ✅ |
+| 7 | `DA-R6` TUI 双角色交互和状态栏真实接线 | P1 | DA-R5 | ⏳ |
+| 8 | `DA-R7` 旧路径迁移、端到端测试与发布门禁 | P1 | DA-R6 | ⏳ |
+
+审查后的原任务状态：
+
+| 原任务 | 当前真实状态 | 不得宣称完成的原因 |
+|---|---|---|
+| `DA-00` | 部分完成 | Schema、迁移和保存边界仍不严格 |
+| `DA-10` | 部分完成 | 未接入启动链路，Supervisor 只读未强制 |
+| `DA-20` | 骨架 | 空 API 参数、无工具循环、未接入主路径 |
+| `DA-30` | 骨架 | 未执行合法转换、计划、验证门和轮次约束 |
+| `DA-40` | 骨架 | 独立存储未接线，写入和路径处理不安全 |
+| `DA-50` | 组件骨架 | 新组件未渲染到 `App.tsx`，测试未覆盖真实组件 |
+| `DA-60` | 未完成 | `ReasonixEngine.currentAgent` 仍驱动生产主路径 |
 
 ---
 
@@ -94,244 +92,126 @@ git diff --check
 
 ---
 
-## 2. DA-00：永久双角色配置与迁移
+## 2. 审查后修复与接线计划
 
-### 目标
+本节是当前唯一可领取的双角色开发清单。已落地部分和历史目标规格见 `DONE.md`、设计文档与 Git 历史。
 
-将现有全局或单会话 Agent 配置升级为两套永久角色配置：
+### DA-R0：建立真实基线与失败测试
 
-```ts
-type AgentRole = "worker" | "supervisor"
+- 将 `CodeReviewReport.md` 仅作为线索使用，不沿用其中"DA-00 至 DA-50 已完成"的判断。
+- 为以下缺陷先增加能够失败的测试：空模型参数、真实流事件、工具调用、Supervisor 写工具、非法 Workflow 转换、9 轮上限、Session 路径穿越、真实 TUI 组件未接线。
+- 测试必须 import 和执行生产实现；禁止在测试文件中重新实现 `buildPhaseChain`、状态映射或权限判断后只测试副本。
+- 记录当前全仓测试中的预置失败；不得把无关失败伪装成本任务回归。
 
-interface AgentRoleProfile {
-  role: AgentRole
-  modelTarget: string
-  harness: "strict" | "normal" | "loose"
-  thinking: "off" | "open" | "high"
-  contextWindow?: number
-  maxTokens?: number
-  temperature?: number
-  tools: { allow?: string[]; deny?: string[] }
-  plugins: string[]
-  mcpServers: string[]
-  skills: string[]
-}
-```
+**验收：新增测试在修复前能够证明缺陷，且任务状态不再以"存在文件/导出符号"为完成依据。**
 
-项目配置文件固定为 `.deepreef/agents.json`。
+**真实缺陷发现（7 个失败测试）：**
 
-### 实施
+1. **Agent Profile 缺陷**：
+   - 接受未知字段（应该拒绝） - `validateAgentProfiles` 没有启用严格校验
+   - 不强制角色字段匹配 - `worker.role` 可以是 "supervisor"
 
-- 新增 `packages/core/src/agent-profile/types.ts`。
-- 新增 `packages/core/src/agent-profile/schema.ts`。
-- 新增 `packages/core/src/agent-profile/store.ts`。
-- 使用 Zod 严格校验和版本字段。
-- API Key 不写入角色配置，继续由 ModelTarget key policy 和环境变量解析。
-- `contextWindow` 必须 clamp 到 ModelTarget 声明窗口。
-- 将旧 `build/plan`、`ui-settings.agent`、全局 thinking、项目 harness 和 activeSkills 幂等迁移为两套配置。
-- 保存时只写 `worker/supervisor`；旧名称只读兼容。
-- 修改配置从对应角色下一次调用生效，不中断正在执行的请求。
+2. **CapabilityCatalog 缺陷**：
+   - `RoleCapabilityView` 没有强制 Supervisor 只读
+   - Supervisor 可以通过配置允许写工具
 
-### 验收
+3. **DualAgentRuntime 缺陷**：
+   - 配置参数不完整（缺少 `maxWorkflowRounds`）
+   - 空模型参数被接受
 
-- 两个角色重启后分别恢复模型、Harness、Thinking、上下文和能力配置。
-- 修改 Worker 不影响 Supervisor，反向同理。
-- 非法配置给出诊断并安全回退。
-- 旧配置迁移幂等，不丢用户选择。
+4. **WorkflowCoordinator 缺陷**：
+   - `transition` 方法不返回 `success` 属性
+   - 9 轮上限没有被正确执行
+   - 非法转换没有被拒绝
 
----
+5. **DualSession 缺陷**：
+   - 路径穿越没有被拒绝
+   - `DualSessionStore.save` 接受恶意路径
 
-## 3. DA-10：CapabilityCatalog 与角色能力视图
+### DA-R1：Agent Profile 严格校验与安全迁移
 
-### 目标
+- 为 Agent Profile 顶层和嵌套对象启用 Zod 严格校验，拒绝未知字段。
+- 强制 `worker.role === "worker"`、`supervisor.role === "supervisor"`。
+- 保存前执行同一 Schema 校验；非法配置不得落盘。
+- `contextWindow` 和 `maxTokens` 按对应 `ModelTarget` 能力 clamp，并产生诊断。
+- 修复默认配置浅复制污染；迁移和读取返回深层独立对象。
+- 从真实旧配置来源迁移 harness、thinking、skills 等字段；迁移必须幂等且不写 API Key。
 
-共享加载底层能力，按角色过滤暴露：
+验收：覆盖未知字段、角色错配、超限窗口、重复迁移、默认对象不被修改和非法保存拒绝。
 
-```text
-CapabilityCatalog
-  ├─ builtin tools
-  ├─ plugin tools/hooks/assets
-  ├─ MCP tools/resources
-  └─ skills
+### DA-R2：CapabilityCatalog 接线与 Supervisor 强制只读
 
-RoleCapabilityView(worker)
-RoleCapabilityView(supervisor)
-```
+- 将 CapabilityCatalog 接入 CLI/Engine 的真实 Plugin、MCP、Skill 和 builtin tool 启动链路；底层能力只初始化一次。
+- 不再仅靠工具名称猜测安全级别。优先使用显式 capability metadata；没有 metadata 的工具默认按更危险等级处理。
+- RoleCapabilityView 同时过滤 Tool、Plugin、MCP server 和 Skill，而不只是工具数组。
+- Supervisor 在 Schema 和 Runtime 两层强制只读；即使配置 allow 写工具，也必须拒绝 write、patch、exec、危险 shell 和权限 bypass。
+- 删除或改写“Supervisor 可以配置写工具”和“没有 deny 就允许全部工具”的现有错误测试。
+- Hook 和能力快照携带 role/workflow metadata。
 
-### 实施
+验收：同一 Plugin/MCP 不重复启动；Supervisor 无法通过配置、别名工具或名称误分类获得写能力。
 
-- 从当前 CLI 启动接线抽出统一 `CapabilityCatalog`。
-- PluginRuntime、McpHost、MCP 连接和 Plugin Hook 只初始化一次。
-- 根据角色配置过滤工具、Plugin、MCP server 和 Skill。
-- Supervisor 最终强制只读；配置错误也不得获得写工具、危险 Shell、直接 patch 或权限 bypass。
-- Worker 能力继续经过现有权限、安全和治理入口。
-- Hook 事件携带 role/workflow metadata。
+### DA-R3：复用现有执行循环接通双 Runtime
 
-### 验收
+- 禁止在 `AgentRuntime.submit()` 中复制实现第二套简化工具循环。
+- 从现有 `ReasonixEngine.submit()`、`runLoop`、`StreamingToolExecutor`、PermissionEngine、Harness、Verification Gate 和 Session 入口抽取可复用的角色运行内核，或让 AgentRuntime 委托现有内核。
+- 从角色 Profile 和 ModelTarget resolver 获取真实 client、provider、model、thinking、temperature、maxTokens 和 contextWindow；删除空 API 参数及硬编码 `"default"`。
+- 正确消费现有 ChatClient 的真实流事件，包括 delta、final、usage、tool call、错误和取消。
+- system prompt 必须进入角色独立 ImmutablePrefix；两个角色拥有独立 ContextManager 和历史。
+- 修复 `reset()` 未清 Context、interrupt signal 未传递、cancelled 被 completed 覆盖、stats 不更新等问题。
+- `DualAgentRuntime` 不再维护与 WorkflowCoordinator 重复的工作流状态，只负责两个长期角色的生命周期和路由。
 
-- 同一 MCP/Plugin 不会因两个角色重复启动。
-- 两角色能力清单不同且符合配置。
-- Supervisor 配置写工具时被 schema 和 runtime 双重拒绝。
+验收：Worker 能真实执行工具并经过权限/Harness/Verification；Supervisor 只能产生文本与结构化 Advice；中断一方不影响另一方。
 
----
+### DA-R4：唯一 WorkflowCoordinator 与治理闭环
 
-## 4. DA-20：长期双 Agent Runtime
+- WorkflowCoordinator 成为唯一工作流状态机；删除 DualAgentRuntime 内重复的 phase/iteration 状态。
+- 明确定义并强制合法转换；非法转换返回结构化错误，不修改状态。
+- 实际执行 `requireSupervisorPlan`、`requireVerificationGate`、`maxRounds` 和 `StartWorkflowOptions.config`。
+- 串联现有 TaskLedger、EvidenceBundle、Verification Gate 和 SupervisorAdvice；提供记录/更新 evidence 的明确入口。
+- 每次 TaskLedger 变化递增 `ledgerVersion`；Advice 仅在版本匹配和 Worker 安全点采用。
+- checkpoint 保存 evidence、advice、phase、iteration、ledgerVersion 和阻塞原因。
+- 不修改调用者传入的 Advice 对象。
+- 9 轮上限、无进展、预算耗尽和角色不可用必须进入 blocked/ask_user。
 
-### 目标
+验收：覆盖完整成功、revise、stale advice、非法转换、验证失败、Supervisor 不可用、9 轮阻塞和恢复。
 
-将单一 `ReasonixEngine.currentAgent` 模式升级为：
+### DA-R5：双角色 Session 安全持久化与恢复
 
-```ts
-DualAgentRuntime {
-  worker: AgentRuntime
-  supervisor: AgentRuntime
-  workflow: WorkflowCoordinator
-}
-```
+- 优先扩展并复用现有 Session JSONL/checkpoint 基础设施；不得长期保留互不相识的第二套 Session 真相源。
+- 持久化 Worker/Supervisor 独立消息、角色配置引用、Workflow checkpoint、TaskLedger、Evidence 和 Advice 采用结果。
+- 改为 best-effort 原子写入或复用现有异步 SessionWriter；不得在主执行路径同步整文件写入。
+- 校验 sessionId，拒绝绝对路径、`..`、分隔符和目录逃逸；删除操作必须限定在 session 根目录内。
+- snapshot、restore 和对外读取不得暴露可修改内部状态的浅复制。
+- 恢复后不得重复执行工具或重复采用 Advice。
 
-### 实施
+验收：覆盖路径穿越、损坏文件、四个 Workflow 阶段恢复、重复 Advice 防护和两个角色历史隔离。
 
-- Worker 和 Supervisor 分别持有 ChatClient、ContextManager、ImmutablePrefix、AppendOnlyLog、VolatileScratch、压缩策略和运行状态。
-- Worker 从 Build Agent system prompt 和权限边界迁移。
-- Supervisor 从 Plan Agent 和 guided-loop prompt 迁移。
-- 用户与 Supervisor 的讨论不得追加到 Worker 历史。
-- 新增 `sendTo(role, input)`、`interruptRole(role)` 和 `getRoleState(role)`。
-- 不使用 `AgentTool` 或一次性 Subagent 模拟两个主角色。
-- `switchAgent(build|plan)` 仅保留短期兼容适配器，映射到对话目标并发出弃用警告。
-- Supervisor 永远没有写执行器。
+### DA-R6：TUI 双角色交互和状态栏真实接线
 
-### 验收
+- 将 `DualTabSystem` 和 `WorkflowStatusBar` 真正接入 `App.tsx`、bridge 和 Core 结构化事件。
+- 两角色分别保存消息、草稿、滚动位置和滚动锁定状态；流式输出不能抢走正在查看历史的滚动位置。
+- Tab 仅在没有补全、Question、Permission 和危险确认覆盖层时切换角色。
+- WorkflowStatusBar 固定放在输入框正上方的 `bottomContent`，不得进入滚动区。
+- 阶段链只显示批准布局中的 `analyse > do > report`；Supervisor check 可作为状态体现，不新增顶部阶段。
+- 当前阶段必须在真实渲染中高亮；删除未使用 props、refs 和计算变量。
+- 测试渲染真实组件并覆盖 App 集成、Tab 优先级、独立滚动和流式输出场景。
 
-- 两个角色保持独立长对话和上下文。
-- Supervisor 流式输出不覆盖 Worker 状态和历史。
-- 中断一个角色不终止另一个角色和整个 TUI。
+验收：用户可在 Worker 输出期间切换 Supervisor 对话，切回后消息、草稿和滚动位置均保持。
 
----
+### DA-R7：旧路径迁移、端到端测试与发布门禁
 
-## 5. DA-30：固定 WorkflowCoordinator
+- 主路径切换到双角色运行时后，再删除或降级 `currentAgent`、全局 thinkingMode、全局 activeSkills 和单一 sessionStrictness。
+- `build/plan` 仅保留一个版本周期的读取迁移/命令提示适配器，不允许继续驱动生产执行。
+- 删除新旧重复状态机、重复 Session 真相源和不再使用的骨架代码。
+- 增加真实 Engine 端到端测试：角色配置加载 → Workflow → Worker 工具调用 → Supervisor Advice → 验证 → Session 恢复 → TUI 状态事件。
+- 端到端矩阵覆盖：两角色不同配置、角色能力隔离、成功/修订/失败/恢复/9 轮阻塞、Tab 独立沟通、Supervisor 无写权限、重启恢复。
+- 更新 `DONE.md` 时必须记录真实接线位置、验证命令和剩余限制；未通过端到端门禁不得标记 `DA-R7` 完成。
 
-### 固定状态机
-
-```text
-Supervisor analyse/plan
-  → Worker do
-  → Worker report/verify
-  → Supervisor check
-  → continue/revise/approve/blocked/ask_user
-  → 最多 9 轮
-```
-
-### 实施
-
-- `/run <goal>` 或明确 TUI 动作启动 Workflow；普通 Tab 对话不得自动修改项目。
-- 首轮执行前必须有 Supervisor 计划。
-- Supervisor 未配置或不可用时请求用户选择降级，不得静默跳过。
-- 扩展 EvidenceBundle、SupervisorAdvice 和 WorkflowLoopState：
-  - `workflowId`
-  - `iteration`
-  - `ledgerVersion`
-  - `basedOnLedgerVersion`
-  - Supervisor 决策字段
-- Supervisor 消费冻结 EvidenceBundle；Advice 只在 Worker 安全点采用。
-- ledgerVersion 不一致的 Advice 标记 stale，禁止注入。
-- 完成条件为 Worker 报告完成、Verification Gate 通过或明确豁免、Supervisor approve。
-- 9 轮上限、无进展、预算耗尽和角色不可用进入 blocked/ask_user。
-
-### 验收
-
-- 覆盖 approve、revise、stale Advice、Supervisor 不可用、用户改计划、9 轮上限和恢复。
-- 测试证明 Supervisor 不执行工具，Worker 不可绕过检查自行宣布完成。
+验收：通过本文件 1.3 门禁、上述端到端矩阵和真实双角色 smoke；旧单 Agent 主路径不再运行。
 
 ---
 
-## 6. DA-40：双角色 Session 与恢复
-
-### 实施
-
-- Session 记录增加 role、agentSessionId、workflow snapshot、EvidenceBundle 摘要和 Advice 采用/拒绝结果。
-- 两个角色消息分别持久化和恢复，不把 Supervisor 对话混入 Worker prefix。
-- Workflow checkpoint 恢复后继续原 iteration/phase，不重复采用同一 Advice。
-- 角色偏好保存在 `.deepreef/agents.json`；任务运行态保存在 Session/checkpoint，二者不可混用。
-
-### 验收
-
-- 在 analyse、Worker do、等待 check 和 blocked 阶段强制退出后均可恢复。
-- 恢复后角色配置、消息历史、TaskLedger 和 Workflow 进度一致。
-
----
-
-## 7. DA-50：TUI Tab 双向沟通与 Workflow 状态栏
-
-### 固定布局
-
-```text
-[Supervisor] [Worker]                         active: Worker
-...当前角色的独立对话记录...
-
-DeepReef   Workflow  [D] analyse > [W] do > [W] report  <- loops: 9 r
-┌──────────────────┬──────────────────┬──────────────────────────────┐
-│ Supervisor  wait │ Worker      work │ goal: fix all bugs           │
-└──────────────────┴──────────────────┴──────────────────────────────┘
-> 发送给 Worker
-```
-
-优先复用现有 `OrchestrationStore`、`OrchestrationSummary`、`ChoiceMenu`、TranscriptStore 和消息滚动实现，不重写 TUI 框架。
-
-### 交互
-
-- 无覆盖层、无 Question/Permission、无自动补全候选时，`Tab` 切换 Supervisor/Worker 对话和输入目标。
-- 自动补全打开时 Tab 保留原用途；Question、Permission 和危险确认优先。
-- 两个 Tab 分别保存草稿、消息列表和滚动锁定位置。
-- Workflow 状态栏固定在输入框正上方，属于 `bottomContent`；不得放在屏幕顶部或滚动消息区。
-- 状态栏固定为两行：
-  - 第一行：`DeepReef + Workflow 阶段链 + loops`
-  - 第二行：单张 `Supervisor | Worker | goal` 三段卡片
-- `[D] analyse` 表示 DeepReef 调度 Supervisor 分析；`[W] do/report` 表示 Worker 实施和报告。
-- 当前阶段通过颜色或粗体高亮。
-- 消息输出、历史滚动和 Tab 切换不得改变状态栏位置。
-- 窄终端优先截断 goal，再缩短角色状态；状态栏不得换行造成聊天区跳动。
-- 输入框和 StatusBar 明确显示当前发送目标。
-- `/talk worker|supervisor` 与 Tab 等价。
-- `/agent-config worker|supervisor` 打开角色永久配置菜单。
-- 旧 `/agent build|plan` 只显示迁移提示。
-
-### 验收
-
-- Worker 输出过程中可切到 Supervisor 交谈，再切回原滚动位置。
-- 向 Supervisor 发消息不会进入 Worker 工具上下文。
-- Workflow 运行期间 Tab 切换不暂停、不取消、不重启任一角色。
-
----
-
-## 8. DA-60：兼容清理与发布门禁
-
-### 清理
-
-- 删除主路径对 `ReasonixEngine.currentAgent`、全局 thinkingMode、全局 activeSkills 和单一 sessionStrictness 的依赖。
-- `build/plan` 仅保留一个版本周期的读取迁移适配器。
-- 更新帮助文本、命令说明、设计文档和 DONE。
-- 不得把旧模式与新双角色模式同时宣称为主架构。
-
-### 端到端矩阵
-
-1. 两角色使用不同 Provider/model/context/harness/thinking。
-2. 两角色使用不同 Tool/Plugin/MCP/Skill 能力视图。
-3. 固定 Workflow 完整成功、修订、失败、恢复和 9 轮阻塞。
-4. Tab 双向沟通、独立草稿、独立滚动、流式输出期间切换。
-5. Supervisor 无写权限、无工具执行、无隐式付费模型调用。
-6. 重启后角色配置和运行中 Workflow 正确恢复。
-
-### 完成门禁
-
-- `bun run typecheck`
-- 双角色 Core/TUI 聚焦测试
-- 真实 Engine 端到端测试
-- `bun test` 真实结果
-- `git diff --check`
-
----
-
-## 9. 待人工验收
+## 3. 待人工验收
 
 ### OS-12/13-R：macOS 与 Windows 原生体验
 
@@ -353,9 +233,9 @@ DeepReef   Workflow  [D] analyse > [W] do > [W] report  <- loops: 9 r
 
 ---
 
-## 10. 待项目负责人决定
+## 4. 待项目负责人决定
 
-以下不阻塞 `DA-00`，进入对应阶段前必须确认或采用保守默认值：
+进入对应修复阶段前必须确认或采用保守默认值：
 
 1. **远程 Supervisor 隐私**：默认关闭；首次启用明确提示 Evidence 可能包含路径、错误日志和代码片段。
 2. **付费 Oracle**：默认禁用；配置后仍需每次或每 Session 确认。
@@ -365,7 +245,7 @@ DeepReef   Workflow  [D] analyse > [W] do > [W] report  <- loops: 9 r
 
 ---
 
-## 11. 明确暂缓
+## 5. 明确暂缓
 
 除非 Benchmark 或用户明确要求，不要顺手实现：
 
