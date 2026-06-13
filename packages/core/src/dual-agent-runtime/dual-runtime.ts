@@ -2,6 +2,7 @@ import type { AgentRole } from "../agent-profile/types.js"
 import type { LoopEvent, ChatClient, AgentTool } from "../interface.js"
 import type { ChatMessage } from "../types.js"
 import { AgentRuntime } from "./runtime.js"
+import { PROVIDERS } from "../config.js"
 import type {
   AgentRuntimeState,
   DualAgentRuntimeConfig,
@@ -39,6 +40,12 @@ export interface DualAgentRuntimeOptions {
   supervisorEngine?: ReasonixEngine
 }
 
+function requiresApiKey(provider: string | undefined): boolean {
+  if (!provider) return true
+  const providerCfg = PROVIDERS[provider]
+  return providerCfg ? !providerCfg.keyless : true
+}
+
 export class DualAgentRuntime {
   private worker: AgentRuntime
   private supervisor: AgentRuntime
@@ -48,12 +55,14 @@ export class DualAgentRuntime {
   constructor(options: DualAgentRuntimeOptions) {
     this.config = options.config
 
-    // Validate required fields
-    if (!options.workerConfig?.apiKey || !options.workerConfig?.baseUrl || !options.workerConfig?.model) {
-      throw new Error("workerConfig is required with apiKey, baseUrl, and model")
+    // Validate required fields — apiKey only required for non-keyless providers
+    const workerNeedsKey = requiresApiKey(options.workerConfig?.provider)
+    const supervisorNeedsKey = requiresApiKey(options.supervisorConfig?.provider)
+    if ((workerNeedsKey && !options.workerConfig?.apiKey) || !options.workerConfig?.baseUrl || !options.workerConfig?.model) {
+      throw new Error("workerConfig is required with baseUrl and model (apiKey required for non-keyless providers)")
     }
-    if (!options.supervisorConfig?.apiKey || !options.supervisorConfig?.baseUrl || !options.supervisorConfig?.model) {
-      throw new Error("supervisorConfig is required with apiKey, baseUrl, and model")
+    if ((supervisorNeedsKey && !options.supervisorConfig?.apiKey) || !options.supervisorConfig?.baseUrl || !options.supervisorConfig?.model) {
+      throw new Error("supervisorConfig is required with baseUrl and model (apiKey required for non-keyless providers)")
     }
 
     this.worker = new AgentRuntime({
