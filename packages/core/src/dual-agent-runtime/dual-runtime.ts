@@ -43,7 +43,13 @@ export interface DualAgentRuntimeOptions {
 function requiresApiKey(provider: string | undefined): boolean {
   if (!provider) return true
   const providerCfg = PROVIDERS[provider]
-  return providerCfg ? !providerCfg.keyless : true
+  if (!providerCfg) return true
+  // 两种"不需要用户提供 key"的判定都要认：
+  //   - keyless: true          （kilo/llm7 等完全无 key 通道）
+  //   - requiresKey: false     （zen 等，有 defaultKey 兜底，用户无需提供）
+  if (providerCfg.keyless) return false
+  if (providerCfg.requiresKey === false) return false
+  return true
 }
 
 export class DualAgentRuntime {
