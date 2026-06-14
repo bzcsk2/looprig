@@ -30,7 +30,7 @@ import { SkillModal } from './SkillModal.js';
 import { ContextModal } from './ContextModal.js';
 import { formatStatus } from './status/format.js';
 import { t, setLocale } from './i18n/index.js';
-import { loadTuiSettings, saveTuiSettings } from './settings.js';
+import { loadTuiSettings, saveTuiSettings, type WorkflowMode } from './settings.js';
 import {
   buildHelpText,
   parseSlashCommand,
@@ -426,6 +426,12 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
     supervisorStatus: 'idle',
     workerStatus: 'idle',
   });
+  // 工作流模式：alone（单 agent）/ subagent（supervisor 自主调度）/ loop（固定双角色编排）
+  // 从 ui-settings.json 恢复上次选择，缺省 alone。
+  const [workflowMode, setWorkflowMode] = useState<WorkflowMode>(persistedSettings.workflowMode ?? 'alone');
+  // loop 模式下，用户选了 loop 后下一条非斜杠消息作为 goal 启动编排
+  const [pendingWorkflowGoal, setPendingWorkflowGoal] = useState(false);
+  const [showWorkflowMenu, setShowWorkflowMenu] = useState(false);
 
   // DA-R6: 检查是否有覆盖层阻止 Tab 切换
   const isOverlayActive = showAutocomplete
@@ -437,6 +443,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
     || showSkillModal
     || showContextModal
     || showHarnessMenu
+    || showWorkflowMenu
     || !!bridgeState.permissionPrompt
     || !!bridgeState.questionPrompt;
 
@@ -624,40 +631,9 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
       }
       return;
     }
-    // DA-R6: /run 命令 — 启动 Workflow（WF-FIX-20: 通过 bridge.runWorkflow）
-    if (command?.name === 'run') {
-      setWorkflowState({
-        phase: 'supervisor_analyse',
-        iteration: 1,
-        maxRounds: 9,
-        goal: command.goal,
-        supervisorStatus: 'analyse',
-        workerStatus: 'idle',
-      });
-      appendMessage({
-        role: 'assistant' as const,
-        content: `Starting workflow for: ${command.goal}\nSupervisor analysing...`,
-      });
-      scrollRef.current?.scrollToBottom();
-      bridge.runWorkflow(command.goal, (phase, iteration) => {
-        const phaseMap: Record<string, { supervisor: WorkflowState['supervisorStatus']; worker: WorkflowState['workerStatus'] }> = {
-          supervisor_analyse: { supervisor: 'analyse', worker: 'idle' },
-          supervisor_check: { supervisor: 'analyse', worker: 'idle' },
-          supervisor_intervene: { supervisor: 'analyse', worker: 'do' },
-          worker_do: { supervisor: 'analyse', worker: 'do' },
-          worker_report: { supervisor: 'waiting', worker: 'report' },
-          waiting_user: { supervisor: 'waiting', worker: 'idle' },
-          blocked: { supervisor: 'blocked', worker: 'blocked' },
-        };
-        const mapped = phaseMap[phase] ?? { supervisor: 'idle' as const, worker: 'idle' as const };
-        setWorkflowState(prev => ({
-          ...prev,
-          phase: phase as WorkflowPhase,
-          iteration,
-          supervisorStatus: mapped.supervisor,
-          workerStatus: mapped.worker,
-        }));
-      });
+    // /workflow 命令 — 打开工作流模式选择菜单（alone / subagent / loop）
+    if (command?.name === 'workflow') {
+      setShowWorkflowMenu(true);
       return;
     }
     // DA-R6: /talk 命令 — 切换输入目标角色
@@ -677,6 +653,44 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
           content: `Input target switched to: ${newRole}`,
         });
       }
+      return;
+    }
+    // loop 模式 goal 收集：用户选了 loop 后，下一条非斜杠消息作为 goal 启动编排
+    if (pendingWorkflowGoal) {
+      setPendingWorkflowGoal(false);
+      const goal = submitted;
+      setWorkflowState({
+        phase: 'supervisor_analyse',
+        iteration: 1,
+        maxRounds: 9,
+        goal,
+        supervisorStatus: 'analyse',
+        workerStatus: 'idle',
+      });
+      appendMessage({
+        role: 'assistant' as const,
+        content: `Starting workflow for: ${goal}\nSupervisor analysing...`,
+      });
+      scrollRef.current?.scrollToBottom();
+      bridge.runWorkflow(goal, (phase, iteration) => {
+        const phaseMap: Record<string, { supervisor: WorkflowState['supervisorStatus']; worker: WorkflowState['workerStatus'] }> = {
+          supervisor_analyse: { supervisor: 'analyse', worker: 'idle' },
+          supervisor_check: { supervisor: 'analyse', worker: 'idle' },
+          supervisor_intervene: { supervisor: 'analyse', worker: 'do' },
+          worker_do: { supervisor: 'analyse', worker: 'do' },
+          worker_report: { supervisor: 'waiting', worker: 'report' },
+          waiting_user: { supervisor: 'waiting', worker: 'idle' },
+          blocked: { supervisor: 'blocked', worker: 'blocked' },
+        };
+        const mapped = phaseMap[phase] ?? { supervisor: 'idle' as const, worker: 'idle' as const };
+        setWorkflowState(prev => ({
+          ...prev,
+          phase: phase as WorkflowPhase,
+          iteration,
+          supervisorStatus: mapped.supervisor,
+          workerStatus: mapped.worker,
+        }));
+      });
       return;
     }
     const taggedSkillNames = extractSkillTags(submitted);
@@ -925,6 +939,43 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
     );
   }
 
+  // ---- 覆盖层：工作流模式选择菜单（当 showWorkflowMenu 为 true 时显示） ----
+  if (showWorkflowMenu) {
+    return (
+      <ChoiceMenu
+        title="Workflow mode"
+        subtitle={`Current: ${workflowMode}`}
+        items={[
+          { value: "alone", label: "alone", description: "只用当前 agent，普通对话模式" },
+          { value: "subagent", label: "subagent", description: "supervisor 自主调度，按需派 worker 子 agent 执行" },
+          { value: "loop", label: "loop", description: "固定双角色编排：supervisor 分析→worker 执行→汇报→检查" },
+        ]}
+        onChoose={(value) => {
+          const mode = value as WorkflowMode;
+          setWorkflowMode(mode);
+          saveTuiSettings({ workflowMode: mode });
+          setShowWorkflowMenu(false);
+          if (mode === 'loop') {
+            // loop 模式需要 goal：标记下一条非斜杠消息作为 goal
+            setPendingWorkflowGoal(true);
+            appendMessage({
+              role: 'assistant' as const,
+              content: `Workflow mode: loop\n请输入本次工作流的目标（goal），回车启动编排。`,
+            });
+          } else {
+            // 切回 alone/subagent 时重置 workflow 状态
+            setWorkflowState(prev => ({ ...prev, phase: 'idle', goal: '', iteration: 0, supervisorStatus: 'idle', workerStatus: 'idle' }));
+            appendMessage({
+              role: 'assistant' as const,
+              content: `Workflow mode: ${mode}`,
+            });
+          }
+        }}
+        onCancel={() => setShowWorkflowMenu(false)}
+      />
+    );
+  }
+
   // ---- 覆盖层：技能管理弹窗（当 showSkillModal 为 true 时显示） ----
   if (showSkillModal) {
     return (
@@ -1031,6 +1082,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
       <WorkflowStatusBar
         workflow={workflowState}
         activeRole={activeRole}
+        workflowMode={workflowMode}
         width={process.stdout.columns ?? 80}
       />
       {showAutocomplete && (

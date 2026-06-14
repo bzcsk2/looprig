@@ -38,6 +38,8 @@ export interface WorkflowState {
 export interface WorkflowStatusBarProps {
   workflow: WorkflowState;
   activeRole?: 'worker' | 'supervisor';
+  /** 当前工作流模式：alone（单 agent）/ subagent（supervisor 自主调度）/ loop（固定双角色编排） */
+  workflowMode?: 'alone' | 'subagent' | 'loop';
   width?: number;
 }
 
@@ -80,14 +82,18 @@ function truncateText(text: string, maxWidth: number): string {
 export function WorkflowStatusBar({
   workflow,
   activeRole,
+  workflowMode = 'alone',
   width = 80,
 }: WorkflowStatusBarProps) {
-  const { phase, iteration, maxRounds, goal, supervisorStatus, workerStatus } = workflow;
+  const { phase, goal, supervisorStatus, workerStatus } = workflow;
 
-  // 第一行：DeepReef + Workflow 阶段链 + loops
-  const phaseDisplay = PHASE_DISPLAY[phase];
-  const phaseChain = buildPhaseChain(phase);
-  const loopsText = `loops: ${iteration}/${maxRounds}`;
+  // 当前工作流模式显示（替代原 loops 计数）
+  const MODE_DISPLAY: Record<string, { label: string; color: string }> = {
+    alone: { label: 'alone', color: FG.faint },
+    subagent: { label: 'subagent', color: TONE.accent },
+    loop: { label: 'loop', color: TONE.brand },
+  };
+  const modeDisplay = MODE_DISPLAY[workflowMode] ?? MODE_DISPLAY.alone;
 
   // 第二行：Supervisor | Worker | goal 三段卡片
   const supervisorDisplay = ROLE_STATUS_DISPLAY[supervisorStatus] ?? ROLE_STATUS_DISPLAY.idle;
@@ -97,49 +103,49 @@ export function WorkflowStatusBar({
   const goalMaxWidth = Math.max(10, width - 40);
 
   return (
-    <Box width="100%" flexDirection="column">
-      {/* 第一行：DeepReef + 阶段链 + loops */}
-      <Box width="100%" flexDirection="row" paddingX={1}>
-        <Text bold color={TONE.brand}>DeepReef</Text>
-        <Text color={FG.meta}>{` ${phaseChain} `}</Text>
-        <Box flexGrow={1} />
-        <Text color={FG.faint}>{loopsText}</Text>
+    <Box width="100%" flexDirection="row" paddingX={1}>
+      <Text color={FG.faint}>{' | '}</Text>
+      <Text bold color={modeDisplay.color as any}>{modeDisplay.label}</Text>
+      <Text color={FG.faint}>{' | '}</Text>
+
+      <Box flexDirection="row" alignItems="center">
+        <Text color={FG.faint}>Supervisor</Text>
+        <Box
+          backgroundColor={activeRole === 'supervisor' ? TONE.brand : FG.faint}
+          paddingX={1}
+        >
+          <Text
+            bold={activeRole === 'supervisor'}
+            color={activeRole === 'supervisor' ? '#000' : supervisorDisplay.color as any}
+          >
+            {supervisorDisplay.label}
+          </Text>
+        </Box>
       </Box>
 
-      {/* 第二行：Supervisor | Worker | goal 三段卡片 */}
-      <Box width="100%" flexDirection="row" paddingX={1}>
-        {/* Supervisor 卡片 */}
+      <Text color={FG.faint}>{' | '}</Text>
+
+      <Box flexDirection="row" alignItems="center">
+        <Text color={FG.faint}>Worker</Text>
         <Box
-          borderStyle="round"
-          borderColor={activeRole === 'supervisor' ? TONE.brand : FG.faint}
+          backgroundColor={activeRole === 'worker' ? TONE.ok : FG.faint}
           paddingX={1}
         >
-          <Text bold={activeRole === 'supervisor'} color={supervisorDisplay.color as any}>
-            Supervisor {supervisorDisplay.label}
+          <Text
+            bold={activeRole === 'worker'}
+            color={activeRole === 'worker' ? '#000' : workerDisplay.color as any}
+          >
+            {workerDisplay.label}
           </Text>
         </Box>
+      </Box>
 
-        <Text color={FG.faint}>{' | '}</Text>
+      <Text color={FG.faint}>{' | '}</Text>
 
-        {/* Worker 卡片 */}
-        <Box
-          borderStyle="round"
-          borderColor={activeRole === 'worker' ? TONE.ok : FG.faint}
-          paddingX={1}
-        >
-          <Text bold={activeRole === 'worker'} color={workerDisplay.color as any}>
-            Worker {workerDisplay.label}
-          </Text>
-        </Box>
-
-        <Text color={FG.faint}>{' | '}</Text>
-
-        {/* Goal */}
-        <Box flexGrow={1}>
-          <Text color={FG.sub}>
-            goal: {truncateText(goal, goalMaxWidth)}
-          </Text>
-        </Box>
+      <Box flexGrow={1}>
+        <Text color={FG.sub}>
+          goal: {truncateText(goal, goalMaxWidth)}
+        </Text>
       </Box>
     </Box>
   );

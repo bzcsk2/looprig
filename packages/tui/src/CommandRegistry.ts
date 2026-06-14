@@ -18,6 +18,7 @@ export const SLASH_COMMANDS: SlashCommand[] = [
   { name: '/context', description: 'configure context trimming/compact' },
   { name: '/thinking', description: 'set thinking mode (off/open/high)' },
   { name: '/harness', description: 'set harness strictness (strict/normal/loose)' },
+  { name: '/workflow', description: 'switch workflow mode (alone/subagent/loop)' },
 ];
 
 export function filterCommands(query: string): SlashCommand[] {
