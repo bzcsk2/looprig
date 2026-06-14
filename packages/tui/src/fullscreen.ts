@@ -10,11 +10,15 @@ export function isFullscreenEnvEnabled(): boolean {
 
 /**
  * 是否启用鼠标跟踪（wheel / click / drag）。
- * Alternate Screen 没有终端原生 scrollback，因此默认必须开启，
- * 让消息区 ScrollBox 能收到滚轮事件。可用 =0 显式关闭。
+ *
+ * 默认关闭。Alternate Screen 没有终端原生 scrollback，开启鼠标跟踪后
+ * ScrollBox 能接收滚轮事件来滚动消息区；但开启也会拦截终端原生的文本
+ * 选择/复制行为，部分用户更希望保留终端原生选择能力。
+ *
+ * 用 DEEPREEF_ENABLE_MOUSE=1 显式开启（含滚轮滚动）。
  */
 export function isMouseTrackingEnabled(): boolean {
-  return process.env.DEEPCODE_ENABLE_MOUSE !== '0';
+  return process.env.DEEPREEF_ENABLE_MOUSE === '1';
 }
 
 export function isFullscreenActive(): boolean {
