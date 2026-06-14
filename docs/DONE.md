@@ -4331,3 +4331,157 @@ DA-R 系列任务（DA-R0 到 DA-R7）已完成双角色运行时的修复、集
 | P3 | DA-R12 历史线程化 | 新增 `assignHistoryThread` |
 | P3 | DA-01 示例文件 | 创建 `examples/dual-agent-basic.ts` |
 | P3 | Bug #5 超时 | 为 QuestionService 添加超时机制 |
+
+---
+
+## 62. TUI 面板精简与 per-role 模型/Agent 绑定（2026-06-14）
+
+本节记录围绕"双角色（Worker/Supervisor）可独立配置模型与 Agent 身份"这一主线落地的 TUI 改动与配套修复。所有提交均在本地 `windev` 分支，未推送远程。
+
+### 62.1 提交记录
+
+| 提交 | 标题 | 范围 |
+|------|------|------|
+| `0089504` | feat(tui): remove orchestration summary panel, surface loop count in status bar | TUI |
+| `48707af` | feat(tui): per-role model config + remove DualTabSystem visual indicator | core/cli/tui |
+| `f3f8032` | feat: per-role agent identity binding + remove build/plan | core/tui |
+| `ec19348` | fix(dual-runtime): requiresApiKey must honor requiresKey:false providers | core |
+
+### 62.2 删除三栏编排概览面板（OrchestrationSummary）
+
+**目标**：移除消息区顶部占用纵向空间的 `Workers | Supervisor | Loop` 三栏卡片（显示 `No active workers` / `No supervisor` / `OBSERVE`），保留 loop 轮次计数。
+
+**实现边界：**
+
+- 删除 `packages/tui/src/components/orchestration/OrchestrationSummary.tsx`（237 行）。
+- `OrchestrationContext.tsx` 原从此文件导入 `SupervisorDisplayData` / `SummaryLoopPhase` 两个类型，改为就地内联定义，保持 `useOrchestrationLoop()` 等 hook 签名不变。
+- `App.tsx` 删除 `OrchestrationSummaryFromStore` 包装组件及其渲染调用；清理不再使用的 `useOrchestrationSupervisors` 导入。
+- **loop 计数迁移到底部状态栏**：`StatusBar.tsx` 新增可选 `loopAttempt?: number` prop，渲染为 `Loop #N`（brand 蓝加粗）。订阅点放在 `BridgeStatusBar` 内部（它在 `OrchestrationStoreProvider` 之内，符合 Context 规则），避免在 `App` 顶层 hook 跨 Provider 边界。
+
+**关键 Bug 修复**：初版误将 `useOrchestrationLoop()` 放在 `App` 组件体（Provider 之外），运行时抛 `useOrchestrationStore must be used within OrchestrationStoreProvider`。改由 `BridgeStatusBar` 内部订阅修复。
+
+**保留限制：**
+
+- `OrchestrationStore` / `OrchestrationContext` / 各 hook 完全保留，`AgentGroupDisplay` 等其它组件不受影响。
+- loop 计数显示格式为 `Loop #3`（纯数字轮次，不含 phase）。
+
+### 62.3 删除 DualTabSystem 视觉指示器（保留 Tab 切换）
+
+**目标**：移除消息区顶部两个并排的 `Supervisor | Worker` 圆角框，但保留 Tab 键切换角色的交互能力。
+
+**实现边界：**
+
+- 删除 `packages/tui/src/components/workflow/DualTabSystem.tsx`。
+- Tab 键的 `useInput` 监听从被删组件挪到 `App.tsx`，放在 `isOverlayActive` 定义之后（无覆盖层时响应 Tab），切换逻辑 `setActiveRole(prev => prev === 'worker' ? 'supervisor' : 'worker')` 不变。
+- `AgentRole` 类型原由 DualTabSystem 导出，删除后内联进 `App.tsx`（底部 `WorkflowStatusBar` 自行内联同名联合类型，不依赖此处）。
+- `components/workflow/index.ts` 与 `tui/src/index.ts` 清理对 `DualTabSystem` / `TabHeader` / `DualTabSystemProps` / `TabState` 的重导出。
+- 当前角色由底部 `WorkflowStatusBar` 的 Supervisor/Worker 卡片显示。
+
+**保留限制：**
+
+- Tab 键切换功能完整保留，行为与之前一致（覆盖层激活时不响应）。
+- `activeRole` 状态、`bridge.submit` 的 role 路由逻辑不动。
+
+### 62.4 per-role 模型配置（worker/supervisor 各自独立模型）
+
+**目标**：worker 和 supervisor 各自持有独立的 model/provider 配置，`/model` 与底部状态栏跟随当前 `activeRole`，配置持久化到磁盘，向后兼容旧的单模型配置。
+
+**决策：** Tab 切换既切消息路由，也切显示/配置上下文；持久化新建 `.deepreef/role-config.json`，不动 `last-config.json`（作为单模型 fallback）。
+
+**实现边界（跨 core / cli / tui 三包）：**
+
+- **core/engine.ts**：新增 `getModel(): string` 与 `getProvider(): string` 公共 getter（`config` 原为 private 且无任何访问器）。
+- **core/config.ts + schemas/config.ts**：新增 `RoleConfig` 类型、`RoleConfigSchema`、`saveRoleConfig(role, cfg)`、`loadRoleConfig(role)`。文件 `.deepreef/role-config.json` 结构为 `{ worker: {provider, model, baseUrl}, supervisor: {...} }`，部分写入（读-改-写，保留另一 role）。`apiKey` 不持久化。
+- **core/index.ts**：导出 `saveRoleConfig` / `loadRoleConfig` / `RoleConfig`。
+- **cli/tui.ts**：启动时分别 `loadRoleConfig("worker")` / `("supervisor")`，若存在则覆盖到各自 config 块；worker 引擎热更新，supervisor 引擎按其 role config 独立创建。
+- **tui/App.tsx**：新增 `roleConfig: Record<'worker'|'supervisor', {provider, model}>` 状态；`activeModel`/`activeProvider` 改为从 `roleConfig[activeRole]` 派生。`handleModelSelect` 改为 role-aware：`activeRole === 'supervisor' && dualRuntime` 时取 `dualRuntime.getSupervisor().getEngine()`，否则 worker engine；更新 `roleConfig` + `saveRoleConfig` + `saveLastConfig`（后者作全局 fallback）。
+- `ModelPicker` 组件无需改动 —— 通过 `currentProvider`/`currentModel` props 自动接收 per-role 派生值。
+
+**保留限制：**
+
+- `last-config.json` 及其读写逻辑不动（向后兼容 fallback）。
+- `bridge.tsx` 的 submit 路由逻辑不动（已正确按 role 分发）。
+- 首次运行无 `role-config.json` → `loadRoleConfig` 返回 null → 两 role 都用全局 config（与改动前行为一致）。
+
+### 62.5 per-role Agent 身份绑定 + 删除 build/plan
+
+**目标**：每个 role 绑定独立的 Agent 身份（system prompt），Tab 切换时状态栏最左侧显示该 role 绑定的 Agent 名，`/agent` 针对当前 role 绑定。删除 `build`/`plan` 原生身份，原生只留 worker/supervisor。
+
+**决策：** per-role agent 持久化复用现有 `.deepreef/agents.json`（agent-profile 系统），给 `AgentRoleProfile` 加 `agent` 字段；不塞进 `role-config.json`（那个只管 model）。
+
+**实现边界（core + tui 两包）：**
+
+- **core/agent.ts**：删除 `build`/`plan` 注册；重写 `worker` 的 system prompt（更实质的执行型描述，工具集仍取自 `MAIN_MODES.build.toolNames`）；`getAgent`/`agentConfigFor` 的 fallback 从 `AGENTS.build` 改为 `AGENTS.worker`。`MAIN_MODES` 保留作为工具清单来源，但不再注册为 agent 身份。
+- **core/agent-profile/types.ts**：`AgentRoleProfile` 新增 `agent?: string` 字段；`DEFAULT_AGENT_PROFILES` 中 worker 默认 `agent: "worker"`，supervisor 默认 `agent: "supervisor"`。
+- **core/agent-profile/schema.ts**：`AgentRoleProfileSchema`（`z.strictObject`）同步加 `agent: z.string().optional()`。
+- **core/index.ts**：导出 `loadAgentProfiles` / `saveAgentProfiles` / `getAgentProfile` / `updateAgentProfile` 及相关类型。
+- **tui/App.tsx**：
+  - 单一 `activeAgent` state → `agentByRole: Record<'worker'|'supervisor', string>`，启动从 `loadAgentProfiles()` 读取各自绑定；`activeAgent = agentByRole[activeRole]` 派生。
+  - `handleAgentChoose` 改为 role-aware：对当前 role 的 engine（supervisor 走 `dualRuntime.getSupervisor().getEngine()`）调 `switchAgent`，更新 `agentByRole` + `updateAgentProfile` + `saveAgentProfiles`。
+  - 启动 seeding effect：worker engine 与 supervisor engine 各自 `switchAgent` 到绑定身份；旧 `persistedAgent`（ui-settings.json）作为 worker 兼容回退。
+  - `/agent` 菜单标题标注当前 role（`Agent [supervisor]`），fallback 列表从 build/plan 改为 worker/supervisor。
+
+**关键架构发现：** 每个 role 有独立 engine（`workerEngine` / `supervisorEngine`），各自持有 `currentAgent`。`switchAgent` 设的是各自 engine 的 `currentAgent`，submit 时 engine 自然用自己的 `currentAgent`，**无需改动 `runtime.ts` / `engine.submit()` / `bridge.tsx` 的调用链**。
+
+**保留限制：**
+
+- agent 注册表机制（`AgentRegistry`）保留，用户仍可通过插件注册自定义 Agent 身份并经 `/agent` 菜单绑定到任一 role。
+- 旧 `ui-settings.json` 的全局 `agent` 字段不再迁移（`migrateLegacyConfig` 未加 agent 迁移），首次升级时两 role 用默认 worker/supervisor —— 可接受的降级。
+- subagent 路径（`engine.spawnSubagent` 用 `agentConfigFor("build")`）fallback 到 worker，工具集与 build 相同，风险低。
+
+### 62.6 修复 requiresApiKey 误判（zen 等 requiresKey:false provider）
+
+**症状**：per-role 模型配置落地后，supervisor 配置为 `zen` provider 时，`bun run dev` 抛 `supervisorConfig is required with baseUrl and model`，尽管 baseUrl/model 都有值。
+
+**根因**：`DualAgentRuntime` 构造时的 `requiresApiKey()` 只检查 `keyless` 字段，不认 `requiresKey: false`。DeepReef 有两种"不需要用户提供 key"的表达：
+- `keyless: true`（kilo 等）—— 完全无 key 通道
+- `requiresKey: false` + `defaultKey`（zen 等）—— 有兜底 public key
+
+`zen.keyless` 为 `undefined`（未定义该字段），`!undefined === true` → `requiresApiKey("zen")` 错误返回 true。supervisor 的 `apiKey` 为空（worker 用 kilo，`loadConfig` 没填 key）→ 触发 OR 条件抛错。
+
+之前 worker/supervisor 共用同一 provider 时此 bug 潜伏（kilo 恰有 `keyless:true`）；per-role 配置允许 supervisor 用不同 provider 后暴露。
+
+**修复**：`packages/core/src/dual-agent-runtime/dual-runtime.ts` 的 `requiresApiKey()` 现在同时认两种：`keyless: true` **或** `requiresKey: false` → 都视为不需要 key。
+
+**验收**：repro 脚本（zen supervisor）从 ERROR 变为 OK；`bun run dev` 启动正常；typecheck 通过。
+
+### 62.7 验证状态
+
+| 检查项 | 状态 | 说明 |
+|--------|------|------|
+| `bun run typecheck` | ✅ | 全项目 tsc 通过，零错误 |
+| `bun run dev` 启动 | ✅ | 无 Provider/context/requiresApiKey 报错（仅剩既有的 memory warn，与本系列无关） |
+| Provider 报错回归 | ✅ | `useOrchestrationStore must be used within Provider` 已修复（订阅挪入 BridgeStatusBar） |
+| requiresApiKey | ✅ | zen supervisor 构造成功 |
+
+**待人工终端验证（非交互环境无法模拟键盘）：**
+
+- Tab 切换 role 时，底部状态栏 model/provider/agent 名跟随变化
+- `/model` 在 supervisor role 下改的是 supervisor 模型，切回 worker 不受影响
+- `/agent` 针对当前 role 绑定，选另一 role 不受影响
+- 重启后两 role 各自恢复模型与 agent 绑定
+- 插件注册的自定义 agent 出现在 `/agent` 菜单
+
+### 62.8 涉及文件汇总
+
+| 包 | 文件 | 改动 |
+|----|------|------|
+| core | `src/engine.ts` | 加 `getModel()` / `getProvider()` getter |
+| core | `src/config.ts` | 加 `RoleConfig` / `saveRoleConfig` / `loadRoleConfig` |
+| core | `src/schemas/config.ts` | 加 `RoleConfigEntrySchema` / `RoleConfigSchema` |
+| core | `src/index.ts` | 导出新函数与类型 |
+| core | `src/agent.ts` | 删 build/plan，重写 worker prompt，fallback→worker |
+| core | `src/agent-profile/types.ts` | `AgentRoleProfile` 加 `agent?` 字段 + 默认值 |
+| core | `src/agent-profile/schema.ts` | zod schema 加 `agent` 字段 |
+| core | `src/dual-agent-runtime/dual-runtime.ts` | 修复 `requiresApiKey` 认 `requiresKey:false` |
+| cli | `src/tui.ts` | 启动分别 seeding worker/supervisor 模型配置 |
+| tui | `src/App.tsx` | roleConfig + agentByRole 状态、role-aware handleModelSelect/handleAgentChoose、Tab useInput、启动 seeding |
+| tui | `src/StatusBar.tsx` | 加 `loopAttempt` prop 与 `Loop #N` 显示 |
+| tui | `src/BridgeConnected.tsx` | `BridgeStatusBar` 内部订阅 loop + 透传 |
+| tui | `src/components/orchestration/OrchestrationContext.tsx` | 内联迁移的类型 |
+| tui | `src/components/orchestration/OrchestrationSummary.tsx` | **删除** |
+| tui | `src/components/workflow/DualTabSystem.tsx` | **删除** |
+| tui | `src/components/workflow/index.ts` | 清理 DualTabSystem 重导出 |
+| tui | `src/index.ts` | 清理 DualTabSystem 重导出 |
+
+> 注：`WorkflowStatusBar.tsx` 与 `CommandRegistry.ts` 为用户手动改动，未包含在本系列提交中。
