@@ -21,7 +21,7 @@
   ],
   "scripts": {
     "dev": "bun run packages/cli/src/index.ts",
-    "build": "bun build ./packages/cli/src/index.ts --outdir ./dist --target node --format esm --external @anthropic-ai/sdk --external @anthropic-ai/claude-agent-sdk",
+    "build": "bun build ./packages/cli/src/index.ts --outdir ./dist --target node --format esm --external @anthropic-ai/sdk --external @anthropic-ai/claude-agent-sdk --banner '#!/usr/bin/env node'",
     "prepublishOnly": "bun run build",
     "test": "bun test packages/core packages/tools packages/tui packages/cli packages/security",
     "test:all": "bun test",
