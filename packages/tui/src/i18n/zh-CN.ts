@@ -22,6 +22,9 @@ export const zhCN: Strings = {
   reply: '回复',
   ctrlO: 'ctrl+o',
   thinkingDots: ' 思考中...',
+  roleWorker: 'Worker',
+  roleSupervisor: 'Supervisor',
+  roleUnknown: 'AI',
   // Status bar
   inputTokens: '入',
   outputTokens: '出',

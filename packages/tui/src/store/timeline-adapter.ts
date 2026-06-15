@@ -6,6 +6,8 @@ import type { TranscriptStore } from './transcript-store.js';
  */
 function timelineEntryEquals(a: TimelineItem, b: TimelineItem): boolean {
   if (a.id !== b.id || a.kind !== b.kind) return false;
+  // role 必须一致（含同为 undefined）
+  if ((a as { role?: unknown }).role !== (b as { role?: unknown }).role) return false;
 
   switch (a.kind) {
     case 'message':

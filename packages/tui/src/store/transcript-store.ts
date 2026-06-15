@@ -1,6 +1,11 @@
-import type { ChatMessage } from '@deepreef/core';
+import type { ChatMessage, AgentRole } from '@deepreef/core';
 import type { TimelineItem, ToolStatus } from '../bridge.js';
 import { mergeTimelineEntries } from './hydration-merge.js';
+
+/**
+ * 带可选 role 字段的条目（用于内部读取/写入 role 属性时绕过联合类型窄化）。
+ */
+type TimelineEntryWithRole = TimelineItem & { role?: AgentRole };
 
 /**
  * 只读快照，供 adapter / useSyncExternalStore 消费。
@@ -113,8 +118,8 @@ export class TranscriptStore {
   /**
    * 追加任意角色消息条目。
    */
-  appendMessage(id: string, message: ChatMessage): void {
-    const entry: TimelineItem = { id, kind: 'message', message: { ...message } };
+  appendMessage(id: string, message: ChatMessage, role?: AgentRole): void {
+    const entry: TimelineItem = { id, kind: 'message', message: { ...message }, role };
     this.order.push(id);
     this.entries.set(id, entry);
     this.markLiveTouch(id);
@@ -124,8 +129,8 @@ export class TranscriptStore {
   /**
    * 追加用户消息条目。
    */
-  appendUser(id: string, content: string): void {
-    this.appendMessage(id, { role: 'user', content });
+  appendUser(id: string, content: string, role?: AgentRole): void {
+    this.appendMessage(id, { role: 'user', content }, role);
   }
 
   /**
@@ -136,8 +141,18 @@ export class TranscriptStore {
     kind: 'assistant_text' | 'reasoning',
     roundId: string,
     startTs: number,
+    role?: AgentRole,
   ): void {
-    if (this.entries.has(id)) return;
+    if (this.entries.has(id)) {
+      // 已存在但缺 role（例如 hydration 合并进来的旧条目）：补齐角色信息
+      const existing = this.entries.get(id)!;
+      if (role && !(existing as TimelineEntryWithRole).role) {
+        (existing as TimelineEntryWithRole).role = role;
+        this.markLiveTouch(id);
+        this.bump();
+      }
+      return;
+    }
 
     const entry: TimelineItem = {
       id,
@@ -146,6 +161,7 @@ export class TranscriptStore {
       text: '',
       isStreaming: true,
       startTs,
+      role,
     };
 
     if (kind === 'assistant_text') {
@@ -268,17 +284,20 @@ export class TranscriptStore {
     roundId: string,
     tool: ToolStatus,
     merge?: (existing: ToolStatus) => ToolStatus,
+    role?: AgentRole,
   ): void {
     const existing = this.entries.get(id);
     if (existing?.kind === 'tool') {
       existing.tool = merge ? merge(existing.tool) : { ...existing.tool, ...tool };
+      // 补齐 role（hydration 合并进来的旧条目可能缺失）
+      if (role && !existing.role) (existing as TimelineEntryWithRole).role = role;
       this.markLiveTouch(id);
       this.bump();
       return;
     }
 
     this.order.push(id);
-    this.entries.set(id, { id, kind: 'tool', roundId, tool: { ...tool } });
+    this.entries.set(id, { id, kind: 'tool', roundId, tool: { ...tool }, role });
     this.markLiveTouch(id);
     this.bump();
   }

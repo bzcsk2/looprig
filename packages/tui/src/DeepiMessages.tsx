@@ -1,6 +1,7 @@
 import React, { memo, useMemo, useState } from 'react';
 import { Box, Text, useInput } from '@deepreef/ink';
 import type { ChatMessage } from '@deepreef/core';
+import type { AgentRole } from '@deepreef/core/agent-profile/types.js';
 import type { TimelineItem, ToolStatus } from './bridge.js';
 import { Markdown } from './MarkdownRenderer.js';
 import { Card } from './reasonix/Card.js';
@@ -8,6 +9,49 @@ import { StreamingCard } from './reasonix/StreamingCard.js';
 import { FG, SURFACE, TONE } from './reasonix/tokens.js';
 import { t } from './i18n/index.js';
 import { useTranscriptTimeline } from './store/TranscriptContext.js';
+
+/**
+ * 角色标签样式映射。
+ * worker → 青色圆点 + 青色 Worker 名；supervisor → 紫色圆点 + 紫色 Supervisor 名；
+ * 未知角色 → 灰色圆点 + 灰色 AI 名。用户消息不渲染标签（由调用方判断）。
+ */
+interface RoleStyle {
+  glyph: string;
+  color: string;
+  label: string;
+}
+
+function roleStyle(role?: AgentRole): RoleStyle {
+  const strings = t();
+  if (role === 'worker') {
+    return { glyph: '\u25CF', color: TONE.ok, label: strings.roleWorker };
+  }
+  if (role === 'supervisor') {
+    return { glyph: '\u25CF', color: TONE.accent, label: strings.roleSupervisor };
+  }
+  // 无角色信息（如老会话 hydration 进来的条目）：用灰色 AI 兜底，保证可读
+  return { glyph: '\u25CF', color: FG.meta, label: strings.roleUnknown };
+}
+
+/**
+ * RoleTag — 彩色圆点 + 彩色角色名前缀。渲染于每条角色消息的开头，
+ * 让双角色时间线一眼可辨（worker 青 / supervisor 紫）。
+ * 用户消息不渲染此组件（由调用方跳过）。
+ */
+const RoleTag = memo(function RoleTag({ role }: { role?: AgentRole }) {
+  const style = roleStyle(role);
+  return (
+    <Text color={style.color as any} bold>
+      {`${style.glyph} ${style.label}`}
+    </Text>
+  );
+});
+
+/** 角色名 + 分隔符，用于在已有标题文本前拼接（如 StreamingCard title） */
+function roleTitle(role?: AgentRole): string {
+  const style = roleStyle(role);
+  return style.label;
+}
 
 interface DeepiMessagesProps {
   /** Legacy 路径传入；Store 路径省略并由 useTranscriptTimeline 订阅 */
@@ -160,15 +204,23 @@ const UserMessage = memo(function UserMessage({ message }: { message: ChatMessag
   );
 });
 
-const AssistantTextMessage = memo(function AssistantTextMessage({ text }: { text: string }) {
+const AssistantTextMessage = memo(function AssistantTextMessage({
+  text,
+  role,
+}: {
+  text: string;
+  role?: AgentRole;
+}) {
   if (!text) return null;
+  const style = roleStyle(role);
   return (
-    <Box flexDirection="row" width="100%" paddingX={1} paddingY={1}>
-      <Box minWidth={2}>
-        <Text color={TONE.accent}>{'\u25CF'}</Text>
-      </Box>
-      <Box flexDirection="column" flexGrow={1}>
-        {markdownText(text)}
+    <Box flexDirection="column" width="100%" paddingX={1} paddingY={1}>
+      <Text color={style.color as any} bold>{`${style.glyph} ${style.label}`}</Text>
+      <Box flexDirection="row">
+        <Box minWidth={2} />
+        <Box flexDirection="column" flexGrow={1}>
+          {markdownText(text)}
+        </Box>
       </Box>
     </Box>
   );
@@ -179,30 +231,36 @@ const AssistantThinkingMessage = memo(function AssistantThinkingMessage({
   isStreaming,
   startTs,
   expanded,
+  role,
 }: {
   text: string;
   isStreaming: boolean;
   startTs: number;
   expanded: boolean;
+  role?: AgentRole;
 }) {
   if (!text) return null;
   if (isStreaming) {
-    return <StreamingCard text={text} startTs={startTs} title={t().thinking} />;
+    return <StreamingCard text={text} startTs={startTs} title={`${roleTitle(role)} · ${t().thinking}`} />;
   }
   if (!expanded) {
     const preview = text.replace(/\s+/g, ' ').trim().slice(0, 80);
     return (
-      <Box paddingX={1}>
-        <Text color={TONE.warn} bold>{'\u2234'} {t().thinking}</Text>
-        {preview ? <Text dimColor>{` ${preview}${text.length > preview.length ? '…' : ''}`}</Text> : null}
-        <Text dimColor>{` ${t().ctrlO}`}</Text>
+      <Box flexDirection="column" width="100%" paddingX={1}>
+        <RoleTag role={role} />
+        <Box flexDirection="row">
+          <Text color={TONE.warn} bold>{`  ${'\u2234'} ${t().thinking}`}</Text>
+          {preview ? <Text dimColor>{` ${preview}${text.length > preview.length ? '…' : ''}`}</Text> : null}
+          <Text dimColor>{` ${t().ctrlO}`}</Text>
+        </Box>
       </Box>
     );
   }
   return (
     <Box flexDirection="column" width="100%" paddingX={1}>
+      <RoleTag role={role} />
       <Box flexDirection="row">
-        <Text color={TONE.warn} bold>{'\u2234'} {t().thinking}</Text>
+        <Text color={TONE.warn} bold>{`  ${'\u2234'} ${t().thinking}`}</Text>
         <Text dimColor>{t().ctrlO}</Text>
       </Box>
       <Box paddingLeft={2}>
@@ -215,9 +273,11 @@ const AssistantThinkingMessage = memo(function AssistantThinkingMessage({
 const AssistantToolUseMessage = memo(function AssistantToolUseMessage({
   tool,
   expanded,
+  role,
 }: {
   tool: ToolStatus;
   expanded: boolean;
+  role?: AgentRole;
 }) {
   const name = displayToolName(tool.name);
   const summary = formatToolUseSummary(tool);
@@ -227,14 +287,15 @@ const AssistantToolUseMessage = memo(function AssistantToolUseMessage({
 
   return (
     <Box flexDirection="column" width="100%" paddingX={1}>
+      <RoleTag role={role} />
       <Box flexDirection="row" flexWrap="wrap">
-        <Text color={color}>{glyph} </Text>
+        <Text color={color}>{`  ${glyph} `}</Text>
         <Text bold color={color}>{name}</Text>
         {summary && <Text>({summary})</Text>}
         <Text dimColor>{tool.elapsedMs !== undefined ? ` ${(tool.elapsedMs / 1000).toFixed(1)}s` : ''}</Text>
       </Box>
       {(tool.status === 'running' || expanded || tool.status === 'error') && result && (
-        <Box flexDirection="column" paddingLeft={2}>
+        <Box flexDirection="column" paddingLeft={4}>
           {result.split('\n').map((line, index) => (
             <Text key={`${tool.key}:result:${index}`} color={tool.status === 'error' ? TONE.err : FG.sub}>
               {line}
@@ -246,7 +307,7 @@ const AssistantToolUseMessage = memo(function AssistantToolUseMessage({
   );
 });
 
-function ToolResultMessage({ message, expanded }: { message: ChatMessage; expanded: boolean }) {
+function ToolResultMessage({ message, expanded, role }: { message: ChatMessage; expanded: boolean; role?: AgentRole }) {
   return (
     <AssistantToolUseMessage
       tool={{
@@ -259,6 +320,7 @@ function ToolResultMessage({ message, expanded }: { message: ChatMessage; expand
         elapsedMs: 0,
       }}
       expanded={expanded}
+      role={role}
     />
   );
 }
@@ -276,19 +338,20 @@ const MessageBlock = memo(function MessageBlock({
       if (item.message.role === 'assistant') {
         return (
           <>
-            <AssistantTextMessage text={item.message.content ?? ''} />
+            <AssistantTextMessage text={item.message.content ?? ''} role={item.role} />
             {item.message.reasoning_content && (
               <AssistantThinkingMessage
                 text={item.message.reasoning_content}
                 isStreaming={false}
                 startTs={Date.now()}
                 expanded={expanded}
+                role={item.role}
               />
             )}
           </>
         );
       }
-      if (item.message.role === 'tool') return <ToolResultMessage message={item.message} expanded={expanded} />;
+      if (item.message.role === 'tool') return <ToolResultMessage message={item.message} expanded={expanded} role={item.role} />;
       return null;
 
     case 'assistant_text':
@@ -297,12 +360,12 @@ const MessageBlock = memo(function MessageBlock({
           <StreamingCard
             text={item.text}
             startTs={item.startTs}
-            title={t().writing}
-            doneTitle={t().reply}
+            title={`${roleTitle(item.role)} · ${t().writing}`}
+            doneTitle={`${roleTitle(item.role)} · ${t().reply}`}
           />
         );
       }
-      return <AssistantTextMessage text={item.text} />;
+      return <AssistantTextMessage text={item.text} role={item.role} />;
 
     case 'reasoning':
       return (
@@ -311,11 +374,12 @@ const MessageBlock = memo(function MessageBlock({
           isStreaming={item.isStreaming}
           startTs={item.startTs}
           expanded={expanded}
+          role={item.role}
         />
       );
 
     case 'tool':
-      return <AssistantToolUseMessage tool={item.tool} expanded={expanded} />;
+      return <AssistantToolUseMessage tool={item.tool} expanded={expanded} role={item.role} />;
   }
 });
 

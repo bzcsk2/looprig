@@ -25,6 +25,10 @@ export interface Strings {
   reply: string;
   ctrlO: string;
   thinkingDots: string;
+  /** 角色名标签：双角色模式下时间线每条消息的角色前缀 */
+  roleWorker: string;
+  roleSupervisor: string;
+  roleUnknown: string;
   // Status bar
   inputTokens: string;
   outputTokens: string;

@@ -22,6 +22,9 @@ export const en: Strings = {
   reply: 'Reply',
   ctrlO: 'ctrl+o',
   thinkingDots: ' thinking...',
+  roleWorker: 'Worker',
+  roleSupervisor: 'Supervisor',
+  roleUnknown: 'AI',
   // Status bar
   inputTokens: 'in',
   outputTokens: 'out',

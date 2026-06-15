@@ -416,7 +416,7 @@ export function createBridge(
         const id = assistantId;
         if (transcriptStore) {
           if (assistantText) {
-            transcriptStore.ensureTextPart(id, 'assistant_text', roundId, assistantStartTs || Date.now());
+            transcriptStore.ensureTextPart(id, 'assistant_text', roundId, assistantStartTs || Date.now(), submitRole);
             transcriptStore.setTextPart(id, assistantText, false);
           }
           transcriptStore.finalizePart(id);
@@ -438,7 +438,7 @@ export function createBridge(
         const id = reasoningId;
         if (transcriptStore) {
           if (reasoningText) {
-            transcriptStore.ensureTextPart(id, 'reasoning', roundId, reasoningStartTs || Date.now());
+            transcriptStore.ensureTextPart(id, 'reasoning', roundId, reasoningStartTs || Date.now(), submitRole);
             transcriptStore.setTextPart(id, reasoningText, false);
           }
           transcriptStore.finalizePart(id);
@@ -507,7 +507,7 @@ export function createBridge(
           elapsedMs: patch.elapsedMs ?? (patch.status && patch.status !== 'running'
             ? now - existing.startedAt
             : existing.elapsedMs),
-        }));
+        }), submitRole);
         publishTimeline();
         return;
       }
@@ -586,7 +586,7 @@ export function createBridge(
             assistantText += chunk;
             const id = ensureAssistant();
             if (transcriptStore) {
-              transcriptStore.ensureTextPart(id, 'assistant_text', roundId, assistantStartTs);
+              transcriptStore.ensureTextPart(id, 'assistant_text', roundId, assistantStartTs, submitRole);
               transcriptStore.appendPartDelta(id, chunk);
               streamBatcher.schedule();
             } else {
@@ -605,7 +605,7 @@ export function createBridge(
             if (assistantText) {
               const id = ensureAssistant();
               if (transcriptStore) {
-                transcriptStore.ensureTextPart(id, 'assistant_text', roundId, assistantStartTs || Date.now());
+                transcriptStore.ensureTextPart(id, 'assistant_text', roundId, assistantStartTs || Date.now(), submitRole);
                 transcriptStore.setTextPart(id, assistantText, false);
               } else {
                 upsertAssistantText({
@@ -615,6 +615,7 @@ export function createBridge(
                   text: assistantText,
                   isStreaming: false,
                   startTs: assistantStartTs || Date.now(),
+                  role: submitRole,
                 });
               }
             }
@@ -627,6 +628,7 @@ export function createBridge(
                 text: reasoningText,
                 isStreaming: false,
                 startTs: reasoningStartTs || Date.now(),
+                role: submitRole,
               };
               if (transcriptStore) {
                 transcriptStore.upsertReasoning(item);
@@ -644,7 +646,7 @@ export function createBridge(
             reasoningText += chunk;
             const id = ensureReasoning();
             if (transcriptStore) {
-              transcriptStore.ensureTextPart(id, 'reasoning', roundId, reasoningStartTs);
+              transcriptStore.ensureTextPart(id, 'reasoning', roundId, reasoningStartTs, submitRole);
               transcriptStore.appendPartDelta(id, chunk);
               streamBatcher.schedule();
             } else {
@@ -655,6 +657,7 @@ export function createBridge(
                 text: reasoningText,
                 isStreaming: true,
                 startTs: reasoningStartTs,
+                role: submitRole,
               });
               commitBridge(() => ({ reasoningActive: true }));
             }
