@@ -49,6 +49,10 @@ describe("Workflow", () => {
 })
 
 describe("AgentTool", () => {
+  it("should not require user approval", () => {
+    expect(createAgentToolTool().approval).toBe("read")
+  })
+
   it("should delegate to build agent by default", async () => {
     const tool = createAgentToolTool()
     const r = await tool.execute({ task: "refactor this code" }, ctx)

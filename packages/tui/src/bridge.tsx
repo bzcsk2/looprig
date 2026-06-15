@@ -1,5 +1,6 @@
 import type { ChatMessage, ReasonixEngine, QuestionRequest, PermissionRequest, PermissionReply, LoopEvent } from '@deepreef/core';
 import type { AgentRole } from '@deepreef/core/agent-profile/types.js';
+import type { WorkflowMode } from '@deepreef/core/dual-agent-runtime/types.js';
 import type { DualAgentRuntime } from '@deepreef/core/dual-agent-runtime/dual-runtime.js';
 import type { WorkflowCoordinator } from '@deepreef/core/workflow-coordinator/coordinator.js';
 import type { WorkflowEvent } from '@deepreef/core/workflow-coordinator/types.js';
@@ -147,7 +148,7 @@ export function createBridge(
   dualRuntime?: DualAgentRuntime,
   workflowCoordinator?: WorkflowCoordinator,
 ): {
-  submit: (text: string, isQueueResubmit?: boolean, role?: AgentRole) => Promise<void>;
+  submit: (text: string, isQueueResubmit?: boolean, role?: AgentRole, mode?: WorkflowMode) => Promise<void>;
   cancel: () => void;
   respondPermission: (reply: PermissionReply, message?: string) => void;
   respondQuestion: (requestId: string, answers: string[][]) => void;
@@ -300,7 +301,7 @@ export function createBridge(
     }
   };
 
-  const submit = async (text: string, isQueueResubmit = false, role?: AgentRole) => {
+  const submit = async (text: string, isQueueResubmit = false, role?: AgentRole, mode: WorkflowMode = 'alone') => {
     if (running) {
       const result = engine.enqueueInstruction(text);
       if (result.status === 'ignored') return;
@@ -331,6 +332,7 @@ export function createBridge(
     running = true;
     const requestId = ++activeRequest;
     const submitRole: AgentRole | undefined = role;
+    let activeOutputRole: AgentRole | undefined = submitRole;
     let roundNumber = 0;
     let roundId = '';
     let assistantId: string | null = null;
@@ -365,7 +367,7 @@ export function createBridge(
             text: assistantText,
             isStreaming: true,
             startTs: assistantStartTs,
-            role: submitRole,
+            role: activeOutputRole,
           });
         }
 
@@ -378,7 +380,7 @@ export function createBridge(
             text: reasoningText,
             isStreaming: true,
             startTs: reasoningStartTs,
-            role: submitRole,
+            role: activeOutputRole,
           });
         }
 
@@ -416,7 +418,7 @@ export function createBridge(
         const id = assistantId;
         if (transcriptStore) {
           if (assistantText) {
-            transcriptStore.ensureTextPart(id, 'assistant_text', roundId, assistantStartTs || Date.now(), submitRole);
+            transcriptStore.ensureTextPart(id, 'assistant_text', roundId, assistantStartTs || Date.now(), activeOutputRole);
             transcriptStore.setTextPart(id, assistantText, false);
           }
           transcriptStore.finalizePart(id);
@@ -428,7 +430,7 @@ export function createBridge(
             text: assistantText,
             isStreaming: false,
             startTs: assistantStartTs || Date.now(),
-            role: submitRole,
+            role: activeOutputRole,
           }, existing => existing.kind === 'assistant_text'
             ? { ...existing, text: assistantText, isStreaming: false }
             : existing);
@@ -438,7 +440,7 @@ export function createBridge(
         const id = reasoningId;
         if (transcriptStore) {
           if (reasoningText) {
-            transcriptStore.ensureTextPart(id, 'reasoning', roundId, reasoningStartTs || Date.now(), submitRole);
+            transcriptStore.ensureTextPart(id, 'reasoning', roundId, reasoningStartTs || Date.now(), activeOutputRole);
             transcriptStore.setTextPart(id, reasoningText, false);
           }
           transcriptStore.finalizePart(id);
@@ -450,7 +452,7 @@ export function createBridge(
             text: reasoningText,
             isStreaming: false,
             startTs: reasoningStartTs || Date.now(),
-            role: submitRole,
+            role: activeOutputRole,
           }, existing => existing.kind === 'reasoning'
             ? { ...existing, text: reasoningText, isStreaming: false }
             : existing);
@@ -507,7 +509,7 @@ export function createBridge(
           elapsedMs: patch.elapsedMs ?? (patch.status && patch.status !== 'running'
             ? now - existing.startedAt
             : existing.elapsedMs),
-        }), submitRole);
+        }), activeOutputRole);
         publishTimeline();
         return;
       }
@@ -517,7 +519,7 @@ export function createBridge(
         kind: 'tool',
         roundId,
         tool: mergedTool,
-        role: submitRole,
+        role: activeOutputRole,
       }, existing => {
         if (existing.kind !== 'tool') return existing;
         return {
@@ -575,10 +577,18 @@ export function createBridge(
       await beforeSubmit?.();
       // WF-FIX-10: Route through DualAgentRuntime when available
       const eventStream = dualRuntime && submitRole
-        ? dualRuntime.sendDirect({ role: submitRole, input: text })
-        : engine.submit(text, undefined, submitRole);
+        ? dualRuntime.sendDirect({ role: submitRole, input: text, mode })
+        : engine.submit(text, undefined, submitRole, mode);
       for await (const event of eventStream) {
         if (requestId !== activeRequest) continue;
+        const eventRole = event.metadata?.agentRole === 'worker' || event.metadata?.agentRole === 'supervisor'
+          ? event.metadata.agentRole as AgentRole
+          : submitRole;
+        if (eventRole !== activeOutputRole) {
+          finalizeRound();
+          activeOutputRole = eventRole;
+          startRound();
+        }
 
         switch (event.role) {
           case 'assistant_delta': {
@@ -586,7 +596,7 @@ export function createBridge(
             assistantText += chunk;
             const id = ensureAssistant();
             if (transcriptStore) {
-              transcriptStore.ensureTextPart(id, 'assistant_text', roundId, assistantStartTs, submitRole);
+              transcriptStore.ensureTextPart(id, 'assistant_text', roundId, assistantStartTs, activeOutputRole);
               transcriptStore.appendPartDelta(id, chunk);
               streamBatcher.schedule();
             } else {
@@ -597,7 +607,7 @@ export function createBridge(
 
           case 'assistant_final': {
             streamBatcher.flushNow();
-            assistantText = event.content ?? assistantText;
+            if (event.content) assistantText = event.content;
             const metadataReasoning = event.metadata?.reasoning;
             if (typeof metadataReasoning === 'string' && metadataReasoning.length > 0) {
               reasoningText = metadataReasoning;
@@ -605,7 +615,7 @@ export function createBridge(
             if (assistantText) {
               const id = ensureAssistant();
               if (transcriptStore) {
-                transcriptStore.ensureTextPart(id, 'assistant_text', roundId, assistantStartTs || Date.now(), submitRole);
+                transcriptStore.ensureTextPart(id, 'assistant_text', roundId, assistantStartTs || Date.now(), activeOutputRole);
                 transcriptStore.setTextPart(id, assistantText, false);
               } else {
                 upsertAssistantText({
@@ -615,7 +625,7 @@ export function createBridge(
                   text: assistantText,
                   isStreaming: false,
                   startTs: assistantStartTs || Date.now(),
-                  role: submitRole,
+                  role: activeOutputRole,
                 });
               }
             }
@@ -628,7 +638,7 @@ export function createBridge(
                 text: reasoningText,
                 isStreaming: false,
                 startTs: reasoningStartTs || Date.now(),
-                role: submitRole,
+                role: activeOutputRole,
               };
               if (transcriptStore) {
                 transcriptStore.upsertReasoning(item);
@@ -646,7 +656,7 @@ export function createBridge(
             reasoningText += chunk;
             const id = ensureReasoning();
             if (transcriptStore) {
-              transcriptStore.ensureTextPart(id, 'reasoning', roundId, reasoningStartTs, submitRole);
+              transcriptStore.ensureTextPart(id, 'reasoning', roundId, reasoningStartTs, activeOutputRole);
               transcriptStore.appendPartDelta(id, chunk);
               streamBatcher.schedule();
             } else {
@@ -657,7 +667,7 @@ export function createBridge(
                 text: reasoningText,
                 isStreaming: true,
                 startTs: reasoningStartTs,
-                role: submitRole,
+                role: activeOutputRole,
               });
               commitBridge(() => ({ reasoningActive: true }));
             }
@@ -892,6 +902,8 @@ export function createBridge(
     });
     // WF-FIX-10: Interrupt both roles when DualAgentRuntime is active
     if (dualRuntime) {
+      dualRuntime.getWorker().getEngine().respondPermission(false);
+      dualRuntime.getSupervisor().getEngine().respondPermission(false);
       dualRuntime.interruptRole('worker');
       dualRuntime.interruptRole('supervisor');
     }
@@ -901,17 +913,25 @@ export function createBridge(
   };
 
   const respondPermission = (reply: PermissionReply, message?: string) => {
-    engine.respondPermission(reply === 'once' || reply === 'always', reply === 'always');
+    const allow = reply === 'once' || reply === 'always';
+    const alwaysAllow = reply === 'always';
+    engine.respondPermission(allow, alwaysAllow);
+    dualRuntime?.getWorker().getEngine().respondPermission(allow, alwaysAllow);
+    dualRuntime?.getSupervisor().getEngine().respondPermission(allow, alwaysAllow);
     commitBridge(() => ({ permissionPrompt: null }));
   };
 
   const respondQuestion = (requestId: string, answers: string[][]) => {
     engine.respondQuestion(requestId, answers);
+    dualRuntime?.getWorker().getEngine().respondQuestion(requestId, answers);
+    dualRuntime?.getSupervisor().getEngine().respondQuestion(requestId, answers);
     commitBridge(() => ({ questionPrompt: null }));
   };
 
   const rejectQuestion = (requestId: string) => {
     engine.rejectQuestion(requestId);
+    dualRuntime?.getWorker().getEngine().rejectQuestion(requestId);
+    dualRuntime?.getSupervisor().getEngine().rejectQuestion(requestId);
     commitBridge(() => ({ questionPrompt: null }));
   };
 
@@ -924,6 +944,12 @@ export function createBridge(
 
     // SFR-70: 标记 loading 使 Ctrl+C 能取消 Workflow
     setTUIState('loading');
+    commitBridge(() => ({
+      isLoading: true,
+      error: null,
+      warnings: [],
+      permissionPrompt: null,
+    }));
 
     if (workflowCoordinator.getState()) {
       workflowCoordinator.reset();
@@ -934,6 +960,49 @@ export function createBridge(
     let wfRoundId = '';
     let wfRoundTs = 0;
     let toolItemIds = new Map<string, string>();
+    let toolCallArgs = new Map<number, string>();
+    let toolOutputs = new Map<string, string>();
+    let assistantText = '';
+    let reasoningText = '';
+
+    const upsertWorkflowItem = (item: TimelineItem) => {
+      commitBridge(prev => {
+        const index = prev.timeline.findIndex(existing => existing.id === item.id);
+        if (index === -1) return { timeline: [...prev.timeline, item] };
+        const timeline = [...prev.timeline];
+        timeline[index] = item;
+        return { timeline };
+      });
+    };
+
+    const upsertWorkflowTool = (key: string, patch: Partial<ToolStatus>) => {
+      const itemId = toolItemIds.get(key) ?? `wf-${key}-${crypto.randomUUID()}`;
+      toolItemIds.set(key, itemId);
+      const tool: ToolStatus = {
+        key,
+        name: patch.name ?? key.replace(/_\d+$/, ''),
+        status: patch.status ?? 'running',
+        args: patch.args ?? {},
+        output: patch.output ?? '',
+        startedAt: patch.startedAt ?? Date.now(),
+        elapsedMs: patch.elapsedMs,
+      };
+      if (transcriptStore) {
+        transcriptStore.upsertTool(itemId, wfRoundId, tool, current => ({ ...current, ...patch }), activeRole);
+        publishTimeline();
+      } else {
+        commitBridge(prev => {
+          const current = prev.timeline.find(item => item.id === itemId);
+          const merged = current?.kind === 'tool' ? { ...current.tool, ...patch } : tool;
+          const item: TimelineItem = { id: itemId, kind: 'tool', roundId: wfRoundId, tool: merged, role: activeRole };
+          const index = prev.timeline.findIndex(entry => entry.id === itemId);
+          if (index === -1) return { timeline: [...prev.timeline, item] };
+          const timeline = [...prev.timeline];
+          timeline[index] = item;
+          return { timeline };
+        });
+      }
+    };
 
     try {
       for await (const rawEvent of workflowCoordinator.runWorkflow()) {
@@ -959,6 +1028,11 @@ export function createBridge(
             }
             wfRoundId = `wf-round-${crypto.randomUUID()}`;
             wfRoundTs = Date.now();
+            assistantText = '';
+            reasoningText = '';
+            toolItemIds = new Map<string, string>();
+            toolCallArgs = new Map<number, string>();
+            toolOutputs = new Map<string, string>();
           }
           if (wfEvent.type === 'completed') {
             onPhaseChange?.('completed', 0, 'completed');
@@ -971,61 +1045,91 @@ export function createBridge(
           const loopEvent = rawEvent as unknown as LoopEvent;
           switch (loopEvent.role) {
             case 'assistant_delta': {
-              if (!wfRoundId || !transcriptStore) break;
-              transcriptStore.ensureTextPart(wfRoundId + '-text', 'assistant_text', wfRoundId, wfRoundTs, activeRole);
-              transcriptStore.appendPartDelta(wfRoundId + '-text', loopEvent.content ?? '');
-              publishTimeline();
+              if (!wfRoundId) break;
+              assistantText += loopEvent.content ?? '';
+              if (transcriptStore) {
+                transcriptStore.ensureTextPart(wfRoundId + '-text', 'assistant_text', wfRoundId, wfRoundTs, activeRole);
+                transcriptStore.appendPartDelta(wfRoundId + '-text', loopEvent.content ?? '');
+                publishTimeline();
+              } else {
+                upsertWorkflowItem({ id: wfRoundId + '-text', kind: 'assistant_text', roundId: wfRoundId, text: assistantText, isStreaming: true, startTs: wfRoundTs, role: activeRole });
+              }
               break;
             }
             case 'assistant_final': {
-              if (!wfRoundId || !transcriptStore) break;
-              transcriptStore.ensureTextPart(wfRoundId + '-text', 'assistant_text', wfRoundId, wfRoundTs, activeRole);
-              transcriptStore.setTextPart(wfRoundId + '-text', loopEvent.content ?? '', false);
-              publishTimeline();
+              if (!wfRoundId) break;
+              if (loopEvent.content) assistantText = loopEvent.content;
+              const metadataReasoning = loopEvent.metadata?.reasoning;
+              if (typeof metadataReasoning === 'string' && metadataReasoning.length > 0) reasoningText = metadataReasoning;
+              if (transcriptStore) {
+                transcriptStore.ensureTextPart(wfRoundId + '-text', 'assistant_text', wfRoundId, wfRoundTs, activeRole);
+                transcriptStore.setTextPart(wfRoundId + '-text', assistantText, false);
+                publishTimeline();
+              } else {
+                upsertWorkflowItem({ id: wfRoundId + '-text', kind: 'assistant_text', roundId: wfRoundId, text: assistantText, isStreaming: false, startTs: wfRoundTs, role: activeRole });
+              }
+              if (reasoningText) {
+                const item: TimelineItem = { id: wfRoundId + '-reasoning', kind: 'reasoning', roundId: wfRoundId, text: reasoningText, isStreaming: false, startTs: wfRoundTs, role: activeRole };
+                if (transcriptStore) transcriptStore.upsertReasoning(item);
+                else upsertWorkflowItem(item);
+              }
               break;
             }
             case 'reasoning_delta': {
-              if (!wfRoundId || !transcriptStore) break;
-              transcriptStore.ensureTextPart(wfRoundId + '-reasoning', 'reasoning', wfRoundId, wfRoundTs, activeRole);
-              transcriptStore.appendPartDelta(wfRoundId + '-reasoning', loopEvent.content ?? '');
-              publishTimeline();
+              if (!wfRoundId) break;
+              reasoningText += loopEvent.content ?? '';
+              if (transcriptStore) {
+                transcriptStore.ensureTextPart(wfRoundId + '-reasoning', 'reasoning', wfRoundId, wfRoundTs, activeRole);
+                transcriptStore.appendPartDelta(wfRoundId + '-reasoning', loopEvent.content ?? '');
+                publishTimeline();
+              } else {
+                upsertWorkflowItem({ id: wfRoundId + '-reasoning', kind: 'reasoning', roundId: wfRoundId, text: reasoningText, isStreaming: true, startTs: wfRoundTs, role: activeRole });
+              }
               break;
             }
+            case 'tool_call_delta':
+              if (loopEvent.toolCallIndex !== undefined && loopEvent.content) {
+                toolCallArgs.set(loopEvent.toolCallIndex, loopEvent.content);
+              }
+              break;
             case 'tool_start': {
-              if (!transcriptStore) break;
-              const key = loopEvent.toolName ?? 'wf-tool';
-              const itemId = `wf-${key}-${crypto.randomUUID()}`;
-              toolItemIds.set(key, itemId);
-              transcriptStore.upsertTool(itemId, wfRoundId, {
-                key,
-                name: key,
+              const key = fallbackToolKey(loopEvent.toolCallIndex, loopEvent.toolName);
+              upsertWorkflowTool(key, {
+                name: loopEvent.toolName ?? 'unknown',
                 status: 'running',
-                args: {},
+                args: parseArgs(loopEvent.toolCallIndex === undefined ? undefined : toolCallArgs.get(loopEvent.toolCallIndex)),
                 output: '',
                 startedAt: Date.now(),
-              }, undefined, activeRole);
-              publishTimeline();
+              });
+              break;
+            }
+            case 'tool_progress': {
+              const key = fallbackToolKey(loopEvent.toolCallIndex, loopEvent.toolName);
+              if (loopEvent.content === 'done') {
+                upsertWorkflowTool(key, { status: 'done' });
+              } else if (loopEvent.content && loopEvent.content !== 'running') {
+                const previous = toolOutputs.get(key) ?? '';
+                const output = previous + (previous ? '\n' : '') + loopEvent.content;
+                toolOutputs.set(key, output);
+                upsertWorkflowTool(key, { output });
+              }
               break;
             }
             case 'tool': {
-              if (!transcriptStore) break;
-              const key = loopEvent.toolName ?? 'wf-tool';
-              const itemId = toolItemIds.get(key) ?? `wf-${key}-${crypto.randomUUID()}`;
-              transcriptStore.upsertTool(itemId, wfRoundId, {
-                key,
-                name: key,
-                status: 'done',
-                args: {},
+              const key = fallbackToolKey(loopEvent.toolCallIndex, loopEvent.toolName);
+              upsertWorkflowTool(key, {
+                name: loopEvent.toolName ?? 'tool',
+                status: loopEvent.severity === 'error' ? 'error' : 'done',
                 output: loopEvent.content ?? '',
-                startedAt: Date.now(),
-              }, undefined, activeRole);
-              publishTimeline();
+              });
               break;
             }
             case 'error': {
+              const message = loopEvent.content ?? 'Unknown error';
               commitBridge(prev => ({
                 ...prev,
-                warnings: [...prev.warnings, loopEvent.content ?? 'Unknown error'],
+                error: message,
+                warnings: [...prev.warnings, message],
               }));
               break;
             }
@@ -1037,8 +1141,56 @@ export function createBridge(
               break;
             }
             case 'status':
-            case 'usage':
+              if (loopEvent.content && loopEvent.content !== 'interrupted' && loopEvent.content !== 'tools_completed') {
+                commitBridge(prev => ({ warnings: [...prev.warnings, loopEvent.content!] }));
+              }
+              break;
             case 'done':
+              break;
+            case 'usage': {
+              const addInput = typeof loopEvent.metadata?.input === 'number' ? loopEvent.metadata.input : 0;
+              const addOutput = typeof loopEvent.metadata?.output === 'number' ? loopEvent.metadata.output : 0;
+              commitBridge(prev => ({
+                tokens: { ...prev.tokens, input: prev.tokens.input + addInput, output: prev.tokens.output + addOutput },
+                contextUsage: addInput,
+              }));
+              break;
+            }
+            case 'permission_ask': {
+              const requestId = loopEvent.metadata?.requestId as string | undefined;
+              const sessionId = loopEvent.metadata?.sessionId as string | undefined;
+              const permission = loopEvent.metadata?.permission as string | undefined;
+              if (requestId && sessionId && permission) {
+                commitBridge(() => ({
+                  permissionPrompt: {
+                    id: requestId,
+                    sessionId,
+                    permission,
+                    patterns: loopEvent.metadata?.patterns as string[] ?? [],
+                    always: loopEvent.metadata?.always as string[] ?? [],
+                    metadata: loopEvent.metadata?.metadata as Record<string, unknown> ?? {},
+                    tool: loopEvent.metadata?.tool as { toolCallId: string; toolName: string } ?? { toolCallId: '', toolName: loopEvent.toolName ?? 'unknown' },
+                    parentSessionId: loopEvent.metadata?.parentSessionId as string | undefined,
+                  },
+                }));
+              }
+              break;
+            }
+            case 'question_ask': {
+              const requestId = loopEvent.metadata?.requestId as string | undefined;
+              const sessionId = loopEvent.metadata?.sessionId as string | undefined;
+              const questions = loopEvent.metadata?.questions as QuestionRequest['questions'] | undefined;
+              if (requestId && sessionId && questions) {
+                commitBridge(() => ({ questionPrompt: { id: requestId, sessionId, questions } }));
+              }
+              break;
+            }
+            case 'question_replied':
+            case 'question_rejected':
+              commitBridge(() => ({ questionPrompt: null }));
+              break;
+            case 'orchestration':
+              if (loopEvent.orchestration && orchestrationStore) orchestrationStore.apply(loopEvent.orchestration);
               break;
           }
         }
@@ -1051,6 +1203,11 @@ export function createBridge(
     } finally {
       // SFR-70: 确保 always 恢复 idle，即使中断或异常
       setTUIState('idle');
+      commitBridge(() => ({
+        isLoading: false,
+        permissionPrompt: null,
+        reasoningActive: false,
+      }));
     }
   };
 

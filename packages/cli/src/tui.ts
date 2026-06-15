@@ -255,10 +255,9 @@ async function main(): Promise<void> {
     // SFR-40: 应用 Supervisor Profile 的 thinking 模式（与 Worker 独立）
     supervisorEngine.setThinkingMode(supervisorProfile.thinking)
 
-    // 给 supervisor 注册"监督规划"角色所需工具：派活（AgentTool）、求助（AskUser）、
-    // 读取证据（read_file/grep/list_dir）、任务清单（todowrite）。不注册写文件/exec
-    // 类工具 —— 执行应通过 AgentTool 派发给独立 worker 子 engine，避免 supervisor
-    // 自己动手偏离规划职责。
+    // Supervisor 自身可见工具仍由 resolveEffectiveTools 限制；底层注册完整工具表，
+    // 以便 AgentTool 派出的独立 Worker 子 engine 能继承执行工具。
+    for (const tool of engine.getRegisteredTools()) supervisorEngine.registerTool(tool)
     supervisorEngine.registerTool(createAgentToolTool())
     supervisorEngine.registerTool(createAskUserQuestionTool())
     supervisorEngine.registerTool(createReadFileTool())

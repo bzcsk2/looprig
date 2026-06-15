@@ -150,6 +150,10 @@ export class ReasonixEngine implements CoreEngine {
 
   /** TUI-FIX-10: 编排事件发射回调（供 TUI Bridge 消费） */
   private emitOrchestration?: (event: LoopEvent) => void
+  /** 子 Worker 的原始事件，在父 submit 流中按顺序转发给 TUI。 */
+  private delegatedEvents: LoopEvent[] = []
+  private delegatedEventWaiters = new Set<() => void>()
+  private activeChildEngines = new Set<ReasonixEngine>()
 
   /**
    * @deprecated 使用 AgentProfile 中的 harness 配置代替
@@ -187,17 +191,27 @@ export class ReasonixEngine implements CoreEngine {
       }
       this.pendingPermission.resolve(allow)
       this.pendingPermission = null
+      return
     }
+    for (const child of this.activeChildEngines) child.respondPermission(allow, alwaysAllow)
   }
 
   /** QST-10: TUI 调用以回答 Question */
   respondQuestion(requestId: string, answers: QuestionAnswer[]): void {
-    this.questionService.reply({ requestId, answers })
+    if (this.questionService.list().some(request => request.id === requestId)) {
+      this.questionService.reply({ requestId, answers })
+      return
+    }
+    for (const child of this.activeChildEngines) child.respondQuestion(requestId, answers)
   }
 
   /** QST-10: TUI 调用以拒绝 Question */
   rejectQuestion(requestId: string): void {
-    this.questionService.reject(requestId)
+    if (this.questionService.list().some(request => request.id === requestId)) {
+      this.questionService.reject(requestId)
+      return
+    }
+    for (const child of this.activeChildEngines) child.rejectQuestion(requestId)
   }
 
   /** QST-10: 获取待处理的 Question 列表 */
@@ -476,11 +490,32 @@ export class ReasonixEngine implements CoreEngine {
     this.tools.set(tool.name, tool)
   }
 
+  /** 返回当前工具注册表快照，供具有独立可见工具策略的委派引擎继承。 */
+  getRegisteredTools(): AgentTool[] {
+    return [...this.tools.values()]
+  }
+
+  private enqueueDelegatedEvent(event: LoopEvent): void {
+    this.delegatedEvents.push(event)
+    for (const wake of this.delegatedEventWaiters) wake()
+    this.delegatedEventWaiters.clear()
+  }
+
+  private waitForDelegatedEvent(): { promise: Promise<void>; cancel: () => void } {
+    let wake!: () => void
+    const promise = new Promise<void>(resolve => { wake = resolve })
+    this.delegatedEventWaiters.add(wake)
+    return { promise, cancel: () => this.delegatedEventWaiters.delete(wake) }
+  }
+
   /** 标记中断，终止当前正在进行的请求和工具执行 */
   interrupt(): void {
     if (this.logger.isEnabled()) this.logger.info("engine.interrupt", { isSubmitting: this.isSubmitting })
     this._interrupted = true
     this.pendingInstructionQueue = []
+    this.respondPermission(false)
+    this.questionService.interrupt()
+    for (const child of this.activeChildEngines) child.interrupt()
     this.activeAbortController?.abort()
   }
 
@@ -621,6 +656,7 @@ export class ReasonixEngine implements CoreEngine {
     const submitId = diagnosticsEnabled ? randomUUID() : undefined
     const submitLogger = submitId ? this.logger.child({ submitId }) : this.logger
     this._interrupted = false
+    this.delegatedEvents = []
     this.isSubmitting = true
     const abortController = new AbortController()
     this.activeAbortController = abortController
@@ -811,10 +847,28 @@ export class ReasonixEngine implements CoreEngine {
         },
       }
 
-      for await (const event of runLoop(loopOpts)) {
+      const loopIterator = runLoop(loopOpts)[Symbol.asyncIterator]()
+      let nextLoopEvent = loopIterator.next()
+      while (true) {
+        while (this.delegatedEvents.length > 0) {
+          yield this.delegatedEvents.shift()!
+        }
+        const delegatedWake = this.waitForDelegatedEvent()
+        const next = await Promise.race([
+          nextLoopEvent.then(result => ({ kind: "loop" as const, result })),
+          delegatedWake.promise.then(() => ({ kind: "delegated" as const })),
+        ])
+        delegatedWake.cancel()
+        if (next.kind === "delegated") continue
+        if (next.result.done) break
+        const event = next.result.value
         yield event
         // P5: Use .catch() for async hook — sync try/catch cannot catch Promise rejections
         void this.hookManager.runOnLoopEvent(event as unknown as Record<string, unknown>).catch(() => {})
+        nextLoopEvent = loopIterator.next()
+      }
+      while (this.delegatedEvents.length > 0) {
+        yield this.delegatedEvents.shift()!
       }
     } finally {
       // TUI-FIX-10: emit loop_transition at submit end
@@ -882,9 +936,12 @@ export class ReasonixEngine implements CoreEngine {
     const def = this.subagentRegistry.resolve(options.subagentType ?? "general-purpose")
     const workerId = `worker_${randomUUID().slice(0, 8)}`
     const workerStartedAt = Date.now()
+    const emitWorkerEvent = (event: LoopEvent): void => {
+      this.enqueueDelegatedEvent(event)
+    }
 
     // TUI-FIX-10: emit worker_upsert (starting)
-    this.emitOrchestration?.({
+    emitWorkerEvent({
       role: "orchestration",
       orchestration: {
         kind: "worker_upsert",
@@ -905,6 +962,7 @@ export class ReasonixEngine implements CoreEngine {
       this.client,
       this.logger.child({ delegate: true, subagentType: def.name }),
     )
+    this.activeChildEngines.add(child)
 
     try {
       for (const tool of this.tools.values()) {
@@ -944,7 +1002,7 @@ export class ReasonixEngine implements CoreEngine {
       let workerErrorCount = 0
 
       // TUI-FIX-10: emit worker_upsert (running)
-      this.emitOrchestration?.({
+      emitWorkerEvent({
         role: "orchestration",
         orchestration: {
           kind: "worker_upsert",
@@ -959,6 +1017,15 @@ export class ReasonixEngine implements CoreEngine {
       })
 
       for await (const event of child.submit(options.prompt, agentCfg)) {
+        this.enqueueDelegatedEvent({
+          ...event,
+          metadata: {
+            ...event.metadata,
+            agentRole: "worker",
+            parentRole: "supervisor",
+            workerId,
+          },
+        })
         if (event.role === "assistant_delta") output += event.content ?? ""
         if (event.role === "usage" && event.metadata) {
           usage = {
@@ -976,7 +1043,7 @@ export class ReasonixEngine implements CoreEngine {
         }
         // TUI-FIX-10: detect waiting states from subagent events
         if (event.role === "permission_ask") {
-          this.emitOrchestration?.({
+          emitWorkerEvent({
             role: "orchestration",
             orchestration: {
               kind: "worker_upsert",
@@ -991,7 +1058,7 @@ export class ReasonixEngine implements CoreEngine {
           })
         }
         if (event.role === "question_ask") {
-          this.emitOrchestration?.({
+          emitWorkerEvent({
             role: "orchestration",
             orchestration: {
               kind: "worker_upsert",
@@ -1013,7 +1080,7 @@ export class ReasonixEngine implements CoreEngine {
       // TUI-FIX-10: emit final worker status (keep visible, don't remove)
       const finalElapsedMs = Date.now() - workerStartedAt
       if (workerCancelled) {
-        this.emitOrchestration?.({
+        emitWorkerEvent({
           role: "orchestration",
           orchestration: {
             kind: "worker_upsert",
@@ -1027,7 +1094,7 @@ export class ReasonixEngine implements CoreEngine {
           },
         })
       } else if (workerFailed) {
-        this.emitOrchestration?.({
+        emitWorkerEvent({
           role: "orchestration",
           orchestration: {
             kind: "worker_upsert",
@@ -1041,7 +1108,7 @@ export class ReasonixEngine implements CoreEngine {
           },
         })
       } else {
-        this.emitOrchestration?.({
+        emitWorkerEvent({
           role: "orchestration",
           orchestration: {
             kind: "worker_upsert",
@@ -1067,6 +1134,7 @@ export class ReasonixEngine implements CoreEngine {
         warnings,
       }
     } finally {
+      this.activeChildEngines.delete(child)
       // Keep worker visible for a while so React can render final state
       // worker_remove will be emitted on next submit or session switch
       await child.shutdown()

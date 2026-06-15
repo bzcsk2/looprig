@@ -227,6 +227,152 @@ describe("SSE Client with MockSseServer", () => {
     }
   })
 
+  it("should cancel an opened response stream when the caller aborts", async () => {
+    const controller = new AbortController()
+    let bodyCancelled = false
+    const body = new ReadableStream<Uint8Array>({
+      start(streamController) {
+        streamController.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"started"}}]}\n\n'))
+      },
+      cancel() {
+        bodyCancelled = true
+      },
+    })
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(body, { status: 200 }))
+
+    try {
+      const client = new DeepSeekClient()
+      const consume = (async () => {
+        for await (const event of client.chatCompletionsStream(
+          [{ role: "user", content: "hi" }],
+          { apiKey: "test-key", baseUrl: "https://example.test/v1", model: "test-model", signal: controller.signal },
+        )) {
+          if (event.type === "text_delta") controller.abort()
+        }
+      })()
+
+      await Promise.race([
+        consume,
+        new Promise((_, reject) => setTimeout(() => reject(new Error("abort did not stop stream")), 500)),
+      ])
+      expect(bodyCancelled).toBe(true)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("should repair an orphaned tool call before sending the next request", async () => {
+    let sentMessages: Array<Record<string, unknown>> = []
+    const responseBody = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode("data: [DONE]\n\n"))
+        controller.close()
+      },
+    })
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+      sentMessages = JSON.parse(String(init?.body)).messages
+      return new Response(responseBody, { status: 200 })
+    })
+
+    try {
+      const client = new DeepSeekClient()
+      for await (const _event of client.chatCompletionsStream(
+        [
+          { role: "assistant", content: null, tool_calls: [{ id: "call_1", type: "function", function: { name: "AgentTool", arguments: "{}" } }] },
+          { role: "user", content: "next turn" },
+        ],
+        { apiKey: "test-key", baseUrl: "https://example.test/v1", model: "test-model" },
+      )) { /* consume */ }
+
+      expect(sentMessages.map(message => message.role)).toEqual(["assistant", "tool", "user"])
+      expect(sentMessages[1]).toMatchObject({ tool_call_id: "call_1" })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("should expose provider keepalive status and fall back after no model events", async () => {
+    const requestedModels: string[] = []
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+      const model = JSON.parse(String(init?.body)).model as string
+      requestedModels.push(model)
+      if (model === "slow-model") {
+        let interval: ReturnType<typeof setInterval> | undefined
+        let closeTimer: ReturnType<typeof setTimeout> | undefined
+        return new Response(new ReadableStream<Uint8Array>({
+          start(controller) {
+            interval = setInterval(() => controller.enqueue(new TextEncoder().encode(": PROCESSING\n\n")), 2)
+            closeTimer = setTimeout(() => {
+              clearInterval(interval)
+              controller.close()
+            }, 100)
+          },
+          cancel() {
+            clearInterval(interval)
+            clearTimeout(closeTimer)
+          },
+        }), { status: 200 })
+      }
+      return new Response(new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('data: {"choices":[{"delta":{"content":"fallback ok"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n'))
+          controller.close()
+        },
+      }), { status: 200 })
+    })
+
+    try {
+      const events: DeepSeekStreamEvent[] = []
+      const client = new DeepSeekClient()
+      for await (const event of client.chatCompletionsStream(
+        [{ role: "user", content: "hi" }],
+        {
+          apiKey: "test-key",
+          baseUrl: "https://example.test/v1",
+          model: "slow-model",
+          fallbackModel: "fallback-model",
+          firstEventTimeoutMs: 15,
+        },
+      )) {
+        events.push(event)
+      }
+
+      expect(requestedModels).toEqual(["slow-model", "fallback-model"])
+      expect(events).toContainEqual(expect.objectContaining({ type: "status", metadata: expect.objectContaining({ kind: "provider_processing" }) }))
+      expect(events).toContainEqual(expect.objectContaining({ type: "status", metadata: expect.objectContaining({ kind: "model_fallback" }) }))
+      expect(events).toContainEqual({ type: "text_delta", delta: "fallback ok" })
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it("should fall back immediately when the primary model returns a retryable HTTP error", async () => {
+    const requestedModels: string[] = []
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+      const model = JSON.parse(String(init?.body)).model as string
+      requestedModels.push(model)
+      if (model === "primary-model") return new Response("bad gateway", { status: 502 })
+      return new Response("data: [DONE]\n\n", { status: 200 })
+    })
+
+    try {
+      const events: DeepSeekStreamEvent[] = []
+      const client = new DeepSeekClient()
+      for await (const event of client.chatCompletionsStream(
+        [{ role: "user", content: "hi" }],
+        { apiKey: "test-key", baseUrl: "https://example.test/v1", model: "primary-model", fallbackModel: "fallback-model" },
+      )) {
+        events.push(event)
+      }
+
+      expect(requestedModels).toEqual(["primary-model", "fallback-model"])
+      expect(events).toContainEqual(expect.objectContaining({ type: "status", metadata: expect.objectContaining({ kind: "model_fallback", status: 502 }) }))
+      expect(events.some(event => event.type === "error")).toBe(false)
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
   // ── 13. finish_reason variants ──────────────────────────
 
   it("isToolUseFinishReason: tool_calls→true", () => {

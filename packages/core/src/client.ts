@@ -37,6 +37,10 @@ export interface DeepSeekClientOptions {
   keyless?: boolean
   /** Per-request HTTP timeout in ms. Overrides the default for slow providers. */
   timeoutMs?: number
+  /** Maximum wait after response headers for the first model event. */
+  firstEventTimeoutMs?: number
+  /** Optional model retried once when the primary stream only emits keepalives. */
+  fallbackModel?: string
   /** Called when the max_completion_tokens field should be used instead of max_tokens */
   useMaxCompletionTokens?: boolean
 }
@@ -93,9 +97,10 @@ export class DeepSeekClient implements ChatClient {
       headers.Authorization = `Bearer ${opts.apiKey}`
     }
 
+    const requestMessages = repairToolCallSequence(messages)
     const body: Record<string, unknown> = {
       model: opts.model,
-      messages: messages.map((m) => {
+      messages: requestMessages.map((m) => {
         if (m.role === "tool") {
           let content = m.content ?? ""
           if (m.is_error && !content.startsWith("[Error]")) {
@@ -151,6 +156,7 @@ export class DeepSeekClient implements ChatClient {
 
     const timeoutMs = opts.timeoutMs ?? 15000
     let resp: Response
+    let responseController: AbortController | undefined
     let attempt = 0
     while (true) {
       attempt++
@@ -159,18 +165,29 @@ export class DeepSeekClient implements ChatClient {
         // Per-request timeout via AbortController (freellmapi fetchWithTimeout pattern)
         // Combined with the user-provided signal so we don't override user abort
         const timeoutController = new AbortController()
+        const requestController = new AbortController()
         const timeout = setTimeout(() => {
           timeoutTriggered = true
           timeoutController.abort()
         }, timeoutMs)
-        const combinedSignal = opts.signal ? combineAbortSignals(opts.signal, timeoutController.signal) : timeoutController.signal
+        const combinedSignal = opts.signal
+          ? combineAbortSignals(opts.signal, timeoutController.signal, requestController.signal)
+          : combineAbortSignals(timeoutController.signal, requestController.signal)
         try {
           resp = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal: combinedSignal, keepalive: false })
+          responseController = requestController
         } finally {
           clearTimeout(timeout)
         }
         if (resp.ok) break
         const status = resp.status
+        if (opts.fallbackModel && opts.fallbackModel !== opts.model && retryableStatuses.has(status)) {
+          responseController?.abort()
+          if (diagnosticsEnabled) requestLogger.warn("api.request.fallback", { status, fromModel: opts.model, toModel: opts.fallbackModel })
+          yield { type: "status", content: `${opts.model} returned HTTP ${status}; falling back to ${opts.fallbackModel}`, metadata: { kind: "model_fallback", status, fromModel: opts.model, toModel: opts.fallbackModel } }
+          yield* this.chatCompletionsStream(messages, { ...opts, model: opts.fallbackModel, fallbackModel: undefined })
+          return
+        }
         if (!retryableStatuses.has(status) || attempt > maxRetries) {
           const text = await safeReadText(resp)
           if (diagnosticsEnabled) {
@@ -210,6 +227,21 @@ export class DeepSeekClient implements ChatClient {
     if (diagnosticsEnabled) requestLogger.info("api.response.open", { status: resp.status, attempt, durationMs: Date.now() - startedAt })
 
     const reader = resp.body.getReader()
+    let fallbackRequested = false
+    const onAbort = () => { void reader.cancel(opts.signal?.reason).catch(() => {}) }
+    opts.signal?.addEventListener("abort", onAbort, { once: true })
+    const abortPromise = new Promise<never>((_, reject) => {
+      if (!opts.signal) return
+      if (opts.signal.aborted) {
+        reject(opts.signal.reason ?? new DOMException("The operation was aborted.", "AbortError"))
+        return
+      }
+      opts.signal.addEventListener(
+        "abort",
+        () => reject(opts.signal?.reason ?? new DOMException("The operation was aborted.", "AbortError")),
+        { once: true },
+      )
+    })
     try {
       const decoder = new TextDecoder("utf-8")
       let buf = ""
@@ -220,9 +252,11 @@ export class DeepSeekClient implements ChatClient {
       let finishReasonYielded = false
       let ttftMs: number | undefined
       let firstEventYielded = false
+      let processingStatusYielded = false
       let sawFinishReason = false
       // Per-read inactivity timeout (freellmapi readSseStream pattern #231 audit)
       const INACTIVITY_TIMEOUT_MS = opts.timeoutMs ?? 90000
+      const firstEventDeadline = Date.now() + (opts.firstEventTimeoutMs ?? 15_000)
 
       const yieldFirstEvent = (type: string) => {
         if (!firstEventYielded) {
@@ -238,14 +272,21 @@ export class DeepSeekClient implements ChatClient {
         try {
           result = await Promise.race([
             reader.read(),
+            abortPromise,
             new Promise<never>((_, reject) => {
               timer = setTimeout(
                 () => reject(new Error(`Stream stalled: no data for ${INACTIVITY_TIMEOUT_MS}ms (timeout)`)),
-                INACTIVITY_TIMEOUT_MS,
+                firstEventYielded
+                  ? INACTIVITY_TIMEOUT_MS
+                  : Math.min(INACTIVITY_TIMEOUT_MS, Math.max(0, firstEventDeadline - Date.now())),
               )
             }),
           ]).finally(() => clearTimeout(timer))
         } catch (e) {
+          if (!firstEventYielded && Date.now() >= firstEventDeadline && opts.fallbackModel && opts.fallbackModel !== opts.model) {
+            fallbackRequested = true
+            break
+          }
           // SSE stall timeout — yield as error if we haven't started; if we
           // have already yielded events, we'll handle it through normal channel
           if (!firstEventYielded) {
@@ -274,11 +315,19 @@ export class DeepSeekClient implements ChatClient {
 
           // accumulate multi-line data: (OpenAI-compatible SSE may split one event across lines)
           let dataPayloads: string[] = []
+          let sawComment = false
           for (const line of raw.split("\n")) {
             const trimmed = line.trimEnd()
-            if (trimmed.startsWith(":")) continue // SSE comment line
+            if (trimmed.startsWith(":")) {
+              sawComment = true
+              continue
+            }
             if (!trimmed.startsWith("data:")) continue
             dataPayloads.push(trimmed.slice("data:".length).trimStart())
+          }
+          if (sawComment && !processingStatusYielded && !firstEventYielded) {
+            processingStatusYielded = true
+            yield { type: "status", content: `Waiting for ${opts.model} to start responding`, metadata: { kind: "provider_processing", model: opts.model } }
           }
           const payload = dataPayloads.join("")
 
@@ -406,21 +455,69 @@ export class DeepSeekClient implements ChatClient {
 
       // freellmapi abnormal EOF detection: stream ended without [DONE] AND
       // without any finish_reason is a truncated generation, not a completion.
-      if (!sawFinishReason && !finishReasonYielded) {
+      if (!fallbackRequested && !sawFinishReason && !finishReasonYielded) {
         yield { type: "error", message: "Stream ended unexpectedly (no [DONE], no finish_reason) — connection reset or truncated upstream" }
         return
       }
 
-      if (!finishReasonYielded) {
+      if (!fallbackRequested && !finishReasonYielded) {
         yield { type: "done", finishReason: null }
       }
-      if (diagnosticsEnabled) requestLogger.info("api.stream.done", { finishReason: null, durationMs: Date.now() - startedAt, ttftMs })
+      if (!fallbackRequested && diagnosticsEnabled) requestLogger.info("api.stream.done", { finishReason: null, durationMs: Date.now() - startedAt, ttftMs })
     } finally {
+      opts.signal?.removeEventListener("abort", onAbort)
+      await reader.cancel().catch(() => {})
+      responseController?.abort()
       reader.releaseLock()
-      // LIFE-01: explicitly cancel the response body to close the underlying HTTP connection
-      await resp.body?.cancel().catch(() => {})
+    }
+
+    if (fallbackRequested && opts.fallbackModel) {
+      if (diagnosticsEnabled) requestLogger.warn("api.stream.fallback", { fromModel: opts.model, toModel: opts.fallbackModel, durationMs: Date.now() - startedAt })
+      yield { type: "status", content: `${opts.model} did not start responding; falling back to ${opts.fallbackModel}`, metadata: { kind: "model_fallback", fromModel: opts.model, toModel: opts.fallbackModel } }
+      yield* this.chatCompletionsStream(messages, { ...opts, model: opts.fallbackModel, fallbackModel: undefined })
     }
   }
+}
+
+/**
+ * Providers reject assistant tool calls without immediately following results.
+ * Interrupts can leave persisted sessions in that state, so repair only the
+ * outbound request copy and keep the transcript unchanged.
+ */
+function repairToolCallSequence(messages: ChatMessage[]): ChatMessage[] {
+  const repaired: ChatMessage[] = []
+  let pending = new Map<string, string>()
+
+  const settlePending = () => {
+    for (const [id, name] of pending) {
+      repaired.push({
+        role: "tool",
+        tool_call_id: id,
+        content: `[Error] ${name} was cancelled before producing a result`,
+        is_error: true,
+      })
+    }
+    pending = new Map()
+  }
+
+  for (const message of messages) {
+    if (message.role === "tool") {
+      if (message.tool_call_id && pending.has(message.tool_call_id)) {
+        repaired.push(message)
+        pending.delete(message.tool_call_id)
+      }
+      continue
+    }
+
+    if (pending.size > 0) settlePending()
+    repaired.push(message)
+    if (message.role === "assistant" && message.tool_calls) {
+      pending = new Map(message.tool_calls.map(call => [call.id, call.function.name]))
+    }
+  }
+
+  if (pending.size > 0) settlePending()
+  return repaired
 }
 
 export function isToolUseFinishReason(reason: string | null): boolean {

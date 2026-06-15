@@ -35,6 +35,7 @@ export class WorkflowCoordinator {
   private runtime?: DualAgentRuntime
   private questionService?: QuestionService
   private abortController?: AbortController
+  private pendingEvents: WorkflowEvent[] = []
 
   constructor(options: WorkflowCoordinatorOptions = {}) {
     this.config = { ...DEFAULT_WORKFLOW_CONFIG, ...options.config }
@@ -65,6 +66,7 @@ export class WorkflowCoordinator {
     }
 
     const maxRounds = options.maxRounds ?? this.config.maxRounds
+    this.pendingEvents = []
 
     this.state = {
       workflowId: options.workflowId ?? randomUUID(),
@@ -257,6 +259,7 @@ export class WorkflowCoordinator {
 
     // Start: idle → supervisor_analyse
     this.transition("supervisor_analyse")
+    yield* this.drainEvents()
 
     while (this.canContinue()) {
       if (this.abortController.signal.aborted) {
@@ -280,6 +283,7 @@ export class WorkflowCoordinator {
       } else {
         break
       }
+      yield* this.drainEvents()
     }
 
     // If we exited the loop without finishing, distinguish interrupt from max rounds
@@ -290,18 +294,25 @@ export class WorkflowCoordinator {
         this.transition("blocked", "Max rounds reached")
       }
     }
+    yield* this.drainEvents()
   }
 
   private async *runSupervisorAnalyse(): AsyncGenerator<WorkflowEvent> {
     const supervisorInput = `Analyse the following goal and create a plan:\n\nGoal: ${this.state!.goal}\n\nProvide a structured plan with steps, constraints, and risks.`
 
+    let errorMessage = ""
     // SFR-10: 使用 "loop" mode
     for await (const event of this.runtime!.getSupervisor().submit(supervisorInput, "loop")) {
       yield event as any
+      if (event.role === "error") errorMessage = event.content ?? "Supervisor analysis failed"
     }
 
     const supervisorState = this.runtime!.getSupervisor().getState()
-    const plan = supervisorState.messages.findLast(m => m.role === "assistant")?.content ?? ""
+    const plan = supervisorState.messages.findLast(m => m.role === "assistant")?.content?.trim() ?? ""
+    if (errorMessage || (this.config.requireSupervisorPlan && !plan)) {
+      this.transition("blocked", errorMessage || "Supervisor did not produce a plan")
+      return
+    }
     this.setSupervisorPlan(plan)
 
     this.transition("worker_do")
@@ -508,6 +519,7 @@ Return your guidance as structured advice.`
 
   reset(): void {
     this.state = null
+    this.pendingEvents = []
     this.abortController?.abort()
     this.abortController = undefined
   }
@@ -534,8 +546,15 @@ Return your guidance as structured advice.`
   }
 
   private emitEvent(event: WorkflowEvent): void {
+    this.pendingEvents.push(event)
     if (this.onEvent) {
       this.onEvent(event)
+    }
+  }
+
+  private *drainEvents(): Generator<WorkflowEvent> {
+    while (this.pendingEvents.length > 0) {
+      yield this.pendingEvents.shift()!
     }
   }
 }

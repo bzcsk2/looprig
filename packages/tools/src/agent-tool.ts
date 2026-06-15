@@ -35,7 +35,7 @@ Returns structured JSON with status, id, subagent_type, result, files, usage.`,
       },
     },
     concurrency: "exclusive",
-    approval: "exec",
+    approval: "read",
     async execute(args, ctx) {
       // Resolve prompt from new or legacy param
       const prompt = typeof args.prompt === "string" && args.prompt

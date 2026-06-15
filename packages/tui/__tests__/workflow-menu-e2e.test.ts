@@ -44,9 +44,12 @@ function makeMockEngine() {
 }
 
 function makeMockCoordinator() {
-  const events: WorkflowEvent[] = [
+  const events: Array<WorkflowEvent | LoopEvent> = [
     { type: 'phase_change', workflowId: 'wf-1', phase: 'supervisor_analyse', iteration: 1, timestamp: Date.now() },
+    { role: 'reasoning_delta', content: 'supervisor reasoning' },
+    { role: 'assistant_final', content: 'supervisor plan' },
     { type: 'phase_change', workflowId: 'wf-1', phase: 'worker_do', iteration: 1, timestamp: Date.now() },
+    { role: 'assistant_final', content: 'worker result' },
     { type: 'completed', workflowId: 'wf-1', timestamp: Date.now() },
   ];
   const interruptedCalls: number[] = [];
@@ -148,5 +151,80 @@ describe('SFR-90: workflow e2e integration', () => {
     });
     expect(route.type).toBe('start_workflow');
     expect(route).toEqual({ type: 'start_workflow', goal: 'my goal' });
+  });
+
+  it('scenario 5: loop preserves supervisor and worker structured output in legacy timeline', async () => {
+    await bridge.runWorkflow('test goal');
+
+    const reasoning = setStateCalls.timeline.find(item => item.kind === 'reasoning');
+    const texts = setStateCalls.timeline.filter(item => item.kind === 'assistant_text');
+
+    expect(reasoning).toMatchObject({ kind: 'reasoning', text: 'supervisor reasoning', role: 'supervisor' });
+    expect(texts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'assistant_text', text: 'supervisor plan', role: 'supervisor' }),
+      expect.objectContaining({ kind: 'assistant_text', text: 'worker result', role: 'worker' }),
+    ]));
+  });
+
+  it('scenario 6: subagent mode is passed to DualAgentRuntime', async () => {
+    const sent: any[] = [];
+    const dualRuntime = {
+      sendDirect: async function* (options: any) {
+        sent.push(options);
+        yield { role: 'done' };
+      },
+      interruptRole: () => {},
+    };
+    const setState = (update: any) => {
+      setStateCalls = typeof update === 'function' ? update(setStateCalls) : update;
+    };
+    const modeBridge = createBridge(engine as any, setState, undefined, undefined, undefined, dualRuntime as any);
+
+    await modeBridge.submit('delegate this', false, 'supervisor', 'subagent');
+
+    expect(sent).toEqual([{ role: 'supervisor', input: 'delegate this', mode: 'subagent' }]);
+  });
+
+  it('scenario 7: subagent worker events keep their worker role in the shared timeline', async () => {
+    const orchestrationEvents: any[] = [];
+    const dualRuntime = {
+      sendDirect: async function* () {
+        yield { role: 'assistant_final', content: 'delegating' };
+        yield {
+          role: 'orchestration',
+          orchestration: {
+            kind: 'worker_upsert',
+            worker: { id: 'worker-1', modelTarget: 'default', status: 'running', elapsedMs: 1 },
+          },
+        };
+        yield { role: 'reasoning_delta', content: 'worker reasoning', metadata: { agentRole: 'worker' } };
+        yield { role: 'assistant_final', content: 'worker result', metadata: { agentRole: 'worker' } };
+        yield { role: 'assistant_final', content: 'supervisor summary' };
+      },
+      interruptRole: () => {},
+    };
+    const setState = (update: any) => {
+      setStateCalls = typeof update === 'function' ? update(setStateCalls) : update;
+    };
+    const modeBridge = createBridge(
+      engine as any,
+      setState,
+      undefined,
+      undefined,
+      { apply: (event: any) => orchestrationEvents.push(event) } as any,
+      dualRuntime as any,
+    );
+
+    await modeBridge.submit('delegate this', false, 'supervisor', 'subagent');
+
+    expect(setStateCalls.timeline).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'assistant_text', text: 'delegating', role: 'supervisor' }),
+      expect.objectContaining({ kind: 'reasoning', text: 'worker reasoning', role: 'worker' }),
+      expect.objectContaining({ kind: 'assistant_text', text: 'worker result', role: 'worker' }),
+      expect.objectContaining({ kind: 'assistant_text', text: 'supervisor summary', role: 'supervisor' }),
+    ]));
+    expect(orchestrationEvents).toEqual([
+      expect.objectContaining({ kind: 'worker_upsert', worker: expect.objectContaining({ id: 'worker-1', status: 'running' }) }),
+    ]);
   });
 });

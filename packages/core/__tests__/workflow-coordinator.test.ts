@@ -3,6 +3,79 @@ import { WorkflowCoordinator } from "../src/workflow-coordinator/coordinator.js"
 import type { WorkflowSupervisorAdvice } from "../src/workflow-coordinator/types.js"
 
 describe("WorkflowCoordinator", () => {
+  it("yields phase events before role output so consumers can label each role", async () => {
+    const roleEvent = { role: "assistant_final", content: "plan" } as const
+    const runtime = {
+      getSupervisor: () => ({
+        submit: async function* () { yield roleEvent },
+        getState: () => ({ messages: [{ role: "assistant", content: "approve" }] }),
+      }),
+      getWorker: () => ({
+        submit: async function* () { yield { role: "assistant_final", content: "done" } },
+        getState: () => ({ messages: [{ role: "assistant", content: "done" }] }),
+      }),
+    }
+    const coordinator = new WorkflowCoordinator({ runtime: runtime as any })
+    coordinator.startWorkflow({ goal: "test" })
+
+    const events: any[] = []
+    for await (const event of coordinator.runWorkflow()) events.push(event)
+
+    const supervisorPhase = events.findIndex(event => event.type === "phase_change" && event.phase === "supervisor_analyse")
+    const supervisorOutput = events.findIndex(event => event.role === "assistant_final" && event.content === "plan")
+    const workerPhase = events.findIndex(event => event.type === "phase_change" && event.phase === "worker_do")
+    const workerOutput = events.findIndex(event => event.role === "assistant_final" && event.content === "done")
+
+    expect(supervisorPhase).toBeGreaterThanOrEqual(0)
+    expect(supervisorOutput).toBeGreaterThan(supervisorPhase)
+    expect(workerPhase).toBeGreaterThan(supervisorOutput)
+    expect(workerOutput).toBeGreaterThan(workerPhase)
+  })
+
+  it("blocks instead of starting Worker when Supervisor analysis fails", async () => {
+    let workerCalls = 0
+    const runtime = {
+      getSupervisor: () => ({
+        submit: async function* () { yield { role: "error", content: "HTTP 400" } },
+        getState: () => ({ messages: [] }),
+      }),
+      getWorker: () => ({
+        submit: async function* () { workerCalls++ },
+        getState: () => ({ messages: [] }),
+      }),
+    }
+    const coordinator = new WorkflowCoordinator({ runtime: runtime as any })
+    coordinator.startWorkflow({ goal: "test" })
+
+    const events: any[] = []
+    for await (const event of coordinator.runWorkflow()) events.push(event)
+
+    expect(workerCalls).toBe(0)
+    expect(coordinator.getState()?.currentPhase).toBe("blocked")
+    expect(events).toContainEqual(expect.objectContaining({ type: "blocked", reason: "HTTP 400" }))
+  })
+
+  it("blocks instead of starting Worker when Supervisor returns no plan", async () => {
+    let workerCalls = 0
+    const runtime = {
+      getSupervisor: () => ({
+        submit: async function* () { yield { role: "done" } },
+        getState: () => ({ messages: [{ role: "assistant", content: "" }] }),
+      }),
+      getWorker: () => ({
+        submit: async function* () { workerCalls++ },
+        getState: () => ({ messages: [] }),
+      }),
+    }
+    const coordinator = new WorkflowCoordinator({ runtime: runtime as any })
+    coordinator.startWorkflow({ goal: "test" })
+
+    for await (const _event of coordinator.runWorkflow()) { /* consume */ }
+
+    expect(workerCalls).toBe(0)
+    expect(coordinator.getState()?.blockedReason).toBe("Supervisor did not produce a plan")
+  })
+
   it("should create coordinator with default config", () => {
     const coordinator = new WorkflowCoordinator()
     const config = coordinator.getConfig()

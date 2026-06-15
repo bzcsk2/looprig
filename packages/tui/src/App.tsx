@@ -671,7 +671,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
         const taggedSkillNames = extractSkillTags(submitted);
         if (taggedSkillNames.length === 0) {
           scrollRef.current?.scrollToBottom();
-          bridge.submit(submitted, false, route.role);
+          bridge.submit(submitted, false, route.role, route.mode);
           return;
         }
         void (async () => {
@@ -684,7 +684,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
           engineRef.current.setActiveSkills(merged);
           scrollRef.current?.scrollToBottom();
           try {
-            await bridge.submit(submitted, false, route.role);
+            await bridge.submit(submitted, false, route.role, route.mode);
           } finally {
             engineRef.current.setActiveSkills(previousSkills);
           }
@@ -694,7 +694,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
       case 'supervisor_task': {
         // subagent 模式：固定发给 Supervisor
         scrollRef.current?.scrollToBottom();
-        bridge.submit(submitted, false, 'supervisor');
+        bridge.submit(submitted, false, 'supervisor', route.mode);
         return;
       }
       case 'start_workflow': {
@@ -716,10 +716,6 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
           goal,
           supervisorStatus: 'analyse',
           workerStatus: 'idle',
-        });
-        appendMessage({
-          role: 'assistant' as const,
-          content: `Starting workflow for: ${goal}\nSupervisor analysing...`,
         });
         scrollRef.current?.scrollToBottom();
         bridge.runWorkflow(goal, (phase: string, iteration: number, finalStatus?: string) => {

@@ -381,6 +381,10 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
       tools: routedTools,
       ...(supportsThinking ? createDeepSeekCapabilities(provider).mapMode(thinkingMode) : {}),
       traceContext: diagnosticsEnabled ? { submitId, turnCount } : undefined,
+      firstEventTimeoutMs: config.provider === "zen" ? 15_000 : undefined,
+      fallbackModel: config.provider === "zen" && config.model !== "deepseek-v4-flash-free"
+        ? "deepseek-v4-flash-free"
+        : undefined,
     })) {
       if (isInterrupted()) {
         yield { role: "status", content: "interrupted" }
