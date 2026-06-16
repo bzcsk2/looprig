@@ -1,9 +1,25 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
 *.node
+
+# Logs
 *.log
-.env
-api-key
-.deep*/
-Deepreef*.md
 LOGSYS/
+
+# Environment and credentials
+.env
+.env.*
+api-key
+
+# DeepReef local runtime state
+.deep*/
+.deepreef/
+
+# Local agent/editor state
+.serena/
+
+# Local planning scratch files
+Deepreef*.md
