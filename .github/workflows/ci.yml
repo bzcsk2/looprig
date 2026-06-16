@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
 
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
@@ -35,6 +35,17 @@ jobs:
         run: bun test packages/core/__tests__/ packages/tui/__tests__/ packages/cli/__tests__/ --timeout 30000
         env:
           CI: "true"
+
+      - name: Build CLI bundle
+        run: bun run build
+
+      - name: CLI help smoke test
+        run: node ./dist/index.js --help
+        env:
+          CI: "true"
+
+      - name: Check npm package contents
+        run: npm pack --dry-run
 
       # ── Platform-specific verification ──
 
@@ -96,7 +107,7 @@ jobs:
           node -e "
           const { execSync } = require('child_process');
           try {
-            const out = execSync('node -e \"console.log(require(process.cwd() + '/packages/tools/src/glob.js'))\" 2>&1', {timeout: 3000});
+            const out = execSync('node -e \"console.log(require(process.cwd() + \'/packages/tools/src/glob.js\'))\" 2>&1', {timeout: 3000});
           } catch(e) {
             // Expected to fail as glob.js is not a standalone executable
             console.log('Glob boundary: module test skipped (requires runtime)');
