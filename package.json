@@ -1,14 +1,18 @@
 {
   "name": "@deepreef/cli",
   "version": "0.1.1",
+  "description": "Terminal-native AI loop agent runtime for supervised local, free, and low-cost coding models.",
   "type": "module",
+  "license": "MIT",
   "bin": {
     "deepreef": "./dist/index.js"
   },
   "files": [
     "dist",
     "README.md",
-    "LICENSE"
+    "README.zh.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "publishConfig": {
     "access": "public"
@@ -16,6 +20,26 @@
   "engines": {
     "node": ">=18"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bzcsk2/DeepReef.git"
+  },
+  "homepage": "https://github.com/bzcsk2/DeepReef#readme",
+  "bugs": {
+    "url": "https://github.com/bzcsk2/DeepReef/issues"
+  },
+  "keywords": [
+    "ai-agent",
+    "coding-agent",
+    "terminal",
+    "tui",
+    "loop-engineering",
+    "local-llm",
+    "mcp",
+    "bun",
+    "typescript",
+    "openai-compatible"
+  ],
   "workspaces": [
     "packages/*"
   ],
@@ -23,6 +47,8 @@
     "dev": "bun run packages/cli/src/index.ts",
     "build": "bun build ./packages/cli/src/index.ts --outdir ./dist --target node --format esm --external @anthropic-ai/sdk --external @anthropic-ai/claude-agent-sdk --banner '#!/usr/bin/env node'",
     "prepublishOnly": "bun run build",
+    "pack:dry-run": "npm pack --dry-run",
+    "smoke:cli": "node ./dist/index.js --help",
     "test": "bun test packages/core packages/tools packages/tui packages/cli packages/security",
     "test:all": "bun test",
     "test:memory": "bun test packages/memory",
