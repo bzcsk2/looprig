@@ -1,6 +1,7 @@
 import type { ChatMessage, ToolSpec, Usage } from "./types.js"
 import type { DeepSeekStreamEvent, DeepSeekClientOptions } from "./client.js"
 import type { QuestionInfo, QuestionAnswer } from "./question/types.js"
+import type { ThinkingMode } from "./provider-thinking.js"
 
 /* ── LoopEvent — core yields these, shell consumes them ── */
 
@@ -187,7 +188,7 @@ export interface CoreEngine {
   respondQuestion(requestId: string, answers: QuestionAnswer[]): void
   rejectQuestion(requestId: string): void
   getContextWindow?(): number
-  setThinkingMode?(mode: "off" | "open" | "high"): void
+  setThinkingMode?(mode: ThinkingMode): void
 }
 
 export interface AgentConfig {
@@ -200,7 +201,6 @@ export interface AgentConfig {
 }
 
 /* ── ChatClient — abstract provider interface ── */
-
 export interface ChatClient {
   chatCompletionsStream(messages: ChatMessage[], opts: DeepSeekClientOptions): AsyncGenerator<DeepSeekStreamEvent>
 }
