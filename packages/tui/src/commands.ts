@@ -21,7 +21,7 @@ export type SlashCommand =
   | { name: "workflow" }
   | { name: "talk"; role?: "worker" | "supervisor" }
 
-const THINKING_MODES = ["off", "open", "high"]
+const THINKING_MODES = ["off", "high", "max"]
 
 /**
  * CL-52: Parse a slash command from user input.
