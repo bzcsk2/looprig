@@ -24,10 +24,14 @@ function loadLegacyConfig(): LegacyConfig | null {
   }
 }
 
+function isThinkingMode(value: string | undefined): value is "off" | "open" | "high" | "max" {
+  return value === "off" || value === "open" || value === "high" || value === "max"
+}
+
 function migrateLegacyConfig(legacy: LegacyConfig): AgentProfilesConfig {
   const config = { ...DEFAULT_AGENT_PROFILES }
 
-  if (legacy.thinkingMode === "off" || legacy.thinkingMode === "open" || legacy.thinkingMode === "high") {
+  if (isThinkingMode(legacy.thinkingMode)) {
     config.worker.thinking = legacy.thinkingMode
     config.supervisor.thinking = legacy.thinkingMode === "high" ? "off" : legacy.thinkingMode
   }
