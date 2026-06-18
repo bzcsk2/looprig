@@ -277,9 +277,7 @@ describe('TUI bridge turn state', () => {
 
     await bridge.submit('continue');
 
-    expect(harness.state.warnings).toEqual([
-      'Tool call loop detected: read_file called 4 times with identical arguments',
-    ]);
+    expect(harness.state.warnings).toEqual([]);
   });
 
   it('replaces repeated tool-call warnings and clears them on the next tool call', async () => {

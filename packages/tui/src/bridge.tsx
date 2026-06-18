@@ -135,8 +135,10 @@ function applyReasoningToTimeline(
   return [...items, item];
 }
 
-function isTransientToolLoopWarning(message: string): boolean {
-  return message.startsWith('Tool call loop detected:');
+function isToolLoopNotice(message: string): boolean {
+  return message.startsWith('Tool call loop detected:')
+    || message.startsWith('Tool call loop stopped:')
+    || message.startsWith('Stopped repeated tool-call loop:');
 }
 
 export function createBridge(
@@ -250,10 +252,12 @@ export function createBridge(
     setState(prev => ({ ...prev, timeline: mutate(prev.timeline) }));
   };
 
-  const clearTransientWarnings = () => {
+  const clearToolLoopNotices = () => {
     commitBridge(prev => {
-      const warnings = prev.warnings.filter(warning => !isTransientToolLoopWarning(warning));
-      return warnings.length === prev.warnings.length ? {} : { warnings };
+      const warnings = prev.warnings.filter(warning => !isToolLoopNotice(warning));
+      const error = prev.error && isToolLoopNotice(prev.error) ? null : prev.error;
+      if (warnings.length === prev.warnings.length && error === prev.error) return {};
+      return { warnings, error };
     });
   };
 
@@ -655,7 +659,7 @@ export function createBridge(
           }
 
           case 'reasoning_delta': {
-            clearTransientWarnings();
+            clearToolLoopNotices();
             const chunk = event.content ?? '';
             reasoningText += chunk;
             const id = ensureReasoning();
@@ -679,14 +683,14 @@ export function createBridge(
           }
 
           case 'tool_call_delta':
-            clearTransientWarnings();
+            clearToolLoopNotices();
             if (event.toolCallIndex !== undefined && event.content) {
               toolCallArgs.set(event.toolCallIndex, event.content);
             }
             break;
 
           case 'tool_start': {
-            clearTransientWarnings();
+            clearToolLoopNotices();
             const key = `${fallbackToolKey(event.toolCallIndex, event.toolName)}_${++toolSequence}`;
             if (event.toolCallIndex !== undefined) activeToolKeys.set(event.toolCallIndex, key);
             const raw = event.toolCallIndex === undefined ? undefined : toolCallArgs.get(event.toolCallIndex);
@@ -701,7 +705,7 @@ export function createBridge(
           }
 
           case 'tool_progress': {
-            clearTransientWarnings();
+            clearToolLoopNotices();
             const key = event.toolCallIndex === undefined
               ? fallbackToolKey(undefined, event.toolName)
               : activeToolKeys.get(event.toolCallIndex) ?? fallbackToolKey(event.toolCallIndex, event.toolName);
@@ -745,7 +749,10 @@ export function createBridge(
               });
               toolOutputs.set(key, event.content ?? t().unknownError);
             } else {
-              commitBridge(() => ({ error: event.content ?? t().unknownError }));
+              const errorText = event.content ?? t().unknownError;
+              if (!isToolLoopNotice(errorText) && event.metadata?.reason !== 'toolCallLoop') {
+                commitBridge(() => ({ error: errorText }));
+              }
             }
             break;
 
@@ -768,10 +775,9 @@ export function createBridge(
 
           case 'warning': {
             const warning = event.content ?? t().unknownWarning;
+            if (isToolLoopNotice(warning)) break;
             commitBridge(prev => ({
-              warnings: isTransientToolLoopWarning(warning)
-                ? [...prev.warnings.filter(item => !isTransientToolLoopWarning(item)), warning]
-                : [...prev.warnings, warning],
+              warnings: [...prev.warnings, warning],
             }));
             break;
           }
@@ -974,6 +980,41 @@ export function createBridge(
     let toolOutputs = new Map<string, string>();
     let assistantText = '';
     let reasoningText = '';
+    let wfToolSequence = 0;
+    let activeWorkflowToolKeys = new Map<number, string>();
+    let activeWorkflowToolKeysByBase = new Map<string, string>();
+
+    const beginWorkflowToolKey = (index: number | undefined, name: string | undefined): string => {
+      const base = fallbackToolKey(index, name);
+      const key = `${base}_${++wfToolSequence}`;
+      if (index !== undefined) {
+        activeWorkflowToolKeys.set(index, key);
+      } else {
+        activeWorkflowToolKeysByBase.set(base, key);
+      }
+      return key;
+    };
+
+    const resolveWorkflowToolKey = (index: number | undefined, name: string | undefined): string => {
+      const base = fallbackToolKey(index, name);
+      if (index !== undefined) {
+        const existing = activeWorkflowToolKeys.get(index);
+        if (existing) return existing;
+        return beginWorkflowToolKey(index, name);
+      }
+      const existing = activeWorkflowToolKeysByBase.get(base);
+      if (existing) return existing;
+      return beginWorkflowToolKey(index, name);
+    };
+
+    const clearWorkflowToolKey = (index: number | undefined, name: string | undefined): void => {
+      const base = fallbackToolKey(index, name);
+      if (index !== undefined) {
+        activeWorkflowToolKeys.delete(index);
+      } else {
+        activeWorkflowToolKeysByBase.delete(base);
+      }
+    };
 
     const finalizeWorkflowRound = () => {
       if (!wfRoundId) return;
@@ -1074,6 +1115,9 @@ export function createBridge(
             toolItemIds = new Map<string, string>();
             toolCallArgs = new Map<number, string>();
             toolOutputs = new Map<string, string>();
+            wfToolSequence = 0;
+            activeWorkflowToolKeys = new Map<number, string>();
+            activeWorkflowToolKeysByBase = new Map<string, string>();
           }
           if (wfEvent.type === 'completed') {
             onPhaseChange?.('completed', 0, 'completed');
@@ -1134,7 +1178,7 @@ export function createBridge(
               }
               break;
             case 'tool_start': {
-              const key = fallbackToolKey(loopEvent.toolCallIndex, loopEvent.toolName);
+              const key = beginWorkflowToolKey(loopEvent.toolCallIndex, loopEvent.toolName);
               upsertWorkflowTool(key, {
                 name: loopEvent.toolName ?? 'unknown',
                 status: 'running',
@@ -1145,10 +1189,13 @@ export function createBridge(
               break;
             }
             case 'tool_progress': {
-              const key = fallbackToolKey(loopEvent.toolCallIndex, loopEvent.toolName);
+              const key = resolveWorkflowToolKey(loopEvent.toolCallIndex, loopEvent.toolName);
               if (loopEvent.content === 'done') {
                 upsertWorkflowTool(key, { status: 'done' });
-              } else if (loopEvent.content && loopEvent.content !== 'running') {
+                clearWorkflowToolKey(loopEvent.toolCallIndex, loopEvent.toolName);
+                break;
+              }
+              if (loopEvent.content && loopEvent.content !== 'running') {
                 const previous = toolOutputs.get(key) ?? '';
                 const output = previous + (previous ? '\n' : '') + loopEvent.content;
                 toolOutputs.set(key, output);
@@ -1157,23 +1204,27 @@ export function createBridge(
               break;
             }
             case 'tool': {
-              const key = fallbackToolKey(loopEvent.toolCallIndex, loopEvent.toolName);
+              const key = resolveWorkflowToolKey(loopEvent.toolCallIndex, loopEvent.toolName);
               upsertWorkflowTool(key, {
                 name: loopEvent.toolName ?? 'tool',
                 status: loopEvent.severity === 'error' ? 'error' : 'done',
                 output: loopEvent.content ?? '',
               });
+              toolOutputs.set(key, loopEvent.content ?? '');
               break;
             }
             case 'error': {
               const message = loopEvent.content ?? 'Unknown error';
-              console.warn(`[tool:error] ${message}`);
+              if (!isToolLoopNotice(message) && loopEvent.metadata?.reason !== 'toolCallLoop') {
+                console.warn(`[tool:error] ${message}`);
+              }
               break;
             }
             case 'warning': {
+              const warning = loopEvent.content ?? 'Warning';
+              if (isToolLoopNotice(warning)) break;
               commitBridge(prev => ({
-                ...prev,
-                warnings: [...prev.warnings, loopEvent.content ?? 'Warning'],
+                warnings: [...prev.warnings, warning],
               }));
               break;
             }
