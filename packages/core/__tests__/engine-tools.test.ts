@@ -28,7 +28,7 @@ describe("ReasonixEngine tool loop regressions", () => {
     let executions = 0
     mockClient.setGenerators([
       (async function* () {
-        yield { type: "tool_call_end", toolCallIndex: 0, id: "tc-disallowed", name: "list_dir", arguments: "{\"path\":\".\"}" }
+        yield { type: "tool_call_end", toolCallIndex: 0, id: "tc-disallowed", name: "bash", arguments: "{\"cmd\":\"ls\"}" }
         yield { type: "done", finishReason: "tool_calls" }
       })(),
       (async function* () {
@@ -39,9 +39,9 @@ describe("ReasonixEngine tool loop regressions", () => {
 
     const engine = makeEngine()
     engine.registerTool({
-      name: "list_dir",
-      description: "List directory",
-      parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+      name: "bash",
+      description: "Run command",
+      parameters: { type: "object", properties: { cmd: { type: "string" } }, required: ["cmd"] },
       concurrency: "shared",
       approval: "read",
       async execute() {
@@ -54,8 +54,8 @@ describe("ReasonixEngine tool loop regressions", () => {
     for await (const e of engine.submit("plan", undefined, "supervisor", "loop")) events.push(e)
 
     expect(executions).toBe(0)
-    const denied = events.find(e => e.role === "error" && e.toolName === "list_dir")
-    expect(denied?.content).toContain("Tool not available in this turn: list_dir")
+    const denied = events.find(e => e.role === "error" && e.toolName === "bash")
+    expect(denied?.content).toContain("Tool not available in this turn: bash")
     expect(denied?.metadata?.reason).toBe("tool_not_allowed")
   })
 

@@ -31,6 +31,9 @@ const LOOP_ORCHESTRATION_TOOLS = new Set([
 const SUPERVISOR_LOOP_TOOLS = new Set([
   "get_goal",
   "update_goal",
+  "list_dir",
+  "read_file",
+  "grep",
 ])
 
 export interface ResolveEffectiveToolsOpts {
