@@ -940,6 +940,7 @@ export function createBridge(
     goal: string | null,
     onPhaseChange?: (phase: string, iteration: number, finalStatus?: string, reason?: string) => void,
     resumeInstruction?: string,
+    workflowId?: string,
   ) => {
     if (!workflowCoordinator) {
       await submit(resumeInstruction ?? goal ?? '', false, 'supervisor');
@@ -961,7 +962,7 @@ export function createBridge(
       if (workflowCoordinator.getState()) {
         workflowCoordinator.reset();
       }
-      workflowCoordinator.startWorkflow({ goal: goal! });
+      workflowCoordinator.startWorkflow({ goal: goal!, workflowId });
     }
     let activeRole: AgentRole = 'supervisor';
     let wfRoundId = '';
@@ -1230,7 +1231,8 @@ export function createBridge(
   const runWorkflow = (
     goal: string,
     onPhaseChange?: (phase: string, iteration: number, finalStatus?: string, reason?: string) => void,
-  ) => driveWorkflow(goal, onPhaseChange);
+    workflowId?: string,
+  ) => driveWorkflow(goal, onPhaseChange, undefined, workflowId);
 
   const resumeWorkflow = (
     instruction: string,

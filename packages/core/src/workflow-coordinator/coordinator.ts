@@ -272,7 +272,7 @@ export class WorkflowCoordinator {
     if (!this.goalStore) return true // no goal tracking, use legacy maxRounds
     const goal = this.goalStore.getGoal(this.state!.workflowId)
     if (!goal) return false
-    return goal.status === "active" || goal.status === "blocked"
+    return goal.status === "active"
   }
 
   canContinue(): boolean {
@@ -594,7 +594,7 @@ export class WorkflowCoordinator {
         }
         this.transition("blocked", response)
       } else {
-        this.blockerAuditState = null
+        // Keep blockerAuditState across rounds for accumulation
         decision = "continue"
         this.transition("supervisor_analyse")
       }

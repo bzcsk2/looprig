@@ -668,8 +668,12 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
       }
       return;
     }
-    // /goal 命令 — 目标管理
+    // /goal 命令 — 目标管理（仅 loop 模式有效）
     if (command?.name === 'goal') {
+      if (workflowMode !== 'loop') {
+        appendMessage({ role: 'assistant' as const, content: '/goal is only available in loop mode.' });
+        return;
+      }
       const sessionId = engineRef.current.getSessionId();
       const goalStore = new GoalStore();
       const goal = goalStore.getGoal(sessionId);
@@ -794,7 +798,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
         const goalStore = new GoalStore();
         const sessionId = engineRef.current.getSessionId();
         try { goalStore.createGoal(sessionId, goal); } catch { goalStore.replaceGoal(sessionId, goal); }
-        const workflowId = 'wf-' + Date.now();
+        const workflowId = sessionId;
         setWorkflowLifecycle({ status: 'running', workflowId });
         setWorkflowState({
           phase: 'supervisor_analyse',
