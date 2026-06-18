@@ -84,6 +84,8 @@ export interface LoopOptions {
   toolRouting?: "two-stage" | "auto" | "direct"
   /** ADV-HAR-08: 验证策略 */
   verificationPolicy?: "block" | "require-or-waive" | "warn"
+  /** Tool names allowed to execute in this loop turn. Undefined preserves legacy execution behavior. */
+  allowedToolNames?: ReadonlySet<string>
 }
 
 const DEFAULT_MAX_TURNS = 100
@@ -99,6 +101,7 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
     toolRouting: toolRoutingMode,
     /** ADV-HAR-08: 验证策略 */
     verificationPolicy: verificationMode,
+    allowedToolNames,
   } = opts
   const diagnosticsEnabled = logger.isEnabled("error")
 
@@ -486,7 +489,7 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
             }
 
             try {
-              for await (const toolEvent of toolExecutor.run(toolCalls, signal, appendToolResult, diagnosticsEnabled ? { submitId, turnCount } : undefined)) {
+              for await (const toolEvent of toolExecutor.run(toolCalls, signal, appendToolResult, diagnosticsEnabled ? { submitId, turnCount } : undefined, allowedToolNames)) {
                 yield toolEvent
                 // P5.5: tool_progress is transient — don't persist to session
                 if (toolEvent.role !== 'tool_progress') {
@@ -585,7 +588,7 @@ export async function* runLoop(opts: LoopOptions): AsyncGenerator<LoopEvent> {
                 totalToolCalls += salvagedCalls.length
 
                 try {
-                  for await (const toolEvent of toolExecutor.run(salvagedCalls, signal, appendToolResult, diagnosticsEnabled ? { submitId, turnCount } : undefined)) {
+                  for await (const toolEvent of toolExecutor.run(salvagedCalls, signal, appendToolResult, diagnosticsEnabled ? { submitId, turnCount } : undefined, allowedToolNames)) {
                     yield toolEvent
                     if (toolEvent.role !== "tool_progress") {
                       sessionWriter?.enqueue({ ts: Date.now(), type: "event", payload: toolEvent })

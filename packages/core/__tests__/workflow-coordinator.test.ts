@@ -602,8 +602,8 @@ describe("WorkflowCoordinator", () => {
     expect(result.error).toBe("No workflow in progress")
   })
 
-  describe("mailbox + goal integration", () => {
-    it("writes plan to mailbox on supervisor analyse", async () => {
+  describe("coordinator state + goal integration", () => {
+    it("does not write plan to mailbox by default", async () => {
       const { AgentCommController } = await import("../src/agent-comm/controller.js")
       const { Mailbox } = await import("../src/agent-comm/mailbox.js")
       const { rmSync, mkdirSync, existsSync } = await import("node:fs")
@@ -641,12 +641,12 @@ describe("WorkflowCoordinator", () => {
 
       const messages = mailbox.read({ threadId: "test-thread" })
       const supervisorTasks = messages.filter(m => m.from === "supervisor" && m.to === "worker")
-      expect(supervisorTasks.length).toBeGreaterThan(0)
+      expect(supervisorTasks).toHaveLength(0)
 
       if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true })
     })
 
-    it("reads task from mailbox in worker_do", async () => {
+    it("passes supervisorPlan directly to worker_do instead of reading mailbox by default", async () => {
       const { AgentCommController } = await import("../src/agent-comm/controller.js")
       const { Mailbox } = await import("../src/agent-comm/mailbox.js")
       const { rmSync, mkdirSync, existsSync } = await import("node:fs")
@@ -674,8 +674,8 @@ describe("WorkflowCoordinator", () => {
       const workerInputs: string[] = []
       const runtime = {
         getSupervisor: () => ({
-          submit: async function* () { yield { role: "assistant_final", content: "approve" } },
-          getState: () => ({ messages: [{ role: "assistant", content: "approve" }] }),
+          submit: async function* () { yield { role: "assistant_final", content: "Direct plan" } },
+          getState: () => ({ messages: [{ role: "assistant", content: "Direct plan" }] }),
         }),
         getWorker: () => ({
           submit: async function* (input: string) {
@@ -693,16 +693,13 @@ describe("WorkflowCoordinator", () => {
       })
       coordinator.startWorkflow({ goal: "test", workflowId: "test-wf" })
 
-      // Manually set supervisorPlan so coordinator has a plan
-      coordinator.setSupervisorPlan("Direct plan")
-
-      // Directly transition to worker_do
-      coordinator.transition("worker_do")
       for await (const _event of coordinator.runWorkflow()) { /* consume */ }
 
-      // The worker input should contain the mailbox task content
+      // The worker input should contain the coordinator plan, not stale mailbox content.
       const hasMailboxContent = workerInputs.some(i => i.includes("Mailbox task content"))
-      expect(hasMailboxContent).toBe(true)
+      const hasDirectPlan = workerInputs.some(i => i.includes("Direct plan"))
+      expect(hasMailboxContent).toBe(false)
+      expect(hasDirectPlan).toBe(true)
 
       if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true })
     })
@@ -837,6 +834,222 @@ describe("WorkflowCoordinator", () => {
 
       const result = coordinator.transition("supervisor_intervene")
       expect(result.success).toBe(false)
+    })
+  })
+
+  describe("Phase 1: Loop 完整 4 阶段推进回归测试", () => {
+    it("完整推进 supervisor_analyse → worker_do → worker_report → supervisor_check", async () => {
+      const phases: string[] = []
+      const supervisorInputs: string[] = []
+      const workerInputs: string[] = []
+      let supervisorMessages: string[] = []
+
+      const runtime = {
+        getSupervisor: () => ({
+          submit: async function* (input: string) {
+            supervisorInputs.push(input)
+            const content = supervisorInputs.length === 1
+              ? "Plan: fix all bugs"
+              : JSON.stringify({
+                  version: 1, workflowId: "wf-1", iteration: 1,
+                  basedOnLedgerVersion: 0, decision: "approve",
+                  diagnosis: "done", nextActions: [], constraints: [],
+                  verification: [],
+                  completionAudit: [{ requirement: "fix bugs", status: "proven", evidence: ["tests pass"] }],
+                })
+            supervisorMessages.push(content)
+            yield { role: "assistant_final", content }
+          },
+          getState: () => ({ messages: [{ role: "assistant", content: supervisorMessages[supervisorMessages.length - 1] ?? "" }] }),
+        }),
+        getWorker: () => ({
+          submit: async function* (input: string) {
+            workerInputs.push(input)
+            yield { role: "assistant_final", content: "worker done" }
+          },
+          getState: () => ({ messages: [{ role: "assistant", content: "worker done" }] }),
+        }),
+      }
+
+      const coordinator = new WorkflowCoordinator({ runtime: runtime as any, config: { requireSupervisorPlan: false } })
+      coordinator.startWorkflow({ goal: "fix bugs" })
+
+      for await (const event of coordinator.runWorkflow()) {
+        if (event.type === "phase_change") phases.push(event.phase)
+      }
+
+      // Verify full 4-phase progression
+      expect(phases).toContain("supervisor_analyse")
+      expect(phases).toContain("worker_do")
+      expect(phases).toContain("worker_report")
+      expect(phases).toContain("supervisor_check")
+      expect(coordinator.getState()?.currentPhase).toBe("completed")
+
+      // Worker inputs come from coordinator state, not mailbox
+      expect(workerInputs[0]).toContain("Plan: fix all bugs")
+    })
+
+    it("Worker report 写入 state.workerReport 并被 Supervisor check 读取", async () => {
+      const supervisorInputs: string[] = []
+      let supervisorCalls = 0
+
+      const runtime = {
+        getSupervisor: () => ({
+          submit: async function* (input: string) {
+            supervisorInputs.push(input)
+            supervisorCalls++
+            const content = supervisorCalls === 1
+              ? "Plan: refactor"
+              : JSON.stringify({
+                  version: 1, workflowId: "wf-1", iteration: 1,
+                  basedOnLedgerVersion: 0, decision: "continue",
+                  diagnosis: "more work needed", nextActions: [], constraints: [],
+                  verification: [],
+                })
+            yield { role: "assistant_final", content }
+          },
+          getState: () => ({ messages: [{ role: "assistant", content: "review done" }] }),
+        }),
+        getWorker: () => ({
+          submit: async function* (input: string) {
+            yield { role: "assistant_final", content: "Refactored all modules, tests pass" }
+          },
+          getState: () => ({ messages: [{ role: "assistant", content: "Refactored all modules, tests pass" }] }),
+        }),
+      }
+
+      const coordinator = new WorkflowCoordinator({ runtime: runtime as any, config: { requireSupervisorPlan: false } })
+      coordinator.startWorkflow({ goal: "refactor" })
+      for await (const _event of coordinator.runWorkflow()) { /* consume */ }
+
+      // state.workerReport must be set
+      const state = coordinator.getState()
+      expect(state?.workerReport).toBe("Refactored all modules, tests pass")
+
+      // Supervisor check input must contain the worker report
+      const checkInput = supervisorInputs[1]
+      expect(checkInput).toContain("Refactored all modules, tests pass")
+      expect(checkInput).toContain("Report: Refactored all modules, tests pass")
+    })
+
+    it("workflowId === sessionId 时 goal/coordinator 使用同一 ID", () => {
+      const { GoalStore } = require("../src/goal/store.js")
+      const { randomUUID } = require("node:crypto")
+      const { rmSync, mkdirSync, existsSync } = require("node:fs")
+      const { resolve } = require("node:path")
+
+      const testDir = resolve(process.cwd(), ".deepreef-test-regression-wfid")
+      if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true })
+      mkdirSync(testDir, { recursive: true })
+
+      const goalStore = new GoalStore(testDir)
+      const sessionId = "session-loop-001"
+      goalStore.createGoal(sessionId, "loop regression test")
+
+      const coordinator = new WorkflowCoordinator({ goalStore })
+      coordinator.startWorkflow({ goal: "loop regression test", workflowId: sessionId })
+
+      const state = coordinator.getState()
+      expect(state?.workflowId).toBe(sessionId)
+
+      const goal = goalStore.getGoal(sessionId)
+      expect(goal).not.toBeNull()
+      expect(goal!.objective).toBe("loop regression test")
+
+      if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true })
+    })
+
+    it("mailbox 消息不污染默认 loop 主路径", async () => {
+      const { Mailbox } = await import("../src/agent-comm/mailbox.js")
+      const { AgentCommController } = await import("../src/agent-comm/controller.js")
+      const { rmSync, mkdirSync, existsSync } = await import("node:fs")
+      const { resolve } = await import("node:path")
+
+      const testDir = resolve(process.cwd(), ".deepreef-test-regression-mailbox")
+      if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true })
+      mkdirSync(testDir, { recursive: true })
+
+      const mailbox = new Mailbox(testDir)
+      const agentComm = new AgentCommController({
+        threadId: "test-thread", goalId: "test-goal", workflowId: "test-wf", iteration: 1,
+      }, mailbox)
+
+      // Write stale mailbox content
+      mailbox.send({
+        threadId: "test-thread", goalId: "test-goal", workflowId: "test-wf",
+        iteration: 1, from: "supervisor", to: "worker",
+        kind: "task", delivery: "trigger_turn",
+        content: "STALE MAILBOX TASK",
+      })
+
+      const workerInputs: string[] = []
+      const runtime = {
+        getSupervisor: () => ({
+          submit: async function* () { yield { role: "assistant_final", content: "Direct coordinator plan" } },
+          getState: () => ({ messages: [{ role: "assistant", content: "Direct coordinator plan" }] }),
+        }),
+        getWorker: () => ({
+          submit: async function* (input: string) {
+            workerInputs.push(input)
+            yield { role: "assistant_final", content: "done" }
+          },
+          getState: () => ({ messages: [{ role: "assistant", content: "done" }] }),
+        }),
+      }
+
+      const coordinator = new WorkflowCoordinator({
+        runtime: runtime as any, agentComm: agentComm as any,
+        config: { requireSupervisorPlan: false },
+      })
+      coordinator.startWorkflow({ goal: "test", workflowId: "test-wf" })
+      for await (const _event of coordinator.runWorkflow()) { /* consume */ }
+
+      // Default path uses coordinator state, not mailbox
+      const hasStale = workerInputs.some(i => i.includes("STALE MAILBOX TASK"))
+      expect(hasStale).toBe(false)
+
+      if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true })
+    })
+
+    it("Supervisor 工具错误时如有非空 plan 不阻断 Worker", async () => {
+      let workerCalls = 0
+      let supervisorInputCount = 0
+      let supervisorContent = "Valid plan despite tool error"
+      const runtime = {
+        getSupervisor: () => ({
+          submit: async function* (input: string) {
+            supervisorInputCount++
+            if (supervisorInputCount === 1) {
+              yield { role: "error", content: "tool_not_allowed: send_message" }
+              yield { role: "assistant_final", content: "Valid plan despite tool error" }
+            } else {
+              supervisorContent = JSON.stringify({
+                version: 1, workflowId: "wf-1", iteration: 1,
+                basedOnLedgerVersion: 0, decision: "approve",
+                diagnosis: "done", nextActions: [], constraints: [],
+                verification: [],
+                completionAudit: [{ requirement: "fix bugs", status: "proven", evidence: ["done"] }],
+              })
+              yield { role: "assistant_final", content: supervisorContent }
+            }
+          },
+          getState: () => ({ messages: [{ role: "assistant", content: supervisorContent }] }),
+        }),
+        getWorker: () => ({
+          submit: async function* () {
+            workerCalls++
+            yield { role: "assistant_final", content: "done" }
+          },
+          getState: () => ({ messages: [{ role: "assistant", content: "done" }] }),
+        }),
+      }
+
+      const coordinator = new WorkflowCoordinator({ runtime: runtime as any, config: { requireSupervisorPlan: false } })
+      coordinator.startWorkflow({ goal: "test" })
+      for await (const _event of coordinator.runWorkflow()) { /* consume */ }
+
+      expect(workerCalls).toBeGreaterThanOrEqual(1)
+      expect(coordinator.getState()?.currentPhase).toBe("completed")
     })
   })
 })

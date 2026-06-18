@@ -24,6 +24,41 @@ function makeEngine() {
 }
 
 describe("ReasonixEngine tool loop regressions", () => {
+  it("does not execute tools omitted from the effective tool specs", async () => {
+    let executions = 0
+    mockClient.setGenerators([
+      (async function* () {
+        yield { type: "tool_call_end", toolCallIndex: 0, id: "tc-disallowed", name: "list_dir", arguments: "{\"path\":\".\"}" }
+        yield { type: "done", finishReason: "tool_calls" }
+      })(),
+      (async function* () {
+        yield { type: "text_delta", delta: "final" }
+        yield { type: "done", finishReason: "stop" }
+      })(),
+    ])
+
+    const engine = makeEngine()
+    engine.registerTool({
+      name: "list_dir",
+      description: "List directory",
+      parameters: { type: "object", properties: { path: { type: "string" } }, required: ["path"] },
+      concurrency: "shared",
+      approval: "read",
+      async execute() {
+        executions++
+        return { content: "should not run", isError: false }
+      },
+    })
+
+    const events: LoopEvent[] = []
+    for await (const e of engine.submit("plan", undefined, "supervisor", "loop")) events.push(e)
+
+    expect(executions).toBe(0)
+    const denied = events.find(e => e.role === "error" && e.toolName === "list_dir")
+    expect(denied?.content).toContain("Tool not available in this turn: list_dir")
+    expect(denied?.metadata?.reason).toBe("tool_not_allowed")
+  })
+
   it("should preserve toolCallIndex mapping and write tool content as string", async () => {
     mockClient.setGenerators([
       (async function* () {

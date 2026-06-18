@@ -31,7 +31,6 @@ const LOOP_ORCHESTRATION_TOOLS = new Set([
 const SUPERVISOR_LOOP_TOOLS = new Set([
   "get_goal",
   "update_goal",
-  "read_mailbox",
 ])
 
 export interface ResolveEffectiveToolsOpts {
@@ -56,8 +55,8 @@ export function resolveEffectiveTools(opts: ResolveEffectiveToolsOpts): ResolveE
   for (const tool of registeredTools.values()) {
     const name = tool.name
 
-    // Loop is coordinator-orchestrated: Supervisor keeps governance tools for
-    // goal/mailbox control, but never receives engineering tools.
+    // Loop is coordinator-orchestrated: Supervisor keeps goal governance tools,
+    // but never receives mailbox or engineering tools.
     if (role === "supervisor" && mode === "loop") {
       if (SUPERVISOR_LOOP_TOOLS.has(name)) {
         toolSpecs.push(toSpec(tool))

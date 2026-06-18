@@ -61,7 +61,13 @@ export class StreamingToolExecutor {
     this.logger = logger
   }
 
-  async *run(toolCalls: ToolCall[], signal: AbortSignal, appendToolResult: (tc: ToolCall, result: ToolResult) => void, traceContext?: Record<string, unknown>): AsyncGenerator<LoopEvent> {
+  async *run(
+    toolCalls: ToolCall[],
+    signal: AbortSignal,
+    appendToolResult: (tc: ToolCall, result: ToolResult) => void,
+    traceContext?: Record<string, unknown>,
+    allowedToolNames?: ReadonlySet<string>,
+  ): AsyncGenerator<LoopEvent> {
     const logger = traceContext && this.logger.isEnabled("error")
       ? this.logger.child(traceContext)
       : this.logger
@@ -180,6 +186,13 @@ export class StreamingToolExecutor {
     try {
       for (let index = 0; index < toolCalls.length; index++) {
         const tc = toolCalls[index]
+        if (allowedToolNames && !allowedToolNames.has(tc.function.name)) {
+          const result = makeToolError(`Tool not available in this turn: ${tc.function.name}`)
+          settle(tc, index, result)
+          if (logger.isEnabled("error")) logger.warn("tool.execute.not_allowed", { toolName: tc.function.name, toolCallIndex: index })
+          yield { role: "error", content: result.content, toolName: tc.function.name, toolCallIndex: index, severity: "error", metadata: { error: true, reason: "tool_not_allowed" } }
+          continue
+        }
         const handler = this.tools.get(tc.function.name)
 
         if (handler?.concurrency === "shared") {

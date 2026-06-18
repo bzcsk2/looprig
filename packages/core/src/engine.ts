@@ -683,11 +683,10 @@ Give each Worker a complete, self-contained task with context, constraints, rele
         ? `## Loop Mode — Supervisor
 You are the Supervisor for the active loop goal.
 The WorkflowCoordinator owns execution order: plan -> Worker execution -> Worker report -> Supervisor review.
-You may use governance tools: get_goal, update_goal, read_mailbox.
-Do not use dispatch or engineering tools such as send_message, followup_task, AgentTool, bash, edit, write, or apply_patch.
+You may use governance tools: get_goal, update_goal.
+Do not use mailbox, dispatch, or engineering tools such as read_mailbox, send_message, followup_task, AgentTool, bash, edit, write, or apply_patch.
 Your job is to return the requested plan or review output for the current phase.
-The coordinator sends your plan to Worker after this turn; do not try to send or execute the task yourself.
-If read_mailbox has no relevant messages, continue with the coordinator phase request instead of doing Worker work yourself.
+The coordinator passes your plan to Worker after this turn; do not try to send or execute the task yourself.
 Do not perform Worker tasks yourself; delegate execution through the plan/review workflow.
 Do not complete without a requirement-by-requirement completion audit with evidence.`
         : role === "worker" && mode === "loop"
@@ -858,6 +857,9 @@ Do not change goal status.`
         toolRouting: this.effectivePolicy?.toolRouting,
         // ADV-HAR-08: 传递 verification 策略供 loop 使用
         verificationPolicy: this.effectivePolicy?.verification,
+        allowedToolNames: effectiveMode === "loop"
+          ? new Set(toolSpecs.map(spec => spec.function.name))
+          : undefined,
         supervisorGuidance: this.effectivePolicy?.supervisorPolicy !== "off"
           ? this.buildSupervisorGuidanceConfig()
           : undefined,

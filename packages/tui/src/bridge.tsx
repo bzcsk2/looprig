@@ -1208,7 +1208,10 @@ export function createBridge(
           const store = workflowCoordinator.getGoalStore?.();
           if (store) {
             const goal = store.getGoal(coordState.workflowId);
-            if (goal && goal.status === "active") {
+            const canStartFromPhase =
+              coordState.currentPhase === "idle" ||
+              coordState.currentPhase === "supervisor_analyse";
+            if (goal && goal.status === "active" && canStartFromPhase) {
               runAgain = true;
             }
           }

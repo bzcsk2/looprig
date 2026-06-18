@@ -35,6 +35,7 @@ export interface WorkflowCoordinatorOptions {
   agentComm?: AgentCommController
   goalStore?: GoalStore
   mailbox?: Mailbox
+  useMailboxWorkflow?: boolean
 }
 
 export class WorkflowCoordinator {
@@ -48,6 +49,7 @@ export class WorkflowCoordinator {
   private agentComm?: AgentCommController
   private goalStore?: GoalStore
   private mailbox?: Mailbox
+  private useMailboxWorkflow: boolean
   private blockerAuditState: BlockerAuditState | null = null
 
   constructor(options: WorkflowCoordinatorOptions = {}) {
@@ -58,6 +60,7 @@ export class WorkflowCoordinator {
     this.agentComm = options.agentComm
     this.goalStore = options.goalStore
     this.mailbox = options.mailbox
+    this.useMailboxWorkflow = options.useMailboxWorkflow ?? false
   }
 
   getCurrentGoal(): ReturnType<GoalStore["getGoal"]> {
@@ -403,31 +406,39 @@ export class WorkflowCoordinator {
 
     const supervisorState = this.runtime!.getSupervisor().getState()
     const plan = supervisorState.messages.findLast(m => m.role === "assistant")?.content?.trim() ?? ""
-    if (errorMessage || (this.config.requireSupervisorPlan && !plan)) {
+
+    // Phase 3: tool errors do not block Worker if a valid plan was produced.
+    // Only block when both error and no plan, or when requireSupervisorPlan
+    // is set and plan is genuinely empty.
+    if (!plan) {
       this.transition("blocked", errorMessage || "Supervisor did not produce a plan")
       return
     }
     this.setSupervisorPlan(plan)
     this.state!.resumeInstruction = undefined
 
-    // Mailbox: write plan as task to Worker
-    const ctrl = this.getOrCreateController()
-    if (ctrl) {
-      ctrl.followupTask("supervisor", plan)
+    // Mailbox workflow path is retained but disabled by default. The active
+    // loop path passes plan/report through coordinator state.
+    if (this.useMailboxWorkflow) {
+      const ctrl = this.getOrCreateController()
+      if (ctrl) {
+        ctrl.followupTask("supervisor", plan)
+      }
     }
 
     this.transition("worker_do")
   }
 
   private async *runWorkerDo(): AsyncGenerator<WorkflowEvent> {
-    // Mailbox: read pending task from Supervisor
     let taskContent = ""
-    const ctrl = this.getOrCreateController()
-    if (ctrl) {
-      const pendingTasks = ctrl.readMailbox({ to: "worker", unreadOnly: true, limit: 1 })
-      if (pendingTasks.length > 0) {
-        taskContent = pendingTasks[0].content
-        ctrl.markRead(pendingTasks[0].id)
+    if (this.useMailboxWorkflow) {
+      const ctrl = this.getOrCreateController()
+      if (ctrl) {
+        const pendingTasks = ctrl.readMailbox({ to: "worker", unreadOnly: true, limit: 1 })
+        if (pendingTasks.length > 0) {
+          taskContent = pendingTasks[0].content
+          ctrl.markRead(pendingTasks[0].id)
+        }
       }
     }
 
@@ -469,24 +480,26 @@ export class WorkflowCoordinator {
     const report = workerState.messages.findLast(m => m.role === "assistant")?.content ?? ""
     this.setWorkerReport(report)
 
-    // Mailbox: write report to Supervisor
-    const ctrl = this.getOrCreateController()
-    if (ctrl) {
-      ctrl.sendMessage("worker", "supervisor", "report", report)
+    if (this.useMailboxWorkflow) {
+      const ctrl = this.getOrCreateController()
+      if (ctrl) {
+        ctrl.sendMessage("worker", "supervisor", "report", report)
+      }
     }
 
     this.transition("supervisor_check")
   }
 
   private async *runSupervisorCheck(): AsyncGenerator<WorkflowEvent> {
-    // Mailbox: read pending report from Worker
     let reportedContent = this.state!.workerReport ?? ""
-    const ctrl = this.getOrCreateController()
-    if (ctrl) {
-      const pendingReports = ctrl.readMailbox({ to: "supervisor", unreadOnly: true, limit: 1 })
-      if (pendingReports.length > 0) {
-        reportedContent = pendingReports[0].content
-        ctrl.markRead(pendingReports[0].id)
+    if (this.useMailboxWorkflow) {
+      const ctrl = this.getOrCreateController()
+      if (ctrl) {
+        const pendingReports = ctrl.readMailbox({ to: "supervisor", unreadOnly: true, limit: 1 })
+        if (pendingReports.length > 0) {
+          reportedContent = pendingReports[0].content
+          ctrl.markRead(pendingReports[0].id)
+        }
       }
     }
 

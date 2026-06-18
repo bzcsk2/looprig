@@ -56,27 +56,42 @@ function makeMockCoordinator() {
   const startedGoals: string[] = [];
   const resumedInstructions: string[] = [];
   let state: any = null;
+  let finished = false;
+  let runCount = 0;
+  const goalStore = {
+    getGoal: () => ({ status: 'active' }),
+  };
 
   return {
     startWorkflow: (opts: any) => {
       startedGoals.push(opts.goal);
-      state = { currentPhase: 'supervisor_analyse', iteration: 1 };
+      state = { currentPhase: 'supervisor_analyse', iteration: 1, workflowId: opts.workflowId ?? 'wf-1' };
+      finished = false;
     },
     runWorkflow: async function* () {
+      runCount += 1;
       for (const evt of events) {
+        if (evt.type === 'completed') finished = true;
+        if (evt.type === 'blocked') {
+          state = { currentPhase: 'blocked', iteration: 1, workflowId: evt.workflowId, blockedReason: evt.reason };
+        }
         yield evt;
       }
     },
     interrupt: () => { interruptedCalls.push(Date.now()); },
     resumeInterruptedWorkflow: (instruction: string) => {
       resumedInstructions.push(instruction);
-      state = { currentPhase: 'supervisor_analyse', iteration: 2 };
+      state = { currentPhase: 'supervisor_analyse', iteration: 2, workflowId: 'wf-1' };
+      finished = false;
     },
-    reset: () => { state = null; },
+    reset: () => { state = null; finished = false; runCount = 0; },
     getState: () => state,
+    isFinished: () => finished,
+    getGoalStore: () => goalStore,
     startedGoals,
     resumedInstructions,
     interruptedCalls,
+    get runCount() { return runCount; },
     events,
   };
 }
@@ -155,6 +170,19 @@ describe('SFR-90: workflow e2e integration', () => {
     });
 
     expect(finals).toEqual([{ status: 'blocked', reason: 'Interrupted by user' }]);
+  });
+
+  it('scenario 2d: blocked coordinator state is not auto-rerun while goal remains active', async () => {
+    coordinator.events.splice(
+      0,
+      coordinator.events.length,
+      { type: 'blocked', workflowId: 'wf-1', reason: 'Max rounds reached', timestamp: Date.now() },
+    );
+
+    await bridge.runWorkflow('test goal');
+
+    expect(coordinator.runCount).toBe(1);
+    expect(setStateCalls.warnings).toEqual([]);
   });
 
   it('scenario 3: routeWorkflowInput + bridge mode consistency', () => {

@@ -145,14 +145,15 @@ describe("SFR-00: Supervisor 请求契约基线（退化证明）", () => {
     const systemMessage = capturedMessages?.messages?.find((m: any) => m.role === "system")
     expect(systemMessage.content).toContain("The WorkflowCoordinator owns execution order")
     expect(systemMessage.content).toContain("You may use governance tools")
-    expect(systemMessage.content).toContain("Do not use dispatch or engineering tools")
-    expect(systemMessage.content).toContain("The coordinator sends your plan to Worker after this turn")
+    expect(systemMessage.content).toContain("Do not use mailbox, dispatch, or engineering tools")
+    expect(systemMessage.content).toContain("The coordinator passes your plan to Worker after this turn")
     expect(systemMessage.content).toContain("Do not perform Worker tasks yourself")
     expect(systemMessage.content).not.toContain("Proactively call AgentTool")
 
     const toolsInRequest = capturedMessages?.opts?.tools ?? []
     const toolNames = toolsInRequest.map((t: any) => t.function.name).sort()
-    expect(toolNames).toEqual(["get_goal", "read_mailbox", "update_goal"])
+    expect(toolNames).toEqual(["get_goal", "update_goal"])
+    expect(toolNames).not.toContain("read_mailbox")
     expect(toolNames).not.toContain("send_message")
     expect(toolNames).not.toContain("followup_task")
   })
@@ -241,7 +242,8 @@ describe("SFR-00: Supervisor 请求契约基线（退化证明）", () => {
     const toolsInRequest = capturedMessages?.opts?.tools ?? []
     const toolNames = toolsInRequest.map((t: any) => t.function.name)
     // Loop 阶段只暴露治理工具，不暴露工程工具
-    expect(toolNames.sort()).toEqual(["get_goal", "read_mailbox", "update_goal"])
+    expect(toolNames.sort()).toEqual(["get_goal", "update_goal"])
+    expect(toolNames).not.toContain("read_mailbox")
     expect(toolNames).not.toContain("bash")
     expect(toolNames).not.toContain("write_file")
     expect(toolNames).not.toContain("edit")
@@ -302,7 +304,7 @@ describe("SFR-00: Supervisor 请求契约基线（退化证明）", () => {
     }
     tools = capturedMessages?.opts?.tools ?? []
     names = tools.map((t: any) => t.function.name).sort()
-    expect(names).toEqual(["get_goal", "read_mailbox", "update_goal"])
+    expect(names).toEqual(["get_goal", "update_goal"])
 
     // 5d: worker + alone → 全部工具（包含 bash/write_file）
     events = []
@@ -386,7 +388,6 @@ describe("SFR-00: 工具策略边界测试", () => {
     })
     expect(loop.tools.map(t => t.function.name).sort()).toEqual([
       "get_goal",
-      "read_mailbox",
       "update_goal",
     ])
   })
@@ -414,9 +415,10 @@ describe("SFR-00: 工具策略边界测试", () => {
       agentToolNames: undefined,
     })
     // Supervisor loop 由 WorkflowCoordinator 固定编排，模型侧只允许治理工具。
-    expect(result.tools.map(t => t.function.name).sort()).toEqual(["get_goal", "read_mailbox", "update_goal"])
+    expect(result.tools.map(t => t.function.name).sort()).toEqual(["get_goal", "update_goal"])
     expect(result.tools.find(t => t.function.name === "bash")).toBeUndefined()
     expect(result.tools.find(t => t.function.name === "write_file")).toBeUndefined()
+    expect(result.tools.find(t => t.function.name === "read_mailbox")).toBeUndefined()
     expect(result.tools.find(t => t.function.name === "send_message")).toBeUndefined()
     expect(result.tools.find(t => t.function.name === "followup_task")).toBeUndefined()
   })
@@ -504,7 +506,6 @@ describe("SFR-00: 配置与诊断契约", () => {
     const toolsInRequest = capturedMessages?.opts?.tools ?? []
     expect(toolsInRequest.map((t: any) => t.function.name).sort()).toEqual([
       "get_goal",
-      "read_mailbox",
       "update_goal",
     ])
   })
@@ -525,7 +526,8 @@ describe("Phase 6: 工具过滤重构", () => {
 
     const result = resolveEffectiveTools({ registeredTools: tools, role: "supervisor", mode: "loop" })
     const names = result.tools.map(t => t.function.name).sort()
-    expect(names).toEqual(["get_goal", "read_mailbox", "update_goal"])
+    expect(names).toEqual(["get_goal", "update_goal"])
+    expect(names).not.toContain("read_mailbox")
     expect(names).not.toContain("bash")
     expect(names).not.toContain("edit")
     expect(names).not.toContain("AgentTool")
