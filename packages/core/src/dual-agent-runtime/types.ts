@@ -1,6 +1,7 @@
 import type { AgentRole } from "../agent-profile/types.js"
 import type { ChatMessage } from "../types.js"
 import type { LoopEvent } from "../interface.js"
+import type { ThinkingMode } from "../provider-thinking.js"
 
 /* SFR-10: 提交场景上下文 */
 export type WorkflowMode = "alone" | "subagent" | "loop"
@@ -40,8 +41,8 @@ export interface AgentRuntimeState {
 export interface DualAgentRuntimeConfig {
   workerModelTarget: string
   supervisorModelTarget: string
-  workerThinking: "off" | "open" | "high"
-  supervisorThinking: "off" | "open" | "high"
+  workerThinking: ThinkingMode
+  supervisorThinking: ThinkingMode
   maxWorkflowRounds: number
 }
 

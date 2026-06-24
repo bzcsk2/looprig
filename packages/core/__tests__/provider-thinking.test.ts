@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest"
 import { createDeepSeekCapabilities } from "../src/provider-thinking.js"
 
 describe("AS1: Provider thinking capabilities", () => {
-  it("declares three thinking modes", () => {
+  it("declares supported thinking modes", () => {
     const caps = createDeepSeekCapabilities("deepseek")
-    expect(caps.supportedModes).toEqual(["off", "open", "high"])
+    expect(caps.supportedModes).toEqual(["off", "high", "max"])
   })
 
   it("mapMode('off') disables thinking", () => {
@@ -12,14 +12,19 @@ describe("AS1: Provider thinking capabilities", () => {
     expect(caps.mapMode("off")).toEqual({ thinking: { type: "disabled" } })
   })
 
-  it("deepseek: mapMode('open') enables thinking without reasoningEffort", () => {
+  it("deepseek: mapMode('open') maps to high reasoning effort for compatibility", () => {
     const caps = createDeepSeekCapabilities("deepseek")
-    expect(caps.mapMode("open")).toEqual({ thinking: { type: "enabled" } })
+    expect(caps.mapMode("open")).toEqual({ thinking: { type: "enabled" }, reasoningEffort: "high" })
   })
 
   it("deepseek: mapMode('high') includes reasoningEffort", () => {
     const caps = createDeepSeekCapabilities("deepseek")
     expect(caps.mapMode("high")).toEqual({ thinking: { type: "enabled" }, reasoningEffort: "high" })
+  })
+
+  it("deepseek: mapMode('max') includes max reasoningEffort", () => {
+    const caps = createDeepSeekCapabilities("deepseek")
+    expect(caps.mapMode("max")).toEqual({ thinking: { type: "enabled" }, reasoningEffort: "max" })
   })
 
   it("non-deepseek: mapMode('open') does not include reasoningEffort", () => {

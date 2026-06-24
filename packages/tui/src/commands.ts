@@ -22,7 +22,7 @@ export type SlashCommand =
   | { name: "talk"; role?: "worker" | "supervisor" }
   | { name: "goal"; subcommand?: "status" | "edit" | "pause" | "resume" | "clear" | "budget" | "no-budget"; arg?: string; objective?: string }
 
-const THINKING_MODES = ["off", "open", "high"]
+const THINKING_MODES = ["off", "high", "max"]
 
 /**
  * CL-52: Parse a slash command from user input.

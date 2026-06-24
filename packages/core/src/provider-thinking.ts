@@ -1,4 +1,4 @@
-export type ThinkingMode = "off" | "open" | "high"
+export type ThinkingMode = "off" | "open" | "high" | "max"
 
 export interface ThinkingModeMapping {
   thinking?: { type: "enabled" | "disabled" }
@@ -13,11 +13,14 @@ export interface ProviderThinkingCapabilities {
 export function createDeepSeekCapabilities(provider?: string): ProviderThinkingCapabilities {
   const supportsReasoningEffort = provider === "deepseek"
   return {
-    supportedModes: ["off", "open", "high"],
+    supportedModes: ["off", "high", "max"],
     mapMode(mode) {
       if (mode === "off") return { thinking: { type: "disabled" } }
       const result: ThinkingModeMapping = { thinking: { type: "enabled" } }
-      if (mode === "high" && supportsReasoningEffort) result.reasoningEffort = "high"
+      if (supportsReasoningEffort) {
+        if (mode === "max") result.reasoningEffort = "max"
+        else result.reasoningEffort = "high"
+      }
       return result
     },
   }

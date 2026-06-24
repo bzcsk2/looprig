@@ -1,10 +1,13 @@
 import { z } from "zod"
 
+const MAX_THINKING_MODE = "max" as const
+const DENY_KEY = "deny" as const
+
 export const AgentRoleSchema = z.enum(["worker", "supervisor"])
 
 export const HarnessStrictnessSchema = z.enum(["strict", "normal", "loose"])
 
-export const ThinkingModeSchema = z.enum(["off", "open", "high"])
+export const ThinkingModeSchema = z.enum(["off", "open", "high", MAX_THINKING_MODE])
 
 export const AgentRoleProfileSchema = z.strictObject({
   role: AgentRoleSchema,
@@ -17,7 +20,7 @@ export const AgentRoleProfileSchema = z.strictObject({
   temperature: z.number().min(0).max(2).optional(),
   tools: z.strictObject({
     allow: z.array(z.string()).optional(),
-    deny: z.array(z.string()).optional(),
+    [DENY_KEY]: z.array(z.string()).optional(),
   }),
   plugins: z.array(z.string()),
   mcpServers: z.array(z.string()),
@@ -30,10 +33,10 @@ export const AgentProfilesConfigSchema = z.strictObject({
   supervisor: AgentRoleProfileSchema,
 }).refine(
   (data) => data.worker.role === "worker",
-  { message: "worker.role must be 'worker'" }
+  { message: "worker.role must be worker" }
 ).refine(
   (data) => data.supervisor.role === "supervisor",
-  { message: "supervisor.role must be 'supervisor'" }
+  { message: "supervisor.role must be supervisor" }
 )
 
 export type ValidatedAgentProfilesConfig = z.infer<typeof AgentProfilesConfigSchema>
