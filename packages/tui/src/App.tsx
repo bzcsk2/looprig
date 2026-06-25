@@ -783,7 +783,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
             const key = command.path.slice(dotIndex + 1);
             const value = command.value;
             try {
-              const current = configManager.get() as Record<string, Record<string, unknown>>;
+              const current = configManager.get() as unknown as Record<string, Record<string, unknown>>;
               if (!current[section]) {
                 appendMessage({ role: 'assistant' as const, content: t().configError(`Unknown section: ${section}`) });
               } else {
@@ -804,7 +804,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
           }
         } else if (command.path) {
           // 显示某个 section 的配置
-          const current = configManager.get() as Record<string, Record<string, unknown>>;
+          const current = configManager.get() as unknown as Record<string, Record<string, unknown>>;
           const section = command.path;
           if (current[section]) {
             appendMessage({ 
