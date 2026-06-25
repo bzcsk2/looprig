@@ -30,7 +30,9 @@ describe("ConfigManager", () => {
   })
 
   it("should load user config from file", async () => {
-    const userConfigDir = join(testDir, ".deepreef")
+    // 创建临时用户目录
+    const tempHome = join(testDir, "home")
+    const userConfigDir = join(tempHome, ".deepreef")
     mkdirSync(userConfigDir, { recursive: true })
     
     const configContent = `
@@ -44,7 +46,11 @@ auto_continue = false
 `
     writeFileSync(join(userConfigDir, "config.toml"), configContent, "utf-8")
     
-    const manager = await ConfigManager.create({ cwd: testDir })
+    // 使用自定义userConfigPath测试
+    const manager = await ConfigManager.create({ 
+      cwd: testDir,
+      userConfigPath: join(userConfigDir, "config.toml")
+    })
     const config = manager.get()
     
     expect(config.workflow.maxRounds).toBe(10)

@@ -183,6 +183,9 @@ export const DeepReefConfigSchema = z.object({
 
 export type DeepReefConfig = z.infer<typeof DeepReefConfigSchema>
 
+// 为了向后兼容，导出为DeepreefConfig
+export type DeepreefConfig = DeepReefConfig
+
 // 配置源类型
 export type ConfigSource = {
   kind: "default" | "user" | "project" | "cli" | "tui"

@@ -309,6 +309,76 @@ export type { MainMode, MainModeDefinition } from "./main-mode.js"
 export { QueryEngine } from "./query-engine.js"
 export type { AgentDefinition } from "./agent.js"
 export type { DeepreefConfig, ProviderInfo, ProviderModel, RoleConfig, ApiKeySource } from "./config.js"
+
+// 新配置系统导出
+export {
+  ConfigManager,
+  getGlobalConfigManager,
+  setGlobalConfigManager,
+  initGlobalConfigManager,
+} from "./config/manager.js"
+export type { ConfigChangeListener } from "./config/manager.js"
+
+export {
+  DeepReefConfigSchema,
+  ProviderConfigSchema,
+  AgentConfigSchema,
+  AgentsConfigSchema,
+  WorkflowConfigSchema,
+  GoalConfigSchema,
+  MailboxConfigSchema,
+  ToolsConfigSchema,
+  ContextConfigSchema,
+  TuiConfigSchema,
+  LoggingConfigSchema,
+  TraceConfigSchema,
+  parseConfig,
+} from "./config/schema.js"
+export type {
+  ProviderConfig,
+  AgentsConfig,
+  GoalConfig,
+  MailboxConfig,
+  ToolRoleModePolicy,
+  ToolsConfig,
+  ContextConfig,
+  TuiConfig,
+  LoggingConfig,
+  TraceConfig,
+  ConfigSource,
+  ConfigWarning,
+  ConfigLoadOptions,
+  DeepReefConfig,
+} from "./config/schema.js"
+
+export {
+  DEFAULT_CONFIG,
+  CONFIG_TEMPLATES,
+  LOCAL_FIRST_CONFIG,
+  SAFE_READONLY_CONFIG,
+  AUTONOMOUS_CODING_CONFIG,
+} from "./config/defaults.js"
+
+export {
+  getConfigPath,
+  getConfigDir,
+} from "./config/loader.js"
+export type { ConfigLoadResult } from "./config/loader.js"
+
+export {
+  migrateConfig,
+  getLatestVersion,
+  needsMigration,
+  getMigrationPath,
+} from "./config/migrations.js"
+
+export {
+  ConfigError,
+  ConfigValidationError,
+  ConfigLoadError,
+  ConfigMigrationError,
+  ConfigAccessError,
+} from "./config/errors.js"
 export type { ChatMessage, ToolCall, ToolSpec, Usage, Role } from "./types.js"
 export type { CoreEngine, AgentConfig, AgentTool, LoopEvent, AgentState, SessionStats, ToolContext, ToolResult, LoopEventRole, ToolTier, ToolConcurrency, ToolProgressUpdate, ChatClient } from "./interface.js"
 // TUI-OT-60: 多 Agent 编排事件类型（供 TUI 消费）

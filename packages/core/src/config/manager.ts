@@ -28,9 +28,9 @@ export class ConfigManager {
   private projectConfigPath: string
   private cwd: string
 
-  constructor(options: { cwd: string }) {
+  constructor(options: { cwd: string; userConfigPath?: string }) {
     this.cwd = options.cwd
-    this.userConfigPath = getConfigPath("user")
+    this.userConfigPath = options.userConfigPath || getConfigPath("user")
     this.projectConfigPath = getConfigPath("project", options.cwd)
   }
 
@@ -174,13 +174,13 @@ export class ConfigManager {
     return this.projectConfigPath
   }
 
-  static async create(options: { cwd: string }): Promise<ConfigManager> {
+  static async create(options: { cwd: string; userConfigPath?: string }): Promise<ConfigManager> {
     const manager = new ConfigManager(options)
     await manager.load()
     return manager
   }
 
-  static createSync(options: { cwd: string }): ConfigManager {
+  static createSync(options: { cwd: string; userConfigPath?: string }): ConfigManager {
     return new ConfigManager(options)
   }
 }
