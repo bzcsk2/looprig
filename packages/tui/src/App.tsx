@@ -701,13 +701,13 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
         workerConfig,
         (progress) => {
           if (progress.status === 'running' && progress.caseId !== 'setup') {
-            const msg = t().evalProgress(progress.index, progress.total, progress.workerModelTarget, progress.caseId)
+            const msg = t().evalProgress(progress.index ?? 0, progress.total ?? 0, progress.workerModelTarget ?? '', progress.caseId ?? '')
             appendMessage({ role: 'assistant' as const, content: msg })
           } else if (progress.status === 'skipped') {
-            const msg = t().evalSkipped(progress.index, progress.total, progress.workerModelTarget, progress.caseId, progress.reason ?? '')
+            const msg = t().evalSkipped(progress.index ?? 0, progress.total ?? 0, progress.workerModelTarget ?? '', progress.caseId ?? '', progress.reason ?? '')
             appendMessage({ role: 'assistant' as const, content: msg })
           } else if ((progress.status === 'passed' || progress.status === 'failed') && progress.score) {
-            const msg = t().evalProgress(progress.index, progress.total, progress.workerModelTarget, progress.caseId, progress.score.overallScore, progress.score.grade)
+            const msg = t().evalProgress(progress.index ?? 0, progress.total ?? 0, progress.workerModelTarget ?? '', progress.caseId ?? '', progress.score.overallScore, progress.score.grade)
             appendMessage({ role: 'assistant' as const, content: msg })
           }
         },

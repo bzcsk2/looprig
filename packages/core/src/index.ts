@@ -652,7 +652,6 @@ export type {
   EvalRunOptions,
   EvalRunProgress,
   EvalRunResult,
-  EvalRunMeta,
   WorkerExecutor,
   SupervisorExecutor,
   ModelSwitchFn,
