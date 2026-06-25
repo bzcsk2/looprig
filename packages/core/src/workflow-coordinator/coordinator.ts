@@ -13,12 +13,13 @@ import { DEFAULT_WORKFLOW_CONFIG } from "./types.js"
 import type { DualAgentRuntime } from "../dual-agent-runtime/dual-runtime.js"
 import type { QuestionService } from "../question/service.js"
 import type { LoopEvent } from "../interface.js"
-import { parseSupervisorDecision, parseSupervisorPlan, type BlockerAuditState } from "./structured-protocol.js"
+import { parseSupervisorDecision, parseSupervisorPlan, parseWorkerReport, type BlockerAuditState } from "./structured-protocol.js"
 import type { AgentCommController } from "../agent-comm/controller.js"
 import type { GoalStore } from "../goal/store.js"
 import type { Mailbox } from "../agent-comm/mailbox.js"
 import { AgentCommController as AgentCommControllerImpl } from "../agent-comm/controller.js"
 import { buildContinuationPrompt, buildBudgetLimitPrompt, buildUsageLimitPrompt } from "../goal/steering.js"
+import { evaluateAgentRunScore, type AgentRunScore, type AgentRuntimeAdjustment, type AgentScoreStore } from "../scoring/index.js"
 
 export interface StartWorkflowOptions {
   goal: string
@@ -36,6 +37,7 @@ export interface WorkflowCoordinatorOptions {
   goalStore?: GoalStore
   mailbox?: Mailbox
   useMailboxWorkflow?: boolean
+  scoreStore?: AgentScoreStore
 }
 
 export class WorkflowCoordinator {
@@ -51,6 +53,7 @@ export class WorkflowCoordinator {
   private mailbox?: Mailbox
   private useMailboxWorkflow: boolean
   private blockerAuditState: BlockerAuditState | null = null
+  private scoreStore?: AgentScoreStore
 
   constructor(options: WorkflowCoordinatorOptions = {}) {
     this.config = { ...DEFAULT_WORKFLOW_CONFIG, ...options.config }
@@ -61,6 +64,7 @@ export class WorkflowCoordinator {
     this.goalStore = options.goalStore
     this.mailbox = options.mailbox
     this.useMailboxWorkflow = options.useMailboxWorkflow ?? false
+    this.scoreStore = options.scoreStore
   }
 
   getCurrentGoal(): ReturnType<GoalStore["getGoal"]> {
@@ -442,7 +446,8 @@ export class WorkflowCoordinator {
     }
 
     const planContent = taskContent || this.state!.supervisorPlan || ""
-    const workerInput = `Execute the following plan for iteration ${this.state!.iteration}:\n\n${planContent}\n\nGoal: ${this.state!.goal}${this.state!.supervisorFeedback ? `\n\nSupervisor feedback from the previous iteration:\n${this.state!.supervisorFeedback}` : ""}`
+    const scoreAdjustment = this.buildScoreAdjustmentPrompt(this.state!.lastRunScore)
+    const workerInput = `Execute the following plan for iteration ${this.state!.iteration}:\n\n${planContent}\n\nGoal: ${this.state!.goal}${this.state!.supervisorFeedback ? `\n\nSupervisor feedback from the previous iteration:\n${this.state!.supervisorFeedback}` : ""}${scoreAdjustment}`
 
     let hasError = false
     let errorCount = 0
@@ -534,6 +539,8 @@ export class WorkflowCoordinator {
     this.state!.lastDecision = decision
     this.state!.supervisorFeedback = response
     this.state!.updatedAt = Date.now()
+
+    this.recordRunScore(reportedContent, parsed?.decision.workerAssessment)
 
     // Phase F: enforce audit gates
     if (decision === "approve") {
@@ -727,6 +734,105 @@ Return your guidance as structured advice.`
   private extractQuestion(response: string): string {
     const questionMatch = response.match(/question[:\s]*(.+)/i)
     return questionMatch?.[1]?.trim() ?? "Supervisor needs user input"
+  }
+
+  private recordRunScore(
+    reportedContent: string,
+    supervisorAssessment?: NonNullable<ReturnType<typeof parseSupervisorDecision>>["decision"]["workerAssessment"],
+  ): void {
+    if (!this.state) return
+
+    const parsedPlan = parseSupervisorPlan(this.state.supervisorPlan ?? "")
+    const parsedReport = parseWorkerReport(reportedContent)
+    const runtimeConfig = typeof this.runtime?.getConfig === "function" ? this.runtime.getConfig() : undefined
+    const workerState = this.runtime?.getWorker().getState()
+
+    const plannedSteps = parsedPlan?.plan.steps.map(step => step.description)
+    const completedSteps = parsedReport?.report.completedSteps
+    const verificationPassed = parsedReport?.report.verification.passed
+    const verificationCommands = parsedReport?.report.verification.commands
+    const blockers = parsedReport?.report.blockers
+    const changedFiles = parsedReport?.report.changedFiles
+
+    const score = evaluateAgentRunScore({
+      mode: "live",
+      workflowId: this.state.workflowId,
+      iteration: this.state.iteration,
+      workerModelTarget: runtimeConfig?.workerModelTarget ?? "unknown-worker",
+      supervisorModelTarget: runtimeConfig?.supervisorModelTarget,
+      task: this.state.goal,
+      workerReport: reportedContent,
+      plannedSteps,
+      completedSteps,
+      changedFiles,
+      verificationPassed,
+      verificationCommands,
+      blockers,
+      toolCalls: workerState?.stats?.toolCalls,
+      loopCount: this.state.iteration,
+      supervisorAssessment,
+    })
+
+    this.state.lastRunScore = score
+    this.state.updatedAt = Date.now()
+    this.applyScoreRuntimeAdjustment(score.adjustment)
+    this.scoreStore?.append(score)
+    this.emitEvent({
+      type: "run_score",
+      workflowId: this.state.workflowId,
+      iteration: this.state.iteration,
+      score,
+      timestamp: Date.now(),
+    })
+  }
+
+  private applyScoreRuntimeAdjustment(adjustment: AgentRuntimeAdjustment): void {
+    if (!this.state || !this.runtime) return
+
+    const workerEngine = this.runtime.getWorker().getEngine?.()
+    if (!workerEngine) return
+
+    if (adjustment.recommendedThinking && typeof workerEngine.setThinkingMode === "function") {
+      workerEngine.setThinkingMode(adjustment.recommendedThinking)
+    }
+
+    if (adjustment.recommendedMaxTokens && typeof workerEngine.updateConfig === "function") {
+      workerEngine.updateConfig({ maxTokens: adjustment.recommendedMaxTokens })
+    }
+
+    if (adjustment.recommendedHarness && typeof workerEngine.setHarnessStrictness === "function") {
+      workerEngine.setHarnessStrictness(adjustment.recommendedHarness)
+    }
+
+    this.state.lastRuntimeAdjustment = adjustment
+    this.state.updatedAt = Date.now()
+    this.emitEvent({
+      type: "runtime_adjustment",
+      workflowId: this.state.workflowId,
+      iteration: this.state.iteration,
+      adjustment,
+      timestamp: Date.now(),
+    })
+  }
+
+  private buildScoreAdjustmentPrompt(score?: AgentRunScore): string {
+    if (!score) return ""
+    const adjustment = score.adjustment
+    const strategies = adjustment.promptStrategies
+      .map(strategy => `- ${strategy.kind}: ${strategy.rationale}`)
+      .join("\n")
+    const dimensionSummary = score.dimensions
+      .filter(d => d.score < 70)
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 3)
+      .map(d => `${d.dimension}=${Math.round(d.score)}`)
+      .join(", ")
+
+    return `\n\nWorker strategy adjustment from the previous run score:
+- Overall score: ${Math.round(score.overallScore)} (${score.grade})
+- Recommended harness strictness: ${adjustment.recommendedHarness ?? "keep current"}
+- Recommended thinking mode: ${adjustment.recommendedThinking ?? "keep current"}
+${adjustment.recommendedMaxTokens ? `- Recommended max output budget: ${adjustment.recommendedMaxTokens}\n` : ""}${dimensionSummary ? `- Weakest dimensions to address: ${dimensionSummary}\n` : ""}${strategies ? `- Prompt strategies:\n${strategies}\n` : ""}Apply these as execution strategy for this iteration. Keep the original goal and Supervisor plan authoritative.`
   }
 
   saveCheckpoint(): WorkflowCheckpoint {

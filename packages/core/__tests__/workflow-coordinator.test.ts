@@ -112,6 +112,11 @@ describe("WorkflowCoordinator", () => {
     let workerCalls = 0
     let supervisorMessage = ""
     let workerMessage = ""
+    const workerEngine = {
+      setThinkingMode: vi.fn(),
+      updateConfig: vi.fn(),
+      setHarnessStrictness: vi.fn(),
+    }
 
     const runtime = {
       getSupervisor: () => ({
@@ -164,6 +169,159 @@ describe("WorkflowCoordinator", () => {
     expect(supervisorInputs[2]).toContain("Your Previous Review:\ncontinue: inspect the remaining rendering path")
     expect(workerInputs[2]).toContain("Plan iteration two using the previous report")
     expect(workerInputs[2]).toContain("Supervisor feedback from the previous iteration")
+  })
+
+  it("scores Worker reports and carries score adjustments into the next Worker iteration", async () => {
+    const workerInputs: string[] = []
+    const emittedEvents: any[] = []
+    let supervisorCalls = 0
+    let workerCalls = 0
+    let supervisorMessage = ""
+    let workerMessage = ""
+    const workerEngine = {
+      setThinkingMode: vi.fn(),
+      updateConfig: vi.fn(),
+      setHarnessStrictness: vi.fn(),
+    }
+
+    const firstWorkerReport = JSON.stringify({
+      version: 1,
+      workflowId: "wf-score",
+      iteration: 1,
+      basedOnLedgerVersion: 0,
+      summary: "Only read the files; tests were not run.",
+      completedSteps: ["read files"],
+      changedFiles: [],
+      verification: { passed: false, commands: [], summary: "not run" },
+      blockers: ["missing verification"],
+      requestsSupervisor: false,
+    })
+    const secondWorkerReport = JSON.stringify({
+      version: 1,
+      workflowId: "wf-score",
+      iteration: 2,
+      basedOnLedgerVersion: 0,
+      summary: "Implemented and verified.",
+      completedSteps: ["implement", "run tests"],
+      changedFiles: ["src/app.ts"],
+      verification: { passed: true, commands: ["bun test"], summary: "passed" },
+      blockers: [],
+      requestsSupervisor: false,
+    })
+
+    const runtime = {
+      getConfig: () => ({
+        workerModelTarget: "worker:test",
+        supervisorModelTarget: "supervisor:test",
+      }),
+      getSupervisor: () => ({
+        submit: async function* () {
+          supervisorCalls++
+          supervisorMessage = supervisorCalls === 1
+            ? JSON.stringify({
+                version: 1,
+                workflowId: "wf-score",
+                iteration: 1,
+                goal: "fix scoring",
+                summary: "Initial plan",
+                steps: [{ id: "read", description: "read files" }, { id: "test", description: "run tests" }],
+                constraints: [],
+                risks: [],
+              })
+            : supervisorCalls === 2
+              ? JSON.stringify({
+                  version: 1,
+                  workflowId: "wf-score",
+                  iteration: 1,
+                  basedOnLedgerVersion: 0,
+                  decision: "continue",
+                  diagnosis: "Verification missing",
+                  nextActions: ["run tests"],
+                  constraints: [],
+                  verification: ["bun test"],
+                  workerAssessment: {
+                    summary: "Worker skipped verification.",
+                    completed: false,
+                    verificationPassed: false,
+                    dimensions: {
+                      taskCompletion: 45,
+                      verification: 20,
+                      communication: 40,
+                    },
+                    promptStrategies: [{ kind: "require_verification", rationale: "Tests were not run." }],
+                  },
+                })
+              : supervisorCalls === 3
+                ? JSON.stringify({
+                    version: 1,
+                    workflowId: "wf-score",
+                    iteration: 2,
+                    goal: "fix scoring",
+                    summary: "Second plan",
+                    steps: [{ id: "implement", description: "implement" }, { id: "test", description: "run tests" }],
+                    constraints: [],
+                    risks: [],
+                  })
+                : JSON.stringify({
+                    version: 1,
+                    workflowId: "wf-score",
+                    iteration: 2,
+                    basedOnLedgerVersion: 0,
+                    decision: "approve",
+                    diagnosis: "done",
+                    nextActions: [],
+                    constraints: [],
+                    verification: ["bun test"],
+                    completionAudit: [{ requirement: "fix scoring", status: "proven", evidence: ["bun test passed"] }],
+                    workerAssessment: {
+                      summary: "Worker completed and verified.",
+                      completed: true,
+                      verificationPassed: true,
+                    },
+                  })
+          yield { role: "assistant_final", content: supervisorMessage }
+        },
+        getState: () => ({ messages: [{ role: "assistant", content: supervisorMessage }] }),
+      }),
+      getWorker: () => ({
+        submit: async function* (input: string, _mode: string, phase: string) {
+          workerInputs.push(input)
+          workerCalls++
+          workerMessage = phase === "worker_report"
+            ? (workerCalls <= 2 ? firstWorkerReport : secondWorkerReport)
+            : "working"
+          yield { role: "assistant_final", content: workerMessage }
+        },
+        getState: () => ({
+          messages: [{ role: "assistant", content: workerMessage }],
+          stats: { toolCalls: 4 },
+        }),
+        getEngine: () => workerEngine,
+      }),
+    }
+
+    const coordinator = new WorkflowCoordinator({
+      runtime: runtime as any,
+      config: { maxRounds: 3 },
+      onEvent: event => emittedEvents.push(event),
+    })
+    coordinator.startWorkflow({ goal: "fix scoring", workflowId: "wf-score" })
+
+    for await (const _event of coordinator.runWorkflow()) { /* consume */ }
+
+    const scoreEvents = emittedEvents.filter(event => event.type === "run_score")
+    const adjustmentEvents = emittedEvents.filter(event => event.type === "runtime_adjustment")
+    expect(scoreEvents).toHaveLength(2)
+    expect(adjustmentEvents).toHaveLength(2)
+    expect(scoreEvents[0].score.overallScore).toBeLessThan(70)
+    expect(coordinator.getState()?.lastRunScore?.evidence.summary).toContain("completed and verified")
+    expect(coordinator.getState()?.lastRuntimeAdjustment?.recommendedHarness).toBeDefined()
+    expect(workerEngine.setThinkingMode).toHaveBeenCalledWith("high")
+    expect(workerEngine.updateConfig).toHaveBeenCalledWith({ maxTokens: 4096 })
+    expect(workerEngine.setHarnessStrictness).toHaveBeenCalledWith("strict")
+    expect(workerInputs[2]).toContain("Worker strategy adjustment from the previous run score")
+    expect(workerInputs[2]).toContain("require_verification")
+    expect(workerInputs[2]).toContain("Weakest dimensions")
   })
 
   it("blocks at max rounds without emitting a phantom next iteration", async () => {

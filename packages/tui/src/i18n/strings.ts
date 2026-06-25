@@ -308,4 +308,16 @@ export interface Strings {
   searchNoMatch: string;
   // P0: custom provider
   customProviderName: string;
+  // P1: config
+  cmdConfig: string;
+  cmdConfigSet: string;
+  cmdConfigOpen: string;
+  cmdConfigReload: string;
+  configLoaded: (path: string) => string;
+  configSet: (key: string, value: string) => string;
+  configOpen: (path: string) => string;
+  configReloaded: string;
+  configError: (msg: string) => string;
+  configCurrent: (path: string) => string;
+  configAll: (content: string) => string;
 }

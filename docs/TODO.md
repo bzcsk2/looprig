@@ -254,29 +254,42 @@ bun test packages/tui/__tests__/i18n.test.ts
 - 不在本阶段重构完整配置系统；语言仍使用 `.deepreef/lang.json`。
 - 不做多语言 beyond `zh-CN` / `en`。
 
-## P1：统一配置系统
+## P1：统一配置系统 ✅
 
 目标：把当前分散的 last-config、role-config、model-targets、TUI settings、env 读取整理成统一 schema/control-plane。
 
-建议范围：
+**状态：已完成** (2026-06-25)
+
+实现内容：
 
 - 新增用户级 `~/.deepreef/config.toml`。
 - 新增项目级 `<project>/.deepreef/config.toml`。
-- 定义 Zod schema、默认值合并、版本迁移。
-- 增加 CLI 命令：
-  - `deepreef config path`
-  - `deepreef config print`
-  - `deepreef config validate`
-  - `deepreef config edit`
-  - `deepreef config doctor`
-- 明确优先级：
+- 定义 Zod schema (`packages/core/src/config/schema.ts`)。
+- 默认值合并 (`packages/core/src/config/defaults.ts`)。
+- 版本迁移 (`packages/core/src/config/migrations.ts`)。
+- CLI 命令：
+  - `deepreef config path` ✅
+  - `deepreef config print` ✅
+  - `deepreef config validate` ✅
+  - `deepreef config edit` ✅
+  - `deepreef config doctor` ✅
+  - `deepreef config init` ✅ (新增)
+- TUI 命令：
+  - `/config` — 显示配置文件路径
+  - `/config <section>` — 显示配置节
+  - `/config <section>.<key> <value>` — 修改配置
+  - `/config open` — 打开配置文件
+  - `/config reload` — 重新加载配置
+- 工具策略：`[tools.supervisor.loop]` / `[tools.worker.loop]` 硬拒绝
+- 文档：`docs/configuration.md`
+
+优先级：
 
 ```text
 CLI flags
   > TUI 临时设置
   > 项目级 .deepreef/config.toml
   > 用户级 ~/.deepreef/config.toml
-  > 当前 .deepreef/last-config.json / role-config.json fallback
   > 内置默认值
 ```
 

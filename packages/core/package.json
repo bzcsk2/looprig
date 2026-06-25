@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@deepreef/security": "workspace:*",
-    "zod": "4.4.3"
+    "zod": "4.4.3",
+    "smol-toml": "^1.7.0"
   }
 }

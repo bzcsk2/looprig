@@ -309,4 +309,16 @@ export const zhCN: Strings = {
   searchNoMatch: '无匹配',
   // P0: custom provider
   customProviderName: 'OpenAI 兼容',
+  // P1: config
+  cmdConfig: '查看/设置配置',
+  cmdConfigSet: '设置配置值（如 /config workflow.max_rounds 10）',
+  cmdConfigOpen: '在编辑器中打开配置文件',
+  cmdConfigReload: '从磁盘重新加载配置',
+  configLoaded: (path) => `已加载配置：${path}`,
+  configSet: (key, value) => `已设置：${key} = ${value}`,
+  configOpen: (path) => `打开配置文件：${path}`,
+  configReloaded: '配置已从磁盘重新加载',
+  configError: (msg) => `配置错误：${msg}`,
+  configCurrent: (path) => `当前配置文件：${path}`,
+  configAll: (content) => `当前配置：\n${content}`,
 };

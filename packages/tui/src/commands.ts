@@ -22,6 +22,7 @@ export type SlashCommand =
   | { name: "workflow" }
   | { name: "talk"; role?: "worker" | "supervisor" }
   | { name: "goal"; subcommand?: "status" | "edit" | "pause" | "resume" | "clear" | "budget" | "no-budget"; arg?: string; objective?: string }
+  | { name: "config"; subcommand?: "open" | "reload" | "set"; path?: string; value?: string }
 
 const THINKING_MODES = ["off", "high", "max"]
 
@@ -93,6 +94,20 @@ export function parseSlashCommand(text: string): SlashCommand | null {
     return { name: "goal", subcommand: "status", objective: rest }
   }
 
+  if (trimmed.startsWith("/config")) {
+    const parts = trimmed.split(/\s+/)
+    if (parts.length === 1) return { name: "config" }
+    const sub = parts[1]
+    if (sub === "open") return { name: "config", subcommand: "open" }
+    if (sub === "reload") return { name: "config", subcommand: "reload" }
+    // /config <section>.<key> <value> — e.g. /config workflow.max_rounds 10
+    if (parts.length >= 3 && parts[2]) {
+      return { name: "config", subcommand: "set", path: parts[1], value: parts.slice(2).join(" ") }
+    }
+    // /config <section> — display section
+    return { name: "config", path: parts[1] }
+  }
+
   return null
 }
 
@@ -160,6 +175,10 @@ export function buildHelpText(activeAgent: string, cmdStrings: Strings): string 
     `  /goal clear  — ${cmdStrings.cmdGoalClear}`,
     `  /goal budget — ${cmdStrings.cmdGoalBudget}`,
     `  /goal no-budget — ${cmdStrings.cmdGoalNoBudget}`,
+    `  /config              — ${cmdStrings.cmdConfig}`,
+    `  /config <key> <val>  — ${cmdStrings.cmdConfigSet}`,
+    `  /config open         — ${cmdStrings.cmdConfigOpen}`,
+    `  /config reload       — ${cmdStrings.cmdConfigReload}`,
     "",
     cmdStrings.helpAgents,
     agentList,

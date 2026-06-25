@@ -1,5 +1,6 @@
 import type { LoopEvent } from "../interface.js"
 import type { AgentRole } from "../agent-profile/types.js"
+import type { AgentRunScore, AgentRuntimeAdjustment, SupervisorRunAssessment } from "../scoring/types.js"
 
 export type WorkflowPhase =
   | "idle"
@@ -50,6 +51,10 @@ export interface WorkflowLoopState {
   lastDecision?: WorkflowDecision
   /** Structured SupervisorDecision when parsed via zod */
   supervisorDecision?: Record<string, unknown>
+  /** Latest run-level Worker score generated after supervisor_check */
+  lastRunScore?: AgentRunScore
+  /** Latest non-persistent runtime adjustment applied to Worker from run score */
+  lastRuntimeAdjustment?: AgentRuntimeAdjustment
   blockedReason?: string
   waitingUserRequestId?: string
   waitingUserQuestion?: string
@@ -111,6 +116,7 @@ export interface SupervisorDecision {
   verification: string[]
   revisedGoal?: string
   question?: string
+  workerAssessment?: SupervisorRunAssessment
 }
 
 export interface WorkflowEvidence {
@@ -172,7 +178,7 @@ export interface StartWorkflowOptions {
 }
 
 export interface WorkflowEvent {
-  type: "phase_change" | "iteration_change" | "blocked" | "completed" | "failed" | "ask_user" | "supervisor_intervene" | "role_output" | "low_confidence_decision"
+  type: "phase_change" | "iteration_change" | "blocked" | "completed" | "failed" | "ask_user" | "supervisor_intervene" | "role_output" | "low_confidence_decision" | "run_score" | "runtime_adjustment"
   workflowId: string
   phase?: WorkflowPhase
   iteration?: number
@@ -183,6 +189,10 @@ export interface WorkflowEvent {
   adviceSummary?: string
   /** low_confidence_decision 时的决策值 */
   decision?: WorkflowDecision
+  /** run_score 事件携带本轮 Worker scoring 结果 */
+  score?: AgentRunScore
+  /** runtime_adjustment 事件携带已应用到 Worker runtime 的非持久化调整 */
+  adjustment?: AgentRuntimeAdjustment
   timestamp: number
   /** SFR-60: role_output 事件携带原始 AgentRuntime 事件 */
   roleEvent?: LoopEvent
@@ -199,4 +209,25 @@ During check (review), you may read files to verify Worker output.
 Do not use mailbox, dispatch, or engineering tools such as read_mailbox, send_message, followup_task, AgentTool, bash, edit, write, or apply_patch.
 The coordinator passes your plan to Worker after this turn; do not try to send or execute the task yourself.
 Do not perform Worker tasks yourself; delegate execution through the plan/review workflow.
-Do not complete without a requirement-by-requirement completion audit with evidence.`
+Do not complete without a requirement-by-requirement completion audit with evidence.
+When reviewing a Worker report, include workerAssessment in your structured decision:
+{
+  "summary": "short assessment",
+  "dimensions": {
+    "taskCompletion": 0-100,
+    "verification": 0-100,
+    "toolUse": 0-100,
+    "efficiency": 0-100,
+    "autonomy": 0-100,
+    "instructionFollowing": 0-100,
+    "recovery": 0-100,
+    "communication": 0-100,
+    "safety": 0-100
+  },
+  "completed": true|false,
+  "verificationPassed": true|false,
+  "safetyIssue": true|false,
+  "promptStrategies": [
+    {"kind": "decompose_task", "rationale": "why"}
+  ]
+}`

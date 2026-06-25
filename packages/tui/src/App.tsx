@@ -674,6 +674,80 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
       }
       return;
     }
+    // /config 命令 — 配置管理
+    if (command?.name === 'config') {
+      void (async () => {
+        const { ConfigManager } = await import('@deepreef/core');
+        const configManager = await ConfigManager.create({ cwd: process.cwd() });
+        const configPath = configManager.getProjectConfigPath();
+
+        if (command.subcommand === 'open') {
+          appendMessage({ role: 'assistant' as const, content: t().configOpen(configPath) });
+          // 打开编辑器
+          const { execSync } = await import('child_process');
+          const editor = process.env.EDITOR || 'vi';
+          try {
+            execSync(`${editor} "${configPath}"`, { stdio: 'inherit' });
+            // 编辑后重新加载
+            await configManager.reload();
+            appendMessage({ role: 'assistant' as const, content: t().configReloaded });
+          } catch {
+            appendMessage({ role: 'assistant' as const, content: t().configError('Failed to open editor') });
+          }
+        } else if (command.subcommand === 'reload') {
+          await configManager.reload();
+          appendMessage({ role: 'assistant' as const, content: t().configReloaded });
+        } else if (command.subcommand === 'set' && command.path && command.value) {
+          // 解析路径: workflow.max_rounds -> { section: 'workflow', key: 'max_rounds' }
+          const dotIndex = command.path.indexOf('.');
+          if (dotIndex === -1) {
+            appendMessage({ role: 'assistant' as const, content: t().configError('Invalid format. Use: /config <section>.<key> <value>') });
+          } else {
+            const section = command.path.slice(0, dotIndex);
+            const key = command.path.slice(dotIndex + 1);
+            const value = command.value;
+            try {
+              const config = configManager.get();
+              const sectionValue = config[section as keyof typeof config];
+              if (sectionValue === undefined || sectionValue === null) {
+                appendMessage({ role: 'assistant' as const, content: t().configError(`Unknown section: ${section}`) });
+              } else if (typeof sectionValue !== 'object' || Array.isArray(sectionValue)) {
+                appendMessage({ role: 'assistant' as const, content: t().configError(`Section '${section}' is not an object`) });
+              } else {
+                // 类型转换
+                let parsed: unknown = value;
+                if (value === 'true') parsed = true;
+                else if (value === 'false') parsed = false;
+                else if (!isNaN(Number(value))) parsed = Number(value);
+                
+                (sectionValue as Record<string, unknown>)[key] = parsed;
+                configManager.update(config, 'tui');
+                await configManager.saveProjectConfig();
+                appendMessage({ role: 'assistant' as const, content: t().configSet(command.path, value) });
+              }
+            } catch (e) {
+              appendMessage({ role: 'assistant' as const, content: t().configError(String(e)) });
+            }
+          }
+        } else if (command.path) {
+          // 显示某个 section 的配置
+          const config = configManager.get();
+          const sectionValue = config[command.path as keyof typeof config];
+          if (sectionValue !== undefined && sectionValue !== null) {
+            appendMessage({ 
+              role: 'assistant' as const, 
+              content: t().configAll(JSON.stringify(sectionValue, null, 2))
+            });
+          } else {
+            appendMessage({ role: 'assistant' as const, content: t().configError(`Unknown section: ${command.path}`) });
+          }
+        } else {
+          // /config — 显示当前配置文件路径
+          appendMessage({ role: 'assistant' as const, content: t().configCurrent(configPath) });
+        }
+      })();
+      return;
+    }
     // /goal 命令 — 目标管理（仅 loop 模式有效）
     if (command?.name === 'goal') {
       if (workflowMode !== 'loop') {

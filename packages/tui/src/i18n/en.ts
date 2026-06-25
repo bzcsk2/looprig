@@ -309,4 +309,16 @@ export const en: Strings = {
   searchNoMatch: 'no match',
   // P0: custom provider
   customProviderName: 'OpenAI Compatible',
+  // P1: config
+  cmdConfig: 'show/set configuration',
+  cmdConfigSet: 'set config value (e.g. /config workflow.max_rounds 10)',
+  cmdConfigOpen: 'open config file in editor',
+  cmdConfigReload: 'reload configuration from disk',
+  configLoaded: (path) => `Config loaded from ${path}`,
+  configSet: (key, value) => `Config set: ${key} = ${value}`,
+  configOpen: (path) => `Opening config file: ${path}`,
+  configReloaded: 'Config reloaded from disk',
+  configError: (msg) => `Config error: ${msg}`,
+  configCurrent: (path) => `Current config file: ${path}`,
+  configAll: (content) => `Current configuration:\n${content}`,
 };

@@ -1,0 +1,107 @@
+version = 1
+
+[providers.default]
+type = "openai-compatible"
+base_url = "https://opencode.ai/zen/v1"
+api_key = "public"
+model = "deepseek-v4-flash-free"
+
+[agents.supervisor]
+provider = "default"
+temperature = 0.2
+reasoning_effort = "high"
+max_output_tokens = 4096
+
+[agents.worker]
+provider = "default"
+temperature = 0.1
+reasoning_effort = "medium"
+max_output_tokens = 8192
+
+[workflow]
+default_mode = "alone"
+max_rounds = 6
+max_consecutive_errors = 2
+supervisor_intervention_error_threshold = 2
+structured_protocol = true
+require_json_decisions = true
+legacy_text_fallback = true
+ask_user_on_blocked = true
+auto_resume_after_ask_user = false
+
+[goal]
+enabled = true
+auto_continue = true
+max_auto_continuations = 10
+max_consecutive_blocked_turns = 3
+max_consecutive_turn_errors = 2
+default_token_budget = 0
+completion_audit_required = true
+blocked_audit_required = true
+inject_continuation_prompt = true
+inject_objective_updated_prompt = true
+inject_budget_limit_prompt = true
+
+[mailbox]
+enabled = true
+storage = "jsonl"
+wait_timeout_ms = 30000
+max_messages_per_role = 200
+mark_read_after_turn = true
+persist_structured_payloads = true
+show_in_tui = true
+
+[tools]
+approval_policy = "on-request"
+sandbox = "workspace-write"
+dangerous_tools_enabled = false
+
+[tools.supervisor.loop]
+allow = []
+deny = ["bash", "edit_file", "apply_patch", "write_file", "AgentTool"]
+
+[tools.supervisor.subagent]
+allow = []
+deny = []
+
+[tools.worker.loop]
+allow = []
+deny = ["update_goal"]
+
+[tools.worker.subagent]
+allow = []
+deny = []
+
+[context]
+strategy = "goal_focused"
+max_input_tokens = 24000
+summary_enabled = true
+summary_every_turns = 4
+include_mailbox_history = true
+include_goal_history = true
+include_tool_events = false
+
+[tui]
+theme = "default"
+show_goal_panel = true
+show_agent_comm_feed = true
+show_token_usage = true
+show_tool_events = false
+compact_reasoning = true
+confirm_before_replacing_goal = true
+confirm_dangerous_tool_policy = true
+
+[logging]
+level = "info"
+path = ".deepreef/logs"
+events_jsonl = true
+mailbox_jsonl = true
+workflow_jsonl = true
+redact_secrets = true
+
+[trace]
+enabled = true
+include_prompts = false
+include_tool_args = true
+include_tool_results = false
+include_model_outputs = false

@@ -1,4 +1,5 @@
 import { z } from "zod"
+import type { AgentPromptStrategyAdjustment } from "../scoring/types.js"
 
 export const SupervisorStepSchema = z.object({
   id: z.string(),
@@ -47,6 +48,38 @@ export const BlockerAuditSchema = z.object({
   canMakeProgress: z.boolean(),
 }).optional()
 
+export const AgentPromptStrategyAdjustmentSchema = z.object({
+  kind: z.enum([
+    "decompose_task",
+    "require_verification",
+    "tighten_tool_policy",
+    "expand_context",
+    "reduce_scope",
+    "increase_reporting",
+    "preserve_current",
+  ]),
+  rationale: z.string(),
+}) satisfies z.ZodType<AgentPromptStrategyAdjustment>
+
+export const WorkerAssessmentSchema = z.object({
+  summary: z.string(),
+  dimensions: z.object({
+    taskCompletion: z.number().min(0).max(100).optional(),
+    verification: z.number().min(0).max(100).optional(),
+    toolUse: z.number().min(0).max(100).optional(),
+    efficiency: z.number().min(0).max(100).optional(),
+    autonomy: z.number().min(0).max(100).optional(),
+    instructionFollowing: z.number().min(0).max(100).optional(),
+    recovery: z.number().min(0).max(100).optional(),
+    communication: z.number().min(0).max(100).optional(),
+    safety: z.number().min(0).max(100).optional(),
+  }).partial().optional(),
+  completed: z.boolean().optional(),
+  verificationPassed: z.boolean().optional(),
+  safetyIssue: z.boolean().optional(),
+  promptStrategies: z.array(AgentPromptStrategyAdjustmentSchema).optional(),
+}).optional()
+
 export const SupervisorDecisionSchema = z.object({
   version: z.literal(1),
   workflowId: z.string(),
@@ -61,6 +94,7 @@ export const SupervisorDecisionSchema = z.object({
   question: z.string().optional(),
   completionAudit: z.array(CompletionAuditItemSchema).optional(),
   blockerAudit: BlockerAuditSchema,
+  workerAssessment: WorkerAssessmentSchema,
 })
 
 export type ParsedSupervisorPlan = z.infer<typeof SupervisorPlanSchema>

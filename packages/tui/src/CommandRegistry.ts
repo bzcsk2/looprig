@@ -28,6 +28,9 @@ export const SLASH_COMMANDS: Array<{ name: string; descKey: keyof Strings }> = [
   { name: '/goal clear', descKey: 'cmdGoalClear' },
   { name: '/goal budget', descKey: 'cmdGoalBudget' },
   { name: '/goal no-budget', descKey: 'cmdGoalNoBudget' },
+  { name: '/config', descKey: 'cmdConfig' },
+  { name: '/config open', descKey: 'cmdConfigOpen' },
+  { name: '/config reload', descKey: 'cmdConfigReload' },
 ];
 
 export function filterCommands(query: string, t?: () => Strings): SlashCommand[] {

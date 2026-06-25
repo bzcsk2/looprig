@@ -24,6 +24,7 @@
     "@deepreef/mcp": "workspace:*",
     "@deepreef/tui": "workspace:*",
     "@deepreef/plugin": "workspace:*",
-    "@deepreef/memory": "workspace:*"
+    "@deepreef/memory": "workspace:*",
+    "smol-toml": "^1.7.0"
   }
 }

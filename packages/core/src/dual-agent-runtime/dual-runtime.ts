@@ -102,6 +102,10 @@ export class DualAgentRuntime {
     return this.supervisor
   }
 
+  getConfig(): DualAgentRuntimeConfig {
+    return { ...this.config }
+  }
+
   /** WF-FIX-60: Load session on supervisor engine for dual-runtime session recovery */
   async loadSupervisorSession(sessionId: string): Promise<ChatMessage[]> {
     // The supervisor engine must implement loadSession (ReasonixEngine does)
