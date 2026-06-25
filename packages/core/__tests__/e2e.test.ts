@@ -147,8 +147,12 @@ describe("TT2: E2E tool chains through engine", () => {
 
   it("bash → read_file cross-verification chain", async () => {
     const filePath = join(tmpDir, "bash-created.txt")
+    // Use cross-platform command: Node.js writeFileSync to avoid shell syntax issues
+    const writeCmd = process.platform === "win32"
+      ? `node -e "require('fs').writeFileSync('${filePath.replace(/\\/g, '\\\\')}', 'created by bash')"`
+      : `echo "created by bash" > ${filePath}`
     mockClient.setGenerators([
-      genBash(`echo "created by bash" > ${filePath}`),
+      genBash(writeCmd),
       genRead(filePath),
       genText("verified"),
     ])
