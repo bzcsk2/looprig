@@ -8,6 +8,11 @@ This project follows a pragmatic pre-1.0 changelog style. Public APIs and config
 
 ### Documentation
 
+- Consolidated the `docs/` tree into a smaller current documentation set: index, architecture, operations, development, roadmap, and changelog.
+- Merged project design and status notes into `ARCHITECTURE.md`.
+- Merged operations, configuration, model-provider, logging, diagnostics, and safety guidance into `OPERATIONS.md`.
+- Merged active TODO and roadmap notes into `ROADMAP.md`.
+- Removed obsolete historical DONE/TODO/archive-style docs from the current documentation set.
 - Rewrote the English README to match the current Supervisor / Worker loop positioning.
 - Refreshed the Chinese README and fixed the global install command to use `@deepreef/cli`.
 - Added this changelog.
