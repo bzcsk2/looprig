@@ -1,4 +1,4 @@
-# DeepReef
+# LoopRig
 
 <p align="center">
   <strong>English</strong> |
@@ -13,20 +13,22 @@
   <img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="License" />
 </p>
 
-**DeepReef is a terminal-native AI loop agent for making cheap, free, and local models complete real engineering work through supervised execution loops.**
+**LoopRig is a terminal-native supervised agent loop rig for local, free, and low-cost coding models.**
 
-Most coding agents assume a strong frontier model is always available. DeepReef takes a different position: use stronger models for planning, supervision, and recovery; use cheaper or local models for the bulk of the execution; keep the loop observable, resumable, and governed by explicit safety boundaries.
+Most coding agents assume a strong frontier model is always available. LoopRig takes a different position: use stronger models for planning, supervision, review, and recovery; use cheaper or local models for the bulk of execution; keep the loop observable, resumable, and governed by explicit safety boundaries.
 
-> The goal is not to replace good models. The goal is to make low-cost models useful enough to keep working.
+> The goal is not to replace strong models. The goal is to make weaker, cheaper, and local models useful enough to keep working.
+
+LoopRig was formerly named **DeepReef**. The repository has been renamed, but the npm package and CLI binary may still use the legacy `@deepreef/cli` / `deepreef` names until the package rename is completed.
 
 ---
 
-## What DeepReef Is
+## What LoopRig Is
 
-DeepReef is a TypeScript/Bun CLI and TUI agent runtime with:
+LoopRig is a TypeScript/Bun CLI and TUI agent runtime with:
 
 - a cache-aware agent loop optimized for low-cost model usage
-- a Supervisor / Worker workflow for long-running engineering tasks
+- a fixed Supervisor / Worker workflow for long-running engineering tasks
 - adjustable harness levels for weak, local, or unreliable models
 - a terminal UI built with Ink and React
 - 30+ built-in tools for file operations, search, editing, shell, web, tasks, workflow, MCP, memory, and notebooks
@@ -34,13 +36,13 @@ DeepReef is a TypeScript/Bun CLI and TUI agent runtime with:
 - deny-first permission handling for shell commands and file modifications
 - session persistence and recovery for interrupted work
 
-DeepReef is currently **pre-1.0**. Core CLI, tools, security, memory, plugin, skills, MCP, and workflow foundations are implemented, but public APIs and configuration formats may still change.
+LoopRig is currently **pre-1.0**. Core CLI, tools, security, memory, plugin, skills, MCP, and workflow foundations are implemented, but public APIs and configuration formats may still change.
 
 ---
 
 ## Core Idea: Supervisor + Worker Loop
 
-DeepReef avoids the fragile pattern of one agent wandering through an unbounded loop. The intended workflow is a fixed two-role execution structure:
+LoopRig avoids the fragile pattern of one agent wandering through an unbounded loop. The intended workflow is a fixed two-role execution structure:
 
 ```text
 Supervisor plans
@@ -64,6 +66,8 @@ The Supervisor uses a stronger model. It is responsible for planning, reviewing 
 
 ### Install the CLI
 
+The package is still published under the legacy name while the rename is in progress:
+
 ```bash
 npm install -g @deepreef/cli
 ```
@@ -74,6 +78,14 @@ You can also use Bun:
 bun install -g @deepreef/cli
 ```
 
+The current binary is still:
+
+```bash
+deepreef
+```
+
+After the package rename lands, this section should move to the future `@looprig/cli` package and `looprig` binary.
+
 ### Start inside a project
 
 ```bash
@@ -81,7 +93,7 @@ cd your-project
 deepreef
 ```
 
-Inside DeepReef, run:
+Inside LoopRig, run:
 
 ```text
 /help
@@ -94,8 +106,8 @@ Inside DeepReef, run:
 ### Develop from source
 
 ```bash
-git clone https://github.com/bzcsk2/DeepReef.git
-cd DeepReef
+git clone https://github.com/bzcsk2/looprig.git
+cd looprig
 bun install
 bun run dev
 ```
@@ -118,11 +130,11 @@ bun run dev
 
 ---
 
-## Why DeepReef Exists
+## Why LoopRig Exists
 
 ### Low-cost model economics
 
-Most AI coding tools rely on expensive models to compensate for weak orchestration. DeepReef focuses on orchestration first:
+Most AI coding tools rely on expensive models to compensate for weak orchestration. LoopRig focuses on orchestration first:
 
 - put expensive intelligence where it matters: planning, review, recovery, verification
 - let cheap/free/local models do repeatable implementation work
@@ -131,7 +143,7 @@ Most AI coding tools rely on expensive models to compensate for weak orchestrati
 
 ### Local and weak-model reliability
 
-DeepReef treats model weakness as a runtime condition, not a fatal limitation. The harness system lets the user choose stricter execution rails for weaker models:
+LoopRig treats model weakness as a runtime condition, not a fatal limitation. The harness system lets the user choose stricter execution rails for weaker models:
 
 - smaller steps
 - stronger verification gates
@@ -141,7 +153,7 @@ DeepReef treats model weakness as a runtime condition, not a fatal limitation. T
 
 ### Terminal-native engineering
 
-DeepReef is built for developers working in repositories, not for generic chatbot sessions. It emphasizes:
+LoopRig is built for developers working in repositories, not for generic chatbot sessions. It emphasizes:
 
 - file-aware edits
 - shell execution with permission checks
@@ -154,7 +166,7 @@ DeepReef is built for developers working in repositories, not for generic chatbo
 
 ## Architecture
 
-DeepReef uses a kernel/shell separation:
+LoopRig uses a kernel/shell separation:
 
 ```text
 packages/core      -> agent loop, API adaptation, context, cache, retry, workflow primitives
@@ -189,7 +201,7 @@ CLI / TUI / future IDE shell
 
 ### Tools
 
-DeepReef includes tools for:
+LoopRig includes tools for:
 
 - reading, writing, editing, and listing files
 - grep and project search
@@ -203,7 +215,7 @@ DeepReef includes tools for:
 
 ### Editing safety
 
-DeepReef uses layered edit safeguards:
+LoopRig uses layered edit safeguards:
 
 - hash-anchored editing
 - fuzzy fallback matching
@@ -214,17 +226,17 @@ DeepReef uses layered edit safeguards:
 
 ### Skills and MCP
 
-Skills are reusable domain instruction packages. MCP support lets DeepReef connect to external tools and data sources through JSON-RPC 2.0 / stdio MCP servers.
+Skills are reusable domain instruction packages. MCP support lets LoopRig connect to external tools and data sources through JSON-RPC 2.0 / stdio MCP servers.
 
 ### AgentMemory
 
-DeepReef includes memory integration for project and agent continuity. Memory behavior should be treated as configurable runtime state and reviewed before using DeepReef in sensitive repositories.
+LoopRig includes memory integration for project and agent continuity. Memory behavior should be treated as configurable runtime state and reviewed before using LoopRig in sensitive repositories.
 
 ---
 
 ## Model Providers
 
-DeepReef is designed around multiple model classes:
+LoopRig is designed around multiple model classes:
 
 | Class | Intended role |
 | --- | --- |
@@ -235,7 +247,7 @@ DeepReef is designed around multiple model classes:
 
 Provider configuration is available through `/model`. Local models are routed through OpenAI-compatible configuration.
 
-DeepReef does not require one fixed provider. The runtime state is effectively:
+LoopRig does not require one fixed provider. The runtime state is effectively:
 
 ```ts
 {
@@ -248,9 +260,25 @@ DeepReef does not require one fixed provider. The runtime state is effectively:
 
 ---
 
+## Evaluation and Sandboxing Direction
+
+LoopRig is moving toward a fixed `/eval` workflow for comparing Worker models, Supervisor strategies, harness levels, and sandbox profiles.
+
+The intended evaluation environments are:
+
+| Environment | Purpose |
+| --- | --- |
+| `sandbox` | Default lightweight evaluation using fixture-copy or git worktree isolation. |
+| `container` | Stronger Docker/Podman-style isolation for external benchmark cases and complex dependencies. |
+| `localenv` | Diagnostic mode for testing LoopRig against the user's real local project; not intended as an official model score by default. |
+
+The design goal is to test agent capability in reproducible environments while keeping real local-project runs clearly separated from official benchmark scores.
+
+---
+
 ## Safety Model
 
-DeepReef is an agent that can read files, edit files, run commands, and call tools. Treat it as a powerful local development assistant, not as a sandboxed security boundary.
+LoopRig is an agent that can read files, edit files, run commands, and call tools. Treat it as a powerful local development assistant, not as a complete security boundary.
 
 Key safeguards:
 
@@ -262,7 +290,7 @@ Key safeguards:
 - isolated sub-agent permissions
 - API key files ignored by Git
 
-Do not run DeepReef in a repository where you are not willing to review agent-generated changes.
+Do not run LoopRig in a repository where you are not willing to review agent-generated changes.
 
 ---
 
@@ -276,7 +304,7 @@ bun run build
 npm pack --dry-run
 ```
 
-The package is published as `@deepreef/cli` and exposes the `deepreef` binary.
+The package is currently published as `@deepreef/cli` and exposes the `deepreef` binary. These names are expected to change in a future package rename.
 
 ---
 
@@ -300,11 +328,12 @@ See [ROADMAP.md](./ROADMAP.md).
 
 Near-term focus:
 
+- complete the DeepReef-to-LoopRig naming transition across package metadata and documentation
 - harden npm installation and package smoke tests
 - stabilize Supervisor / Worker workflow behavior
 - document provider configuration and harness levels
 - improve Windows terminal compatibility
-- add reliability benchmarks for weak/local models
+- add reliability benchmarks and `/eval` workflows for weak/local models
 
 ---
 
@@ -312,7 +341,7 @@ Near-term focus:
 
 Issues and pull requests are welcome. Start with [CONTRIBUTING.md](./CONTRIBUTING.md), then check open issues and roadmap items.
 
-DeepReef is especially interested in contributions around:
+LoopRig is especially interested in contributions around:
 
 - local model presets
 - weak-model workflow reliability
@@ -321,6 +350,7 @@ DeepReef is especially interested in contributions around:
 - MCP examples
 - documentation and examples
 - safety hardening
+- evaluation fixtures and sandbox providers
 
 ---
 
