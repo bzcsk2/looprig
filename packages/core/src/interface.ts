@@ -1,6 +1,7 @@
 import type { ChatMessage, ToolSpec, Usage } from "./types.js"
 import type { DeepSeekStreamEvent, DeepSeekClientOptions } from "./client.js"
 import type { QuestionInfo, QuestionAnswer } from "./question/types.js"
+import type { SandboxProvider } from "./sandbox/types.js"
 import type { WorkflowMode } from "./dual-agent-runtime/types.js"
 import type { WorkflowPhase } from "./workflow-coordinator/types.js"
 import type { ThinkingMode } from "./provider-thinking.js"
@@ -124,6 +125,7 @@ export interface AgentTool {
 export interface ToolContext {
   cwd: string
   sessionId: string
+  sandboxProvider?: SandboxProvider
   signal?: AbortSignal
   reportProgress?: (update: ToolProgressUpdate) => void
   invokeTool?: (name: string, args: Record<string, unknown>) => Promise<ToolResult>

@@ -19,7 +19,28 @@ export function listProviders(): SandboxProvider[] {
 export async function detectBestProvider(
   environmentId: EvalEnvironmentId,
 ): Promise<{ provider: SandboxProvider; capabilities: SandboxCapabilities }> {
-  if (environmentId === "localenv") {
+  if (environmentId === "sandbox.local") {
+    const order: SandboxProviderId[] = ["bwrap", "soft-workspace"];
+    for (const id of order) {
+      const p = providers.get(id);
+      if (!p) continue;
+      const caps = await p.canRun();
+      if (caps.available) {
+        return {
+          provider: p,
+          capabilities: {
+            ...caps,
+            official: false,
+            reason: id === "bwrap"
+              ? "sandbox.local: OS-level sandbox with host/local toolchain. Scores are diagnostic only."
+              : caps.reason ?? "sandbox.local: soft workspace fallback. Scores are diagnostic only.",
+          },
+        };
+      }
+    }
+  }
+
+  if (environmentId === "diagnostic") {
     const soft = providers.get("soft-workspace");
     if (soft) {
       const caps = await soft.canRun();
@@ -27,9 +48,8 @@ export async function detectBestProvider(
     }
   }
 
-  if (environmentId === "sandbox") {
+  if (environmentId === "sandbox.benchmark") {
     const order: SandboxProviderId[] = ["bwrap", "soft-workspace"];
-
     for (const id of order) {
       const p = providers.get(id);
       if (!p) continue;
@@ -38,19 +58,6 @@ export async function detectBestProvider(
         return { provider: p, capabilities: caps };
       }
     }
-  }
-
-  if (environmentId === "container") {
-    const containerOrder: SandboxProviderId[] = ["docker", "podman"];
-    for (const id of containerOrder) {
-      const p = providers.get(id);
-      if (!p) continue;
-      const caps = await p.canRun();
-      if (caps.available) {
-        return { provider: p, capabilities: caps };
-      }
-    }
-    throw new Error(`No container provider available (docker/podman) for environment: container`);
   }
 
   const fallback = providers.get("soft-workspace");

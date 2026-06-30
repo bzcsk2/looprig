@@ -1,9 +1,13 @@
 import React, { useState, useCallback, useEffect } from 'react';
+import { Box, Text } from '@deepreef/ink';
 import type { EvalCategory, EvalSuite, EvalEnvironmentId, EvalCategoryId } from '@deepreef/core';
 import { getCategories, getCategory, getSuite, getFilteredSuites } from '@deepreef/core/eval/registry.js';
+import { resolveEvalEnvironment } from '@deepreef/core/sandbox/types.js';
 import { EvalCategorySelect } from './EvalCategorySelect.js';
 import { EvalSuiteSelect } from './EvalSuiteSelect.js';
 import { EvalEnvironmentSelect } from './EvalEnvironmentSelect.js';
+import { ModalShell } from '../ModalShell.js';
+import { TONE } from '../reasonix/tokens.js';
 
 type EvalWizardStep = 'category' | 'environment' | 'suite';
 
@@ -19,7 +23,7 @@ export function EvalWizard({ onDone, onStart, initialCategoryId, initialSuiteId,
   const [step, setStep] = useState<EvalWizardStep>(() => {
     if (initialCategoryId && initialSuiteId) {
       const cat = getCategory(initialCategoryId as any);
-      const suite = getSuite(initialCategoryId as any, initialSuiteId as any);
+      const suite = getSuite(initialCategoryId as any, initialSuiteId as any, (initialEnvironmentId as any) ?? "sandbox.benchmark");
       if (cat && suite) return 'suite';
     }
     if (initialCategoryId) {
@@ -32,12 +36,12 @@ export function EvalWizard({ onDone, onStart, initialCategoryId, initialSuiteId,
     initialCategoryId ? getCategory(initialCategoryId as any) ?? null : null,
   );
   const [selectedEnvironment, setSelectedEnvironment] = useState<EvalEnvironmentId>(() =>
-    (initialEnvironmentId as EvalEnvironmentId) ?? 'sandbox',
+    initialEnvironmentId ? resolveEvalEnvironment(initialEnvironmentId) : 'sandbox.benchmark',
   );
   useEffect(() => {
     if (initialCategoryId && initialSuiteId) {
       const cat = getCategory(initialCategoryId as any);
-      const suite = getSuite(initialCategoryId as any, initialSuiteId as any);
+      const suite = getSuite(initialCategoryId as any, initialSuiteId as any, selectedEnvironment);
       if (cat && suite) {
         onStart(cat.id, suite.id, selectedEnvironment);
         onDone();

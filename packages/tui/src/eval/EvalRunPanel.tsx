@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text } from '@deepreef/ink';
 import type { EvalCategoryId, EvalSuiteId, EvalProgressEvent, EvalEnvironmentId } from '@deepreef/core';
+import { resolveEvalEnvironment } from '@deepreef/core/sandbox/types.js';
 import { ModalShell } from '../ModalShell.js';
 import { FG, TONE } from '../reasonix/tokens.js';
 import { Spinner } from '../Spinner.js';
@@ -21,7 +22,7 @@ export function EvalRunPanel({ categoryId, suiteId, environmentId, latestEvent, 
   return (
     <ModalShell
       title={`Running Eval — ${categoryId}/${suiteId}`}
-      subtitle={`env=${environmentId ?? 'sandbox'} ${progressText}`}
+      subtitle={`env=${resolveEvalEnvironment(environmentId ?? '')} ${progressText}`}
       onCancel={onCancel}
     >
       <Box flexDirection="column" gap={1}>

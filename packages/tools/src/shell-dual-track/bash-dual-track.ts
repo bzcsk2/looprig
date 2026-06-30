@@ -27,6 +27,11 @@ import { isDestructiveShellCommand, validateShellCommand } from "./shell-securit
 const DEFAULT_TIMEOUT = 30_000
 const DEFAULT_MAX_CHARS = 200_000
 
+function truncateOutput(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text
+  return text.slice(-maxChars) + `\n... [truncated: ${text.length - maxChars} more chars]`
+}
+
 export interface DualTrackBashOptions {
   /** 工具名称，默认 bash */
   name?: string
@@ -214,6 +219,43 @@ export function createDualTrackBashTool(options: DualTrackBashOptions = {}): Age
       }
 
       const shellClass = classifyShellCommand(command)
+      const maxChars = typeof args.max_chars === "number" ? Math.max(0, Math.floor(args.max_chars)) : DEFAULT_MAX_CHARS
+
+      if (ctx.sandboxProvider) {
+        const timeoutMs = pickForegroundTimeout(
+          shellClass,
+          typeof args.timeout_ms === "number" ? args.timeout_ms : undefined,
+          DEFAULT_TIMEOUT,
+        )
+        const result = await ctx.sandboxProvider.run({
+          command,
+          cwd,
+          timeoutMs,
+          allowNetwork: false,
+          readRoots: [cwd],
+          writeRoots: [cwd],
+        })
+        const out = {
+          mode: "foreground" as const,
+          backend: "sandbox",
+          command,
+          cwd,
+          stdout: truncateOutput(result.stdout, maxChars),
+          stderr: truncateOutput(result.stderr, maxChars),
+          exitCode: result.exitCode ?? 1,
+          timedOut: result.timedOut,
+          classifiedAs: shellClass,
+        }
+        if (hasBinaryEncoding(out.stdout) || hasBinaryEncoding(out.stderr)) {
+          ;(out as Record<string, unknown>).encoding_warning = "output contains non-UTF-8 binary data"
+        }
+        return {
+          content: safeStringify(out),
+          isError: out.exitCode !== 0,
+          metadata: { exitCode: out.exitCode, providerId: ctx.sandboxProvider.id },
+        }
+      }
+
       const explicitBackground = args.background === true
       const explicitForeground = args.background === false
       const destructive = isDestructiveShellCommand(command, backend.id)
@@ -253,7 +295,6 @@ export function createDualTrackBashTool(options: DualTrackBashOptions = {}): Age
         typeof args.timeout_ms === "number" ? args.timeout_ms : undefined,
         DEFAULT_TIMEOUT,
       )
-      const maxChars = typeof args.max_chars === "number" ? Math.max(0, Math.floor(args.max_chars)) : DEFAULT_MAX_CHARS
       const enableEscalate = shellClass === "auto" && !explicitForeground
 
       const out = await runForegroundShell({

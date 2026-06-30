@@ -29,6 +29,29 @@ describe("bash tool", () => {
     expect(r.isError).toBe(true)
   })
 
+  it("delegates command execution to sandboxProvider when present", async () => {
+    const { createBashTool } = await import("../src/shell-exec.js")
+    const tool = createBashTool()
+    const calls: any[] = []
+    const sandboxProvider = {
+      id: "bwrap",
+      async canRun() {
+        return { available: true, official: true, providerId: "bwrap" }
+      },
+      async run(input: any) {
+        calls.push(input)
+        return { stdout: "sandbox-ok\n", stderr: "", exitCode: 0, timedOut: false }
+      },
+    }
+    const r = await tool.execute({ command: "echo should-not-spawn-host" }, { ...ctx, sandboxProvider })
+    const p = JSON.parse(r.content as string)
+    expect(r.isError).toBe(false)
+    expect(calls).toHaveLength(1)
+    expect(calls[0].command).toBe("echo should-not-spawn-host")
+    expect(p.backend).toBe("sandbox")
+    expect(p.stdout.trim()).toBe("sandbox-ok")
+  })
+
   it("should deny rm -rf /", async () => {
     const { createBashTool } = await import("../src/shell-exec.js")
     const tool = createBashTool()

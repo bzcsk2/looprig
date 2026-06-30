@@ -133,7 +133,7 @@ function buildVerifier(
   const hasTests = existsSync(testDir);
 
   if (!hasTests) {
-    return { type: "file-assert", fileAssertions: [] };
+    throw new Error(`Missing tests directory for terminal-bench task "${taskId}" — cannot generate verifier`);
   }
 
   return {
@@ -228,6 +228,8 @@ export function buildManifest(
     fixtureSource: `__tb__${taskId}`,
     sourceMeta,
     setup: buildSetupCommands(taskId, taskPath),
+    requiredBinaries: ["python3", "pytest", "pip"],
+    requiredPythonModules: ["pytest"],
     taskPrompt: baseTaskPrompt,
     expectedVerification: scenario === "recovery"
       ? ["恢复后 pytest 测试应全部通过"]
@@ -249,7 +251,12 @@ export function loadTerminalBenchManifests(): EvalCaseManifest[] {
       const caseId = buildCaseId(inst.taskId, inst.scenario);
       if (seen.has(caseId)) return null;
       seen.add(caseId);
-      return buildManifest(inst, lock);
+      try {
+        return buildManifest(inst, lock);
+      } catch (err) {
+        console.warn(`[eval] Skipping terminal-bench task "${inst.taskId}": ${(err as Error).message}`);
+        return null;
+      }
     })
     .filter((m): m is EvalCaseManifest => m !== null);
 }

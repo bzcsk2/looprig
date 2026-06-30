@@ -1,4 +1,48 @@
-export type EvalEnvironmentId = "sandbox" | "localenv" | "container" | "diagnostic";
+export type EvalEnvironmentId = "sandbox.benchmark" | "sandbox.local" | "diagnostic";
+
+export type ScoreKind = "official" | "local-compatible";
+
+export const ENV_ALIASES: Record<string, EvalEnvironmentId> = {
+  sandbox: "sandbox.benchmark",
+  localenv: "sandbox.local",
+  container: "sandbox.local",
+  diagnostic: "diagnostic",
+};
+
+export function resolveEvalEnvironment(input: string): EvalEnvironmentId {
+  if (input === "sandbox.benchmark" || input === "sandbox.local" || input === "diagnostic") {
+    return input as EvalEnvironmentId;
+  }
+  return ENV_ALIASES[input] ?? "sandbox.local";
+}
+
+export interface ToolchainTool {
+  name: string;
+  version?: string;
+  source: "managed" | "host" | "fallback";
+  path?: string;
+  sha256?: string;
+}
+
+export interface ToolchainFingerprint {
+  profile: string;
+  tools: ToolchainTool[];
+  path: string[];
+  createdAt: string;
+}
+
+export interface EvalSandboxProfile {
+  id: EvalEnvironmentId;
+  toolchainProfile: string;
+  officialScore: boolean;
+  path: string[];
+  toolchainFingerprint: ToolchainFingerprint | null;
+  networkPolicy: {
+    setup: boolean;
+    agent: boolean;
+    verifier: boolean;
+  };
+}
 
 export type SandboxProviderId =
   | "soft-workspace"
@@ -55,4 +99,6 @@ export interface SandboxProvider {
   canRun(): Promise<SandboxCapabilities>;
   run(input: SandboxCommand): Promise<SandboxResult>;
   runPreflight?(environmentId: EvalEnvironmentId): Promise<PreflightResult>;
+  getProfile?(): EvalSandboxProfile | null;
+  setProfile?(profile: EvalSandboxProfile): void;
 }

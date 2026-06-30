@@ -14,7 +14,15 @@ const VerifierSchema = z.object({
   scriptPath: z.string().optional(),
   fileAssertions: z.array(FileAssertionSchema).optional(),
   timeoutMs: z.number().int().positive().optional(),
-});
+}).refine(
+  (v) => {
+    if (v.type === "file-assert") {
+      return (v.fileAssertions?.length ?? 0) > 0;
+    }
+    return true;
+  },
+  { message: "file-assert verifier must have at least one file assertion" },
+);
 
 const ScoringSchema = z.object({
   requireCleanGitDiff: z.boolean().optional(),
@@ -36,7 +44,7 @@ const EvalCaseManifestSchema = z.object({
   description: z.string().min(1),
   fixtureSource: z.string(),
   sourceMeta: z.object({
-    sourceKind: z.enum(["terminal-bench", "swe-bench", "looprig-real"]),
+    sourceKind: z.enum(["terminal-bench", "swe-bench"]),
     sourceId: z.string(),
     sourceRepoPath: z.string(),
     sourceCommit: z.string().optional(),
@@ -46,6 +54,7 @@ const EvalCaseManifestSchema = z.object({
     sourceInstanceId: z.string().optional(),
   }).optional(),
   setup: z.array(z.string()).optional(),
+  protectedFiles: z.array(z.string()).optional(),
   taskPrompt: z.string().min(1),
   expectedVerification: z.array(z.string()).min(1),
   verifier: VerifierSchema,

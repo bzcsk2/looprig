@@ -226,4 +226,29 @@ describe("createBashTool dualTrack option", () => {
     const tool = createBashTool()
     expect(tool.parameters.properties).not.toHaveProperty("action")
   })
+
+  it("dual-track bash delegates commands to sandboxProvider instead of host background", async () => {
+    const tool = createBashTool({ dualTrack: true })
+    const calls: any[] = []
+    const sandboxProvider = {
+      id: "bwrap",
+      async canRun() {
+        return { available: true, official: true, providerId: "bwrap" }
+      },
+      async run(input: any) {
+        calls.push(input)
+        return { stdout: "dual-sandbox-ok\n", stderr: "", exitCode: 0, timedOut: false }
+      },
+    }
+    const r = await tool.execute(
+      { command: "sleep 10", background: true },
+      { cwd: process.cwd(), sessionId: "dual-sandbox-test", signal: new AbortController().signal, sandboxProvider } as any,
+    )
+    const p = JSON.parse(r.content as string)
+    expect(r.isError).toBe(false)
+    expect(calls).toHaveLength(1)
+    expect(p.mode).toBe("foreground")
+    expect(p.backend).toBe("sandbox")
+    expect(p.stdout.trim()).toBe("dual-sandbox-ok")
+  })
 })

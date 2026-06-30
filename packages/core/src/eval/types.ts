@@ -1,4 +1,4 @@
-import type { EvalEnvironmentId, SandboxProviderId, PreflightResult } from "../sandbox/types";
+import type { EvalEnvironmentId, SandboxProviderId, PreflightResult, ScoreKind, ToolchainFingerprint, EvalSandboxProfile } from "../sandbox/types";
 
 export type EvalCategoryId =
   | "coding-basics"
@@ -23,7 +23,7 @@ export interface EvalSuite {
   title: string;
   description: string;
   estimatedMinutes: string;
-  environmentId?: EvalEnvironmentId;
+  environmentId: EvalEnvironmentId;
   cases: EvalCaseRef[];
 }
 
@@ -44,7 +44,7 @@ export interface FileAssertion {
 }
 
 export interface RealCaseSourceMeta {
-  sourceKind: "terminal-bench" | "swe-bench" | "looprig-real";
+  sourceKind: "terminal-bench" | "swe-bench";
   sourceId: string;
   sourceRepoPath: string;
   sourceCommit?: string;
@@ -72,6 +72,24 @@ export interface EvalCaseManifest {
     fileAssertions?: FileAssertion[];
     timeoutMs?: number;
   };
+  protectedFiles?: string[];
+  outOfBoundsCheckPaths?: string[];
+  requiredBinaries?: string[];
+  requiredPythonModules?: string[];
+  network?: boolean;
+  requires?: {
+    toolchainProfile?: string;
+    tools?: {
+      required?: string[];
+      recommended?: string[];
+      optional?: string[];
+    };
+    network?: {
+      setup?: boolean;
+      agent?: boolean;
+      verifier?: boolean;
+    };
+  };
   scoring?: {
     requireCleanGitDiff?: boolean;
     maxChangedFiles?: number;
@@ -87,12 +105,31 @@ export interface VerifierResult {
   details: string[];
 }
 
+export interface SetupCommandResult {
+  command: string;
+  exitCode: number | null;
+  timedOut: boolean;
+  stdout: string;
+  stderr: string;
+  startedAt: string;
+  finishedAt: string;
+}
+
+export interface SetupResult {
+  commands: SetupCommandResult[];
+  allPassed: boolean;
+  startedAt: string;
+  finishedAt: string;
+}
+
 export interface ObjectiveSignals {
   changedFiles: number;
   diffSize: number;
   toolFailureCount: number;
   verificationCommandsRun: number;
   cleanGitDiff: boolean;
+  outOfBoundsWrites: string[];
+  toolTrackingValid: boolean;
 }
 
 export interface CaseScore {
@@ -103,6 +140,29 @@ export interface CaseScore {
   objectiveScore: number;
   supervisorScore: number;
   finalScore: number;
+  scoreIneligible: boolean;
+}
+
+export interface PolicyGateResult {
+  gate: string;
+  passed: boolean;
+  detail: string;
+}
+
+export interface CaseContract {
+  environment: EvalEnvironmentId;
+  provider: string;
+  requiredBinaries: string[];
+  requiredPythonModules: string[];
+  network: boolean;
+  allowedWriteRoots: string[];
+  protectedFiles: string[];
+  verifier: string;
+  toolchainProfile: string;
+  scoring: {
+    requireCleanGitDiff: boolean;
+    maxChangedFiles: number | undefined;
+  };
 }
 
 export interface CaseResult {
@@ -114,11 +174,14 @@ export interface CaseResult {
   verdict: "pass" | "fail" | "error" | "skipped" | "infra_error";
   verifierResult: VerifierResult | null;
   objectiveSignals: ObjectiveSignals | null;
+  setupResult: SetupResult | null;
+  policyGates: PolicyGateResult[];
   supervisorAssessment: Record<string, number> | null;
   score: CaseScore | null;
   workerOutput: string;
   supervisorOutput: string;
   patchDiff: string;
+  caseContract: CaseContract | null;
   startedAt: string;
   finishedAt: string;
   error?: string;
@@ -149,6 +212,7 @@ export interface EvalRunMeta {
   status: "running" | "completed" | "cancelled" | "failed" | "infra_error";
   providerId: SandboxProviderId;
   officialScore: boolean;
+  scoreKind: ScoreKind;
   fallbackReason?: string;
   preflight?: PreflightResult;
 }

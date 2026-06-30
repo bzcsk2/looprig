@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll, afterAll, beforeEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import {
@@ -100,17 +100,20 @@ describe("provider-registry", () => {
     expect(getProvider("mock-test")).toBe(b);
   });
 
-  it("detectBestProvider('localenv') returns soft-workspace when bwrap also registered", async () => {
+  it("detectBestProvider('sandbox.local') prefers bwrap boundary when available", async () => {
     initDefaultProviders();
-    const { provider, capabilities } = await detectBestProvider("localenv");
-    expect(provider.id).toBe("soft-workspace");
+    const { provider, capabilities } = await detectBestProvider("sandbox.local");
+    expect(["bwrap", "soft-workspace"]).toContain(provider.id);
     expect(capabilities.available).toBe(true);
     expect(capabilities.official).toBe(false);
+    if (provider.id === "bwrap") {
+      expect(capabilities.reason).toContain("OS-level sandbox");
+    }
   });
 
-  it("detectBestProvider('sandbox') prefers bwrap over soft-workspace when bwrap available", async () => {
+  it("detectBestProvider('sandbox.benchmark') prefers bwrap over soft-workspace when bwrap available", async () => {
     initDefaultProviders();
-    const { provider, capabilities } = await detectBestProvider("sandbox");
+    const { provider, capabilities } = await detectBestProvider("sandbox.benchmark");
     // bwrap may or may not be available on this machine
     if (provider.id === "bwrap") {
       expect(capabilities.official).toBe(true);
@@ -121,29 +124,30 @@ describe("provider-registry", () => {
     }
   });
 
-  it("detectBestProvider('sandbox') falls back to soft-workspace when bwrap unavailable", async () => {
+  it("detectBestProvider('sandbox.benchmark') falls back to soft-workspace when bwrap unavailable", async () => {
     registerProvider(new UnavailableProvider());
     registerProvider(new SoftWorkspaceProvider());
     const providers = listProviders();
     Object.defineProperty(providers[0], "id", { value: "bwrap" });
 
-    const { provider, capabilities } = await detectBestProvider("sandbox");
+    const { provider, capabilities } = await detectBestProvider("sandbox.benchmark");
     expect(provider.id).toBe("soft-workspace");
     expect(capabilities.official).toBe(false);
   });
 
-  it("detectBestProvider('container') throws when no container provider registered", async () => {
+  it("detectBestProvider('diagnostic') falls back to soft-workspace", async () => {
     registerProvider(new SoftWorkspaceProvider());
-    await expect(detectBestProvider("container")).rejects.toThrow("No container provider available");
+    const { provider } = await detectBestProvider("diagnostic");
+    expect(provider.id).toBe("soft-workspace");
   });
 
   it("detectBestProvider throws when no providers registered", async () => {
-    await expect(detectBestProvider("sandbox")).rejects.toThrow("No provider available");
+    await expect(detectBestProvider("sandbox.benchmark")).rejects.toThrow("No provider available");
   });
 
-  it("detectBestProvider('sandbox') returns unavailable provider when it's the only one", async () => {
+  it("detectBestProvider('sandbox.benchmark') returns unavailable provider when it's the only one", async () => {
     registerProvider(new UnavailableProvider());
-    await expect(detectBestProvider("sandbox")).rejects.toThrow("No provider available");
+    await expect(detectBestProvider("sandbox.benchmark")).rejects.toThrow("No provider available");
   });
 });
 
@@ -213,31 +217,68 @@ describe("bwrap provider (integration)", () => {
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("hello-from-bwrap");
   });
+
+  it("binds profile PATH directories into the sandbox", async () => {
+    const p = new BwrapProvider();
+    const caps = await p.canRun();
+    if (!caps.available) return; // skip if bwrap not installed
+
+    const profileToolDir = mkdtempSync(join(tmpdir(), "bwrap-profile-path-"));
+    const workspace = mkdtempSync(join(tmpdir(), "bwrap-profile-workspace-"));
+    try {
+      const toolPath = join(profileToolDir, "mytool");
+      writeFileSync(toolPath, "#!/bin/sh\necho managed-ok\n");
+      chmodSync(toolPath, 0o755);
+      p.setProfile({
+        id: "sandbox.benchmark",
+        toolchainProfile: "node",
+        officialScore: true,
+        path: [profileToolDir],
+        toolchainFingerprint: null,
+        networkPolicy: { setup: false, agent: false, verifier: false },
+      });
+
+      const result = await p.run({
+        command: "command -v mytool && mytool",
+        cwd: workspace,
+        readRoots: [workspace],
+        writeRoots: [workspace],
+        allowNetwork: false,
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("/looprig/toolchains/0/mytool");
+      expect(result.stdout).toContain("managed-ok");
+    } finally {
+      rmSync(profileToolDir, { recursive: true, force: true });
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("detect", () => {
   it("diagnoseEnvironment returns unavailable when no providers", async () => {
-    const diag = await diagnoseEnvironment("sandbox");
+    const diag = await diagnoseEnvironment("sandbox.benchmark");
     expect(diag.available).toBe(false);
     expect(diag.official).toBe(false);
     expect(diag.providerId).toBe("none");
     expect(diag.reason).toBeDefined();
   });
 
-  it("diagnoseEnvironment returns soft-workspace for localenv", async () => {
-    registerProvider(new SoftWorkspaceProvider());
-    const diag = await diagnoseEnvironment("localenv");
+  it("diagnoseEnvironment returns diagnostic provider for sandbox.local", async () => {
+    initDefaultProviders();
+    const diag = await diagnoseEnvironment("sandbox.local");
     expect(diag.available).toBe(true);
     expect(diag.official).toBe(false);
-    expect(diag.providerId).toBe("soft-workspace");
+    expect(["bwrap", "soft-workspace"]).toContain(diag.providerId);
   });
 
-  it("diagnoseEnvironment('sandbox') handles bwrap-unavailable fallback", async () => {
+  it("diagnoseEnvironment('sandbox.benchmark') handles bwrap-unavailable fallback", async () => {
     registerProvider(new UnavailableProvider());
     registerProvider(new SoftWorkspaceProvider());
     const providers = listProviders();
     Object.defineProperty(providers[0], "id", { value: "bwrap" });
-    const diag = await diagnoseEnvironment("sandbox");
+    const diag = await diagnoseEnvironment("sandbox.benchmark");
     expect(diag.available).toBe(true);
     expect(diag.providerId).toBe("soft-workspace");
   });
@@ -246,21 +287,21 @@ describe("detect", () => {
 describe("exec", () => {
   it("execViaProvider delegates to provider.run", async () => {
     const p = new MockProvider();
-    const result = await execViaProvider(p, "test-cmd", tmpDir, "sandbox");
+    const result = await execViaProvider(p, "test-cmd", tmpDir, "sandbox.benchmark");
     expect(result.stdout).toBe("exec: test-cmd");
     expect(p.runCalls).toBe(1);
   });
 
   it("execInSandbox resolves provider and executes", async () => {
     registerProvider(new SoftWorkspaceProvider());
-    const result = await execInSandbox("echo works", tmpDir, "localenv");
+    const result = await execInSandbox("echo works", tmpDir, "sandbox.local");
     expect(result.stdout.trim()).toBe("works");
     expect(result.exitCode).toBe(0);
   });
 
   it("execInSandbox returns error for invalid command", async () => {
     registerProvider(new SoftWorkspaceProvider());
-    const result = await execInSandbox("exit 1", tmpDir, "localenv");
+    const result = await execInSandbox("exit 1", tmpDir, "sandbox.local");
     expect(result.exitCode).toBe(1);
   });
 });

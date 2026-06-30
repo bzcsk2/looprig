@@ -45,21 +45,32 @@ describe("eval registry", () => {
   });
 
   it("should get suite from category", () => {
-    const suite = getSuite("coding-basics", "smoke");
+    const suite = getSuite("coding-basics", "smoke", "sandbox.benchmark");
     expect(suite).toBeDefined();
     expect(suite!.id).toBe("smoke");
+    expect(suite!.environmentId).toBe("sandbox.benchmark");
     expect(suite!.cases.length).toBeGreaterThanOrEqual(3);
   });
 
   it("should get case ref by id", () => {
-    const ref = getCaseRef("coding-basics", "smoke", "cb-fix-ts-type");
+    const ref = getCaseRef("coding-basics", "smoke", "sandbox.benchmark", "cb-fix-ts-type");
     expect(ref).toBeDefined();
     expect(ref!.id).toBe("cb-fix-ts-type");
   });
 
   it("should list case refs for a suite", () => {
-    const refs = listCaseRefs("coding-basics", "smoke");
+    const refs = listCaseRefs("coding-basics", "smoke", "sandbox.benchmark");
     expect(refs.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("should return undefined for invalid environment/suite combination", () => {
+    const suite = getSuite("coding-basics", "standard", "sandbox.benchmark");
+    expect(suite).toBeUndefined();
+  });
+
+  it("should return undefined for nonexistent suite in environment", () => {
+    const suite = getSuite("coding-basics", "stress", "sandbox.benchmark");
+    expect(suite).toBeUndefined();
   });
 
   it("should list available ids", () => {
@@ -505,6 +516,18 @@ describe("runner", () => {
     expect(existsSync(join(tmpDir, "evals", latest, "trace.jsonl"))).toBe(true);
     expect(existsSync(join(tmpDir, "evals", latest, "registry.json"))).toBe(true);
   });
+
+  it("does not mark sandbox.benchmark as official without a verified managed toolchain", async () => {
+    const report = await runFixedEval({
+      categoryId: "coding-basics",
+      suiteId: "smoke",
+      environmentId: "sandbox.benchmark",
+    });
+
+    expect(report.meta.officialScore).toBe(false);
+    expect(report.meta.scoreKind).toBe("local-compatible");
+    expect(report.meta.fallbackReason).toContain("Benchmark toolchain not official");
+  });
 });
 
 describe("report generation", () => {
@@ -530,7 +553,7 @@ describe("report generation", () => {
         suiteId: "smoke" as const,
         model: "test-model",
         status: "completed" as const,
-        environmentId: "sandbox" as const,
+        environmentId: "sandbox.benchmark" as const,
         providerId: "test-provider",
         officialScore: true,
       },
@@ -564,6 +587,8 @@ describe("report generation", () => {
               toolFailureCount: 0,
               verificationCommandsRun: 1,
               cleanGitDiff: false,
+              outOfBoundsWrites: [],
+              toolTrackingValid: false,
             },
             supervisorAssessment: { taskCompletion: 90 },
             score: {
@@ -574,10 +599,12 @@ describe("report generation", () => {
               objectiveScore: 80,
               supervisorScore: 90,
               finalScore: 95,
+              scoreIneligible: false,
             },
             workerOutput: "worker output",
             supervisorOutput: "supervisor output",
             patchDiff: "diff content",
+            caseContract: null,
             startedAt: new Date().toISOString(),
             finishedAt: new Date().toISOString(),
             manifest: {
@@ -605,6 +632,7 @@ describe("report generation", () => {
             workerOutput: "",
             supervisorOutput: "",
             patchDiff: "",
+            caseContract: null,
             startedAt: new Date().toISOString(),
             finishedAt: new Date().toISOString(),
             manifest: {
@@ -627,7 +655,7 @@ describe("report generation", () => {
     const { summaryMd, summaryJson } = await saveEvalReport(report);
 
     expect(summaryMd).toContain("# LoopRig Eval Report");
-    expect(summaryMd).toContain("sandbox");
+    expect(summaryMd).toContain("sandbox.benchmark");
     expect(summaryMd).toContain("test-provider");
     expect(summaryMd).toContain("true");
     expect(summaryMd).toContain("test-run-1");

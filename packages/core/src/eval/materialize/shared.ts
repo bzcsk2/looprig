@@ -39,12 +39,7 @@ export async function initDefaultMaterializers(): Promise<void> {
   } catch (e) {
     console.error("[materializer] Failed to load SWE-bench materializer:", e);
   }
-  try {
-    const { looprigRealMaterializer } = await import("./looprig-real.js");
-    registerMaterializer(looprigRealMaterializer);
-  } catch (e) {
-    console.error("[materializer] Failed to load looprig-real materializer:", e);
-  }
+
 }
 
 export async function copyToWorkspace(

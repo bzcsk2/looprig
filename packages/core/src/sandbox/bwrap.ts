@@ -2,18 +2,26 @@ import { execSync, execFileSync } from "node:child_process";
 import { existsSync, realpathSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { resolveBundledBwrap } from "./bundled-bwrap";
-import type { SandboxProvider, SandboxCommand, SandboxResult, SandboxCapabilities, PreflightResult, PreflightCheck, EvalEnvironmentId } from "./types";
+import type { SandboxProvider, SandboxCommand, SandboxResult, SandboxCapabilities, PreflightResult, PreflightCheck, EvalEnvironmentId, EvalSandboxProfile } from "./types";
 
 const SYSTEM_DIRS = ["/usr", "/bin", "/lib", "/lib64"];
 
 const ETC_FILES = ["/etc/passwd", "/etc/group", "/etc/nsswitch.conf", "/etc/resolv.conf", "/etc/hosts", "/etc/hostname"];
 
 const TOOL_NAMES = ["sh", "node", "bun", "python3", "pytest"];
+const PROFILE_MOUNT_ROOT = "/looprig/toolchains";
 
-function getEssentialDirs(): string[] {
+interface ProfilePathBind {
+  source: string;
+  dest: string;
+}
+
+function getEssentialDirs(profilePath?: string[]): string[] {
   const dirs = new Set(SYSTEM_DIRS.filter((d) => existsSync(d)));
-  for (const dir of getToolDirs()) {
-    dirs.add(dir);
+  if (!profilePath || profilePath.length === 0) {
+    for (const dir of getToolDirs()) {
+      dirs.add(dir);
+    }
   }
   return Array.from(dirs);
 }
@@ -70,7 +78,23 @@ function getToolVersion(path: string): string | null {
   }
 }
 
-function getSandboxPath(): string {
+function getProfilePathBinds(profilePath?: string[]): ProfilePathBind[] {
+  if (!profilePath || profilePath.length === 0) return [];
+  const unique = Array.from(new Set(profilePath.filter((p) => p && existsSync(p))));
+  return unique.map((source, index) => ({
+    source,
+    dest: `${PROFILE_MOUNT_ROOT}/${index}`,
+  }));
+}
+
+function getSandboxPathFromBinds(binds: ProfilePathBind[]): string {
+  if (binds.length > 0) {
+    return [...binds.map((b) => b.dest), "/usr/bin", "/bin"].join(":");
+  }
+  return getHostSandboxPath();
+}
+
+function getHostSandboxPath(): string {
   const basePath = "/usr/bin:/bin";
   const toolDirs = new Set<string>();
   for (const name of ["node", "bun", "python3", "pytest"]) {
@@ -85,11 +109,22 @@ function getSandboxPath(): string {
   return [...extra, basePath].join(":");
 }
 
-
+function getSandboxPath(profilePath?: string[]): string {
+  return getSandboxPathFromBinds(getProfilePathBinds(profilePath));
+}
 
 export class BwrapProvider implements SandboxProvider {
   id = "bwrap" as const;
   private bwrapPath: string | null = null;
+  private _profile: EvalSandboxProfile | null = null;
+
+  getProfile(): EvalSandboxProfile | null {
+    return this._profile;
+  }
+
+  setProfile(profile: EvalSandboxProfile): void {
+    this._profile = profile;
+  }
 
   private findBwrap(): string | null {
     if (this.bwrapPath) return this.bwrapPath;
@@ -140,6 +175,7 @@ export class BwrapProvider implements SandboxProvider {
   }
 
   private buildArgs(input: SandboxCommand): string[] {
+    const profileBinds = getProfilePathBinds(this._profile?.path);
     const args: string[] = [
       "--unshare-all",
       "--new-session",
@@ -150,11 +186,19 @@ export class BwrapProvider implements SandboxProvider {
       "--chdir", input.cwd,
     ];
 
-    for (const dir of getEssentialDirs()) {
+    for (const dir of getEssentialDirs(this._profile?.path)) {
       args.push("--ro-bind", dir, dir);
     }
     for (const file of getEssentialFiles()) {
       args.push("--ro-bind", file, file);
+    }
+
+    if (profileBinds.length > 0) {
+      args.push("--dir", "/looprig");
+      args.push("--dir", PROFILE_MOUNT_ROOT);
+      for (const bind of profileBinds) {
+        args.push("--ro-bind", bind.source, bind.dest);
+      }
     }
 
     for (const dir of input.readRoots) {
@@ -176,7 +220,7 @@ export class BwrapProvider implements SandboxProvider {
     }
 
     args.push("--setenv", "HOME", input.cwd);
-    args.push("--setenv", "PATH", getSandboxPath());
+    args.push("--setenv", "PATH", getSandboxPathFromBinds(profileBinds));
     args.push("--unsetenv", "DBUS_SESSION_BUS_ADDRESS");
     args.push("--unsetenv", "DISPLAY");
     args.push("--unsetenv", "WAYLAND_DISPLAY");
@@ -226,8 +270,8 @@ export class BwrapProvider implements SandboxProvider {
 
   async runPreflight(environmentId: EvalEnvironmentId): Promise<PreflightResult> {
     const startedAt = new Date().toISOString();
-    const sandboxPath = getSandboxPath();
-    const toolNames = ["sh", "node", "bun", "python3", "pytest"];
+    const sandboxPath = getSandboxPath(this._profile?.path);
+    const toolNames = this._profile?.toolchainProfile === "node" ? ["sh", "node", "bun", "git"] : ["sh"];
 
     try {
       const bwrap = this.findBwrap();

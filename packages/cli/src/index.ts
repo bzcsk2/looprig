@@ -1,5 +1,6 @@
 import { stdin as input, stdout as output, stderr as errorOutput } from "node:process"
 import { configCommand } from "./commands/config.js"
+import { evalCommand } from "./commands/eval.js"
 
 function printHelp(): void {
   output.write(`deepreef - Terminal-native AI loop agent runtime
@@ -7,6 +8,7 @@ function printHelp(): void {
 Usage:
   deepreef                        Start interactive TUI session
   deepreef config <subcommand>    Configuration management
+  deepreef eval <subcommand>      Eval environment management
   deepreef --help, -h             Show this help
   deepreef --version, -v          Show version
 
@@ -18,11 +20,17 @@ Config Subcommands:
   deepreef config edit [options]    Open config in editor
   deepreef config doctor            Check config health
 
+Eval Subcommands:
+  deepreef eval doctor [--json]    Check eval environment health
+  deepreef eval prepare <env>      Prepare an eval environment
+
 Examples:
   deepreef config init --template local-first
   deepreef config print --redact
   deepreef config validate
   deepreef config doctor
+  deepreef eval doctor
+  deepreef eval prepare sandbox.benchmark
 `)
 }
 
@@ -47,6 +55,14 @@ async function main(): Promise<void> {
     const subcommand = args[1] || "help"
     const subArgs = args.slice(2)
     await configCommand(subcommand, subArgs)
+    return
+  }
+  
+  // Handle eval subcommand
+  if (args[0] === "eval") {
+    const subcommand = args[1] || "help"
+    const subArgs = args.slice(2)
+    await evalCommand(subcommand, subArgs)
     return
   }
   

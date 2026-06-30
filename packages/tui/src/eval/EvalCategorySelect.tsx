@@ -34,7 +34,20 @@ export function EvalCategorySelect({ categories, onSelect, onCancel }: Props): R
     <ModalShell title="Select Evaluation Category" subtitle="Choose a category to evaluate" onCancel={onCancel}>
       <Box flexDirection="column" gap={1}>
         {categories.map((cat, i) => {
-          const caseCount = cat.suites.reduce((s, su) => s + su.cases.length, 0);
+          const envGroups = new Map<string, number>();
+          for (const su of cat.suites) {
+            const prev = envGroups.get(su.environmentId) ?? 0;
+            envGroups.set(su.environmentId, prev + su.cases.length);
+          }
+          const ENV_LABELS: Record<string, string> = {
+            'sandbox.benchmark': 'benchmark',
+            'sandbox.local': 'local',
+            diagnostic: 'diagnostic',
+          };
+          const envBreakdown = Array.from(envGroups)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([env, count]) => `${ENV_LABELS[env] ?? env}: ${count}`)
+            .join(' · ');
           return (
             <Box key={cat.id} flexDirection="row">
               <Text color={i === selectedIdx ? TONE.brand : FG.faint}>
@@ -44,7 +57,7 @@ export function EvalCategorySelect({ categories, onSelect, onCancel }: Props): R
                 {cat.title}
               </Text>
               <Text color={FG.faint}> — {cat.description}</Text>
-              <Text color={FG.faint}> ({caseCount} cases)</Text>
+              <Text color={FG.faint}> {envBreakdown}</Text>
             </Box>
           );
         })}

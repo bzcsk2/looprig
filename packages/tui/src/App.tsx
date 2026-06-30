@@ -496,7 +496,8 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
   // Fixed eval: 跟踪 evalAbortRef 供 /eval-cancel 使用
   const evalAbortRef = useRef<AbortController | null>(null);
   const startFixedEval = useCallback(async (categoryId: string, suiteId: string, environmentId?: string) => {
-    const env = environmentId ?? 'sandbox';
+    const { resolveEvalEnvironment } = await import('@deepreef/core/sandbox/types.js');
+    const env = resolveEvalEnvironment(environmentId ?? '');
     const category = getCategory(categoryId as any);
     const suite = getSuite(categoryId as any, suiteId as any, env as any);
     if (!category || !suite) {

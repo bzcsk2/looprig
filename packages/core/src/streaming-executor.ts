@@ -9,6 +9,8 @@ import { ReadTracker, extractFilePath, isWriteTool, isReadTool } from "./read-be
 import type { SubagentRunOptions, SubagentRunResult } from "./subagent/types.js"
 import type { QuestionInfo, QuestionAnswer } from "./question/types.js"
 import { getCurrentCaseWorkspace } from "./eval/runner.js"
+import { evalToolTracker } from "./eval/tool-tracker.js"
+import { getEvalSandboxProvider } from "./eval/workspace.js"
 
 export class StreamingToolExecutor {
   private tools: Map<string, AgentTool>
@@ -299,6 +301,7 @@ export class StreamingToolExecutor {
       }
 
       this.hookManager?.runAfterToolCall(tc.function.name, { content: result.content, isError: result.isError, metadata: result.metadata })
+      evalToolTracker.record(result.isError)
 
       // DRF-20: 记录读/写跟踪
       if (this.readTracker && !result.isError) {
@@ -324,6 +327,7 @@ export class StreamingToolExecutor {
     } catch (e) {
       const result = makeToolError(errorMessage(e))
       this.hookManager?.runAfterToolCall(tc.function.name, { content: result.content, isError: true, metadata: result.metadata })
+      evalToolTracker.record(true)
       if (diagnosticsEnabled) logger.error("tool.execute.error", e, { durationMs: Date.now() - startedAt })
       return { event: makeErrorEvent(result, tc.function.name, index), result }
     }
@@ -333,6 +337,7 @@ export class StreamingToolExecutor {
     return {
       cwd: getCurrentCaseWorkspace() ?? this.cwd,
       sessionId: this.sessionId,
+      sandboxProvider: getEvalSandboxProvider() ?? undefined,
       signal,
       reportProgress,
       delegateTask: this.delegateTask,

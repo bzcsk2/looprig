@@ -59,6 +59,34 @@ function createForegroundBashTool(): AgentTool {
       const timeoutMs = typeof args.timeout_ms === "number" ? Math.max(0, Math.floor(args.timeout_ms)) : 30_000
       const maxChars = typeof args.max_chars === "number" ? Math.max(0, Math.floor(args.max_chars)) : 200_000
 
+      if (ctx.sandboxProvider) {
+        const result = await ctx.sandboxProvider.run({
+          command,
+          cwd,
+          timeoutMs,
+          allowNetwork: false,
+          readRoots: [cwd],
+          writeRoots: [cwd],
+        })
+        const out = {
+          backend: "sandbox",
+          command,
+          cwd,
+          stdout: truncateOutput(result.stdout, maxChars),
+          stderr: truncateOutput(result.stderr, maxChars),
+          exitCode: result.exitCode ?? 1,
+          timedOut: result.timedOut,
+        }
+        if (hasBinaryEncoding(out.stdout) || hasBinaryEncoding(out.stderr)) {
+          ;(out as Record<string, unknown>).encoding_warning = "output contains non-UTF-8 binary data"
+        }
+        return {
+          content: safeStringify(out),
+          isError: out.exitCode !== 0,
+          metadata: { exitCode: out.exitCode, providerId: ctx.sandboxProvider.id },
+        }
+      }
+
       const out = await runShell(command, cwd, timeoutMs, maxChars, ctx.signal, ctx.reportProgress, backend)
       if (hasBinaryEncoding(out.stdout) || hasBinaryEncoding(out.stderr)) {
         ;(out as Record<string, unknown>).encoding_warning = "output contains non-UTF-8 binary data"
@@ -77,6 +105,11 @@ interface BoundedBuffer {
   text: string
   max: number
   dropped: number
+}
+
+function truncateOutput(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text
+  return text.slice(-maxChars) + `\n... [truncated: ${text.length - maxChars} more chars]`
 }
 
 function pushBounded(buf: BoundedBuffer, chunk: string): void {

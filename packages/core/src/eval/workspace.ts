@@ -1,8 +1,8 @@
 import { mkdir, cp, rm, writeFile, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { existsSync } from "node:fs";
-import type { EvalCaseManifest } from "./types";
-import type { SandboxProvider } from "../sandbox/types";
+import type { EvalCaseManifest, SetupResult, SetupCommandResult } from "./types";
+import type { SandboxProvider, SandboxCommand } from "../sandbox/types";
 import { runMaterializers, initDefaultMaterializers } from "./materialize/shared";
 
 export interface WorkspaceInfo {
@@ -10,6 +10,7 @@ export interface WorkspaceInfo {
   caseDir: string;
   initialisedAt: string;
   sandboxProvider?: SandboxProvider;
+  setupResult: SetupResult | null;
 }
 
 let _sandboxProvider: SandboxProvider | null = null;
@@ -45,6 +46,7 @@ function getCaseWorkspaceDir(caseDir: string): string {
 export async function createCaseWorkspace(
   runId: string,
   manifest: EvalCaseManifest,
+  provider?: SandboxProvider | null,
 ): Promise<WorkspaceInfo> {
   const caseDir = join(getEvalsDir(), runId, "cases", manifest.id);
   const workspaceDir = join(caseDir, "workspace");
@@ -65,23 +67,75 @@ export async function createCaseWorkspace(
     await runMaterializers(manifest, workspaceDir);
   }
 
+  let setupResult: SetupResult | null = null;
+  if (manifest.setup && manifest.setup.length > 0) {
+    const runner = provider ?? _sandboxProvider;
+    if (!runner) {
+      throw new Error(`Setup requires a sandbox provider but none is available for case ${manifest.id}`);
+    }
+
+    const setupStarted = new Date().toISOString();
+    const commandResults: SetupCommandResult[] = [];
+    let allPassed = true;
+
+    for (const cmd of manifest.setup) {
+      const cmdStart = new Date().toISOString();
+      const sandboxCmd: SandboxCommand = {
+        command: cmd,
+        cwd: workspaceDir,
+        timeoutMs: 300_000,
+        allowNetwork: manifest.network ?? false,
+        readRoots: [workspaceDir],
+        writeRoots: [workspaceDir],
+      };
+      const result = await runner.run(sandboxCmd);
+      const cmdEnd = new Date().toISOString();
+      const passed = result.exitCode === 0 && !result.timedOut;
+      if (!passed) allPassed = false;
+      commandResults.push({
+        command: cmd,
+        exitCode: result.exitCode,
+        timedOut: result.timedOut,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        startedAt: cmdStart,
+        finishedAt: cmdEnd,
+      });
+    }
+
+    setupResult = {
+      commands: commandResults,
+      allPassed,
+      startedAt: setupStarted,
+      finishedAt: new Date().toISOString(),
+    };
+
+    if (!allPassed) {
+      throw new SetupFailedError(setupResult);
+    }
+  }
+
   const { execSync } = await import("node:child_process");
   execSync("git init 2>/dev/null", { cwd: workspaceDir, stdio: "pipe" });
   execSync("git config user.email eval@deepreef && git config user.name deepreef-eval", { cwd: workspaceDir, stdio: "pipe" });
   execSync("git add -A && git commit -m baseline --allow-empty 2>/dev/null", { cwd: workspaceDir, stdio: "pipe" });
-
-  if (manifest.setup && manifest.setup.length > 0) {
-    for (const cmd of manifest.setup) {
-      execSync(cmd, { cwd: workspaceDir, stdio: "pipe" });
-    }
-  }
 
   return {
     workspaceDir,
     caseDir,
     initialisedAt: new Date().toISOString(),
     sandboxProvider: _sandboxProvider ?? undefined,
+    setupResult,
   };
+}
+
+export class SetupFailedError extends Error {
+  setupResult: SetupResult;
+  constructor(setupResult: SetupResult) {
+    super("Setup failed");
+    this.name = "SetupFailedError";
+    this.setupResult = setupResult;
+  }
 }
 
 export { getCaseWorkspaceDir };

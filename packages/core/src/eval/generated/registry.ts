@@ -17,19 +17,31 @@ interface CategoryMapData {
 
 const mapData = categoryMap as unknown as CategoryMapData;
 
+type EnvGroupKey = `${EvalSuiteId}::${string}`;
+
+function envForManifest(_m: { id: string }): string {
+  return "sandbox.local";
+}
+
+function makeEnvGroupKey(suiteId: EvalSuiteId, env: string): EnvGroupKey {
+  return `${suiteId}::${env}`;
+}
+
 export function buildRealCategories(): EvalCategory[] {
   const manifests = getRealManifests();
-  const categoryGroups = new Map<EvalCategoryId, Map<EvalSuiteId, EvalCaseRef[]>>();
+  const categoryGroups = new Map<EvalCategoryId, Map<EnvGroupKey, EvalCaseRef[]>>();
 
   for (const m of manifests) {
     if (!categoryGroups.has(m.category)) {
       categoryGroups.set(m.category, new Map());
     }
-    const suiteMap = categoryGroups.get(m.category)!;
-    if (!suiteMap.has(m.suite)) {
-      suiteMap.set(m.suite, []);
+    const groupMap = categoryGroups.get(m.category)!;
+    const env = envForManifest(m);
+    const key = makeEnvGroupKey(m.suite, env);
+    if (!groupMap.has(key)) {
+      groupMap.set(key, []);
     }
-    suiteMap.get(m.suite)!.push({
+    groupMap.get(key)!.push({
       id: m.id,
       title: m.title,
       difficulty: m.suite,
@@ -38,16 +50,19 @@ export function buildRealCategories(): EvalCategory[] {
   }
 
   const categories: EvalCategory[] = [];
-  for (const [catId, suiteMap] of categoryGroups) {
+  for (const [catId, groupMap] of categoryGroups) {
     const catConfig = mapData.categories[catId];
     const suites: EvalSuite[] = [];
-    for (const [suiteId, cases] of suiteMap) {
+    for (const [key, cases] of groupMap) {
+      const suiteId = key.split("::")[0] as EvalSuiteId;
+      const env = key.split("::")[1]!;
       const suiteConfig = catConfig?.suites[suiteId];
       suites.push({
         id: suiteId,
         title: suiteConfig?.title ?? suiteId,
         description: suiteConfig?.description ?? "",
         estimatedMinutes: suiteConfig?.estimatedMinutes ?? "15-30",
+        environmentId: env as any,
         cases,
       });
     }

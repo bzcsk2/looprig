@@ -13,13 +13,11 @@
   <img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="License" />
 </p>
 
-**LoopRig is a terminal-native supervised agent loop rig for local, free, and low-cost coding models.**
+**LoopRig is a terminal-native AI loop agent for making cheap, free, and local models complete real engineering work through supervised execution loops.**
 
-Most coding agents assume a strong frontier model is always available. LoopRig takes a different position: use stronger models for planning, supervision, review, and recovery; use cheaper or local models for the bulk of execution; keep the loop observable, resumable, and governed by explicit safety boundaries.
+Most coding agents assume a strong frontier model is always available. LoopRig takes a different position: use stronger models for planning, supervision, and recovery; use cheaper or local models for the bulk of the execution; keep the loop observable, resumable, and governed by explicit safety boundaries.
 
-> The goal is not to replace strong models. The goal is to make weaker, cheaper, and local models useful enough to keep working.
-
-LoopRig was formerly named **DeepReef**. The repository has been renamed, but the npm package and CLI binary may still use the legacy `@deepreef/cli` / `deepreef` names until the package rename is completed.
+> The goal is not to replace good models. The goal is to make low-cost models useful enough to keep working.
 
 ---
 
@@ -28,7 +26,7 @@ LoopRig was formerly named **DeepReef**. The repository has been renamed, but th
 LoopRig is a TypeScript/Bun CLI and TUI agent runtime with:
 
 - a cache-aware agent loop optimized for low-cost model usage
-- a fixed Supervisor / Worker workflow for long-running engineering tasks
+- a Supervisor / Worker workflow for long-running engineering tasks
 - adjustable harness levels for weak, local, or unreliable models
 - a terminal UI built with Ink and React
 - 30+ built-in tools for file operations, search, editing, shell, web, tasks, workflow, MCP, memory, and notebooks
@@ -66,8 +64,6 @@ The Supervisor uses a stronger model. It is responsible for planning, reviewing 
 
 ### Install the CLI
 
-The package is still published under the legacy name while the rename is in progress:
-
 ```bash
 npm install -g @deepreef/cli
 ```
@@ -78,19 +74,11 @@ You can also use Bun:
 bun install -g @deepreef/cli
 ```
 
-The current binary is still:
-
-```bash
-deepreef
-```
-
-After the package rename lands, this section should move to the future `@looprig/cli` package and `looprig` binary.
-
 ### Start inside a project
 
 ```bash
 cd your-project
-deepreef
+looprig
 ```
 
 Inside LoopRig, run:
@@ -260,25 +248,9 @@ LoopRig does not require one fixed provider. The runtime state is effectively:
 
 ---
 
-## Evaluation and Sandboxing Direction
-
-LoopRig is moving toward a fixed `/eval` workflow for comparing Worker models, Supervisor strategies, harness levels, and sandbox profiles.
-
-The intended evaluation environments are:
-
-| Environment | Purpose |
-| --- | --- |
-| `sandbox` | Default lightweight evaluation using fixture-copy or git worktree isolation. |
-| `container` | Stronger Docker/Podman-style isolation for external benchmark cases and complex dependencies. |
-| `localenv` | Diagnostic mode for testing LoopRig against the user's real local project; not intended as an official model score by default. |
-
-The design goal is to test agent capability in reproducible environments while keeping real local-project runs clearly separated from official benchmark scores.
-
----
-
 ## Safety Model
 
-LoopRig is an agent that can read files, edit files, run commands, and call tools. Treat it as a powerful local development assistant, not as a complete security boundary.
+LoopRig is an agent that can read files, edit files, run commands, and call tools. Treat it as a powerful local development assistant, not as a sandboxed security boundary.
 
 Key safeguards:
 
@@ -304,7 +276,7 @@ bun run build
 npm pack --dry-run
 ```
 
-The package is currently published as `@deepreef/cli` and exposes the `deepreef` binary. These names are expected to change in a future package rename.
+The package is published as `@deepreef/cli` and exposes the `looprig` binary.
 
 ---
 
@@ -328,12 +300,11 @@ See [ROADMAP.md](./ROADMAP.md).
 
 Near-term focus:
 
-- complete the DeepReef-to-LoopRig naming transition across package metadata and documentation
 - harden npm installation and package smoke tests
 - stabilize Supervisor / Worker workflow behavior
 - document provider configuration and harness levels
 - improve Windows terminal compatibility
-- add reliability benchmarks and `/eval` workflows for weak/local models
+- add reliability benchmarks for weak/local models
 
 ---
 
@@ -350,7 +321,6 @@ LoopRig is especially interested in contributions around:
 - MCP examples
 - documentation and examples
 - safety hardening
-- evaluation fixtures and sandbox providers
 
 ---
 

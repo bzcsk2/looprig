@@ -341,7 +341,7 @@ export const zhCN: Strings = {
   configAll: (content) => `当前配置：\n${content}`,
   // Fixed eval wizard
   evalWizardHeader: 'DeepReef 固定评测模式',
-  evalWizardUsage: '用法：/eval-start <category> <suite> [--env sandbox|localenv] 来开始一个评测套件',
+  evalWizardUsage: '用法：/eval-start <category> <suite> [--env sandbox.benchmark|sandbox.local] 来开始一个评测套件',
   evalWizardCategoryList: (list) => `可用的评测类别：\n${list}`,
   evalWizardCategoryInfo: (id, title, desc, caseCount) => `  ${id}: ${title} — ${desc} (${caseCount} 个 case)`,
   evalWizardSuiteInfo: (suite, desc, mins, caseCount) => `套件 ${suite}: ${desc} (预估 ${mins}, ${caseCount} 个 case)`,

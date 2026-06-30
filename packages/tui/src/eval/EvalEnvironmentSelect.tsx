@@ -11,9 +11,8 @@ interface EnvironmentOption {
 }
 
 const ENVIRONMENTS: EnvironmentOption[] = [
-  { id: 'sandbox', label: 'Sandbox', description: 'Official evaluation environment with bwrap isolation (Linux)' },
-  { id: 'localenv', label: 'Local Environment', description: 'Diagnostic mode — runs in soft-workspace, not official score' },
-  { id: 'container', label: 'Container', description: 'Docker/Podman — planned for future use' },
+  { id: 'sandbox.benchmark', label: 'Sandbox.Benchmark', description: 'Official evaluation environment with managed toolchain and bwrap isolation (Linux)' },
+  { id: 'sandbox.local', label: 'Sandbox.Local', description: 'Local diagnostic environment — uses host or fallback tools, not official score' },
 ];
 
 interface Props {
@@ -60,8 +59,8 @@ export function EvalEnvironmentSelect({ onSelect, onCancel }: Props): React.Reac
               <Text bold={i === selected} color={i === selected ? TONE.brand : undefined}>
                 {env.label}
               </Text>
-              {env.id === 'sandbox' && <Text color={TONE.ok}> (default)</Text>}
-              {env.id === 'localenv' && <Text color={TONE.warn}> (diagnostic)</Text>}
+              {env.id === 'sandbox.benchmark' && <Text color={TONE.ok}> (default)</Text>}
+              {env.id === 'sandbox.local' && <Text color={TONE.warn}> (diagnostic)</Text>}
             </Box>
             <Box>
               <Text>  {env.description}</Text>

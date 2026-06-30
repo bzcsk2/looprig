@@ -2,7 +2,7 @@ import { describe, it, expect } from "bun:test";
 import { getRealManifests } from "../src/eval/generated/manifests";
 import type { EvalCaseManifest, EvalCategoryId } from "../src/eval/types";
 
-type SourceKind = "terminal-bench" | "swe-bench" | "looprig-real";
+type SourceKind = "terminal-bench" | "swe-bench";
 
 interface SourceEntry {
   kind: string;
@@ -13,11 +13,10 @@ interface SourceEntry {
 describe("真实来源覆盖", () => {
   const manifests = getRealManifests();
 
-  it("三类来源都存在", () => {
+  it("两类来源都存在", () => {
     const sources = new Set(manifests.map((m) => m.sourceMeta?.sourceKind));
     expect(sources.has("terminal-bench")).toBe(true);
     expect(sources.has("swe-bench")).toBe(true);
-    expect(sources.has("looprig-real")).toBe(true);
   });
 
   it("有效 real manifests 均有 sourceMeta", () => {
@@ -28,12 +27,12 @@ describe("真实来源覆盖", () => {
     }
   });
 
-  it("unique 真实来源实例总数 >= 60", () => {
+  it("unique 真实来源实例总数 >= 70", () => {
     const unique = new Set<string>();
     for (const m of manifests) {
       unique.add(`${m.sourceMeta!.sourceKind}::${m.sourceMeta!.sourceId}`);
     }
-    expect(unique.size).toBeGreaterThanOrEqual(60);
+    expect(unique.size).toBeGreaterThanOrEqual(70);
   });
 
   const ALL_CATEGORIES: EvalCategoryId[] = [
@@ -66,10 +65,7 @@ describe("真实来源覆盖", () => {
     expect(sweCount).toBe(12);
   });
 
-  it("looprig-real manifest 数量正确", () => {
-    const lrCount = manifests.filter((m) => m.sourceMeta?.sourceKind === "looprig-real").length;
-    expect(lrCount).toBe(12);
-  });
+
 });
 
 describe("scenario wrapper 差异测试", () => {
@@ -126,13 +122,7 @@ describe("scenario wrapper 差异测试", () => {
     }
   });
 
-  it("looprig-real manifest 有可执行的 verifier 命令", () => {
-    const lr = manifests.filter((m) => m.sourceMeta?.sourceKind === "looprig-real");
-    for (const m of lr) {
-      expect(m.verifier.type).toBe("command");
-      expect(m.verifier.command).toBeTruthy();
-    }
-  });
+
 });
 
 describe("manifest 结构验证", () => {

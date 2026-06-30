@@ -64,48 +64,49 @@ const smokeCases: Record<string, EvalCaseRef[]> = {
   ],
 };
 
-const coreSuite: EvalSuite = {
+const benchmarkSuite: EvalSuite = {
   id: "smoke",
   title: "Official Sandbox Smoke Tests",
   description: "在当前环境的隔离沙箱中运行的基础官方测试集（synthetic fixtures）",
   estimatedMinutes: "10-15",
-  environmentId: "sandbox",
+  environmentId: "sandbox.benchmark",
   cases: [],
 };
+
+const localSuite: EvalSuite = {
+  id: "smoke",
+  title: "Diagnostic Sandbox Smoke Tests",
+  description: "在本地环境运行的镜像测试集。使用本地工具链，结果不计入官方评分。",
+  estimatedMinutes: "10-15",
+  environmentId: "sandbox.local",
+  cases: [],
+};
+
+function nativeSuites(cases: typeof smokeCases[string]): EvalSuite[] {
+  return [
+    { ...benchmarkSuite, cases },
+    { ...localSuite, cases },
+  ];
+}
 
 const NATIVE_CATEGORIES: EvalCategory[] = [
   {
     id: "coding-basics",
     title: "Coding Basics",
     description: "基础编码能力评测：类型修复、bug 修复、测试修复",
-    suites: [
-      {
-        ...coreSuite,
-        cases: smokeCases["coding-basics"],
-      },
-    ],
+    suites: nativeSuites(smokeCases["coding-basics"]),
   },
   {
     id: "tool-use",
     title: "Tool Use",
     description: "工具使用能力评测：搜索、编辑、命令执行",
-    suites: [
-      {
-        ...coreSuite,
-        cases: smokeCases["tool-use"],
-      },
-    ],
+    suites: nativeSuites(smokeCases["tool-use"]),
   },
   {
     id: "safety",
     title: "Safety",
     description: "安全与约束评测：越权防护、deny 命令处理、只读约束",
-    suites: [
-      {
-        ...coreSuite,
-        cases: smokeCases["safety"],
-      },
-    ],
+    suites: nativeSuites(smokeCases["safety"]),
   },
   {
     id: "supervisor-recovery",
@@ -135,12 +136,13 @@ function mergeCategories(): EvalCategory[] {
     const realCat = realMap.get(nativeCat.id);
     if (!realCat) return nativeCat;
 
-    const realSuites = realCat.suites.map(s => ({
-      ...s,
-      environmentId: "localenv" as const,
-      title: `${s.title} (Local Environment — Diagnostic)`,
-      description: `${s.description} 若需要在本地环境中运行真实评测 case，选择此套件。注意：localenv 结果不计入官方评分。`,
-    }));
+    const realSuites = realCat.suites.map(s => {
+      return {
+        ...s,
+        title: `${s.title} (Sandbox.Local — Diagnostic)`,
+        description: `${s.description} 此套件在 sandbox.local 环境中运行，使用本地工具链。结果不计入官方评分。`,
+      };
+    });
 
     return {
       ...nativeCat,
@@ -175,23 +177,23 @@ export function getCategory(id: EvalCategoryId): EvalCategory | undefined {
 export function getSuite(
   categoryId: EvalCategoryId,
   suiteId: EvalSuiteId,
-  environmentId?: EvalEnvironmentId,
+  environmentId: EvalEnvironmentId,
 ): EvalSuite | undefined {
   const category = CATEGORY_MAP.get(categoryId);
   if (!category) return undefined;
   return category.suites.find((s) => {
     if (s.id !== suiteId) return false;
-    if (environmentId && s.environmentId && s.environmentId !== environmentId) return false;
-    return true;
+    return s.environmentId === environmentId;
   });
 }
 
 export function getCaseRef(
   categoryId: EvalCategoryId,
   suiteId: EvalSuiteId,
+  environmentId: EvalEnvironmentId,
   caseId: string,
 ): EvalCaseRef | undefined {
-  const suite = getSuite(categoryId, suiteId);
+  const suite = getSuite(categoryId, suiteId, environmentId);
   if (!suite) return undefined;
   return suite.cases.find((c) => c.id === caseId);
 }
@@ -199,8 +201,9 @@ export function getCaseRef(
 export function listCaseRefs(
   categoryId: EvalCategoryId,
   suiteId: EvalSuiteId,
+  environmentId: EvalEnvironmentId,
 ): EvalCaseRef[] {
-  const suite = getSuite(categoryId, suiteId);
+  const suite = getSuite(categoryId, suiteId, environmentId);
   if (!suite) return [];
   return suite.cases;
 }
@@ -230,15 +233,21 @@ export function getFilteredSuites(
   const category = getCategory(categoryId);
   if (!category) return [];
   if (!environmentId) return category.suites;
-  return category.suites.filter(s => !s.environmentId || s.environmentId === environmentId);
+  return category.suites.filter(s => s.environmentId === environmentId);
 }
 
 export function getCaseCount(
   categoryId?: EvalCategoryId,
   suiteId?: EvalSuiteId,
+  environmentId?: EvalEnvironmentId,
 ): number {
-  if (categoryId && suiteId) {
-    return listCaseRefs(categoryId, suiteId).length;
+  if (categoryId && suiteId && environmentId) {
+    return listCaseRefs(categoryId, suiteId, environmentId).length;
+  }
+  if (categoryId && suiteId && !environmentId) {
+    return getCategory(categoryId)?.suites
+      .filter(s => s.id === suiteId)
+      .reduce((sum, s) => sum + s.cases.length, 0) ?? 0;
   }
   if (categoryId) {
     const cat = getCategory(categoryId);

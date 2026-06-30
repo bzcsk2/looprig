@@ -85,6 +85,8 @@ export function buildManifest(
       sourceCommit: instance.baseCommit,
     },
     setup: INSTALL_COMMANDS[instance.repo] ?? [],
+    requiredBinaries: ["python3", "pip", "git"],
+    requiredPythonModules: ["pytest"],
     taskPrompt: instruction,
     expectedVerification: [`FAIL_TO_PASS tests should pass:\n${failToPassList}`],
     verifier: {

@@ -177,6 +177,16 @@ async function runFileAssertVerifier(
   workspaceDir: string,
 ): Promise<VerifierResult> {
   const assertions = manifest.verifier.fileAssertions ?? [];
+  if (assertions.length === 0) {
+    return {
+      passed: false,
+      verdict: "error",
+      stdout: "",
+      stderr: "",
+      exitCode: null,
+      details: ["file-assert verifier with empty assertions — must specify at least one file assertion"],
+    };
+  }
   const result = await runFileAssertions(assertions, workspaceDir);
 
   return {

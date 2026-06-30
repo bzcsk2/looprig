@@ -341,7 +341,7 @@ export const en: Strings = {
   configAll: (content) => `Current configuration:\n${content}`,
   // Fixed eval wizard
   evalWizardHeader: 'DeepReef Fixed Evaluation Mode',
-  evalWizardUsage: 'Usage: /eval-start <category> <suite> [--env sandbox|localenv] to run an evaluation suite',
+  evalWizardUsage: 'Usage: /eval-start <category> <suite> [--env sandbox.benchmark|sandbox.local] to run an evaluation suite',
   evalWizardCategoryList: (list) => `Available categories:\n${list}`,
   evalWizardCategoryInfo: (id, title, desc, caseCount) => `  ${id}: ${title} — ${desc} (${caseCount} cases)`,
   evalWizardSuiteInfo: (suite, desc, mins, caseCount) => `Suite ${suite}: ${desc} (est. ${mins}, ${caseCount} cases)`,
