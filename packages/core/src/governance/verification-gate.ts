@@ -7,6 +7,8 @@
 
 import type { TaskLedger } from "../task-ledger.js"
 import { buildVerificationDigest, buildVerificationSuccessSummary } from "./verification-digest.js"
+import { getPromptLocale } from "../prompt-locale.js"
+import type { PromptLocale } from "../prompt-locale.js"
 
 /** Verification Gate 运行时计数器状态 */
 export interface VerificationGateState {
@@ -42,16 +44,30 @@ export function isVerificationBlockingFinal(
 /**
  * 构造 Verification Gate 拦截提示。
  */
-export function buildVerificationGatePrompt(ledger: TaskLedger): string {
+export function buildVerificationGatePrompt(ledger: TaskLedger, locale?: PromptLocale): string {
+  const isZh = (locale ?? getPromptLocale()) === "zh-CN"
   const fileList = ledger.changedFiles.slice(0, 8)
   const more = ledger.changedFiles.length > 8
-    ? `\n- … and ${ledger.changedFiles.length - 8} more`
+    ? isZh ? `\n- … 以及其他 ${ledger.changedFiles.length - 8} 个文件`
+          : `\n- … and ${ledger.changedFiles.length - 8} more`
     : ""
 
   const lastFail = ledger.lastVerification && ledger.lastVerification.exitCode !== 0
-    ? `\n\nLast verification failed (exit ${ledger.lastVerification.exitCode}): ${ledger.lastVerification.summary}`
+    ? isZh
+      ? `\n\n上次验证失败（退出码 ${ledger.lastVerification.exitCode}）：${ledger.lastVerification.summary}`
+      : `\n\nLast verification failed (exit ${ledger.lastVerification.exitCode}): ${ledger.lastVerification.summary}`
     : ""
 
+  if (isZh) {
+    return `[系统] 完成此任务前需要验证。
+
+你修改了 ${ledger.changedFiles.length} 个文件，但验证仍未通过。
+修改的文件：
+${fileList.map(f => `- ${f}`).join("\n")}${more}${lastFail}
+
+运行合适的验证命令（如 bun test、bun run typecheck、bun run build）。
+在验证通过之前，不要声明任务完成；或者明确请求用户豁免验证。`
+  }
   return `[System] Verification required before completing this task.
 
 You changed ${ledger.changedFiles.length} file(s) but verification is still pending.
@@ -70,6 +86,7 @@ export function evaluateVerificationGate(
   requireVerification: boolean,
   state: VerificationGateState,
   maxContinuations = DEFAULT_MAX_GATE_CONTINUATIONS,
+  locale?: PromptLocale,
 ): VerificationGateDecision {
   const blocking = isVerificationBlockingFinal(ledger, requireVerification)
   if (!blocking) {
@@ -77,8 +94,12 @@ export function evaluateVerificationGate(
   }
 
   const requiresUser = state.continuationCount >= maxContinuations
+  const isZh = (locale ?? getPromptLocale()) === "zh-CN"
+  const gateLimitMsg = isZh
+    ? "\n\n[门禁限额已达] 询问用户是否继续修复、重新验证或豁免验证。"
+    : "\n\n[Gate limit reached] Ask the user whether to continue fixing, re-run verification, or waive verification."
   const prompt = requiresUser
-    ? `${buildVerificationGatePrompt(ledger)}\n\n[Gate limit reached] Ask the user whether to continue fixing, re-run verification, or waive verification.`
+    ? `${buildVerificationGatePrompt(ledger)}${gateLimitMsg}`
     : buildVerificationGatePrompt(ledger)
 
   return { blocking: true, prompt, requiresUser }

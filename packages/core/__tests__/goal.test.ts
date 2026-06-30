@@ -4,6 +4,7 @@ import { resolve } from "node:path"
 import { randomUUID } from "node:crypto"
 import { GoalStore } from "../src/goal/store.js"
 
+import { setPromptLocale } from "../src/prompt-locale";
 const TEST_DIR = resolve(process.cwd(), ".deepreef-test-goal")
 
 function makeStore(): GoalStore {
@@ -17,6 +18,7 @@ function cleanUp(): void {
 }
 
 describe("GoalStore", () => {
+  beforeEach(() => setPromptLocale("en"));
   let store: GoalStore
   let threadId: string
 

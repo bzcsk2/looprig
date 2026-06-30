@@ -301,6 +301,16 @@ export {
 } from "./checkpoint/checkpoint-envelope.js"
 export type { SessionCheckpointEnvelope } from "./checkpoint/checkpoint-envelope.js"
 export { buildSystemPrompt } from "./system-prompt.js"
+export {
+  normalizePromptLocale,
+  setPromptLocale,
+  getPromptLocale,
+  isChinesePromptLocale,
+  loadPromptLocaleFromDisk,
+  savePromptLocaleToDisk,
+} from "./prompt-locale.js"
+export type { PromptLocale } from "./prompt-locale.js"
+export * as prompts from "./prompts/index.js"
 export { AGENTS, getAgent, agentConfigFor, AgentRegistry, defaultAgentRegistry } from "./agent.js"
 export { loadAgentProfiles, saveAgentProfiles, getAgentProfile, updateAgentProfile } from "./agent-profile/store.js"
 export type { AgentRoleProfile, AgentProfilesConfig, AgentRole } from "./agent-profile/types.js"

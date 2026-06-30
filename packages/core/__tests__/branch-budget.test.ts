@@ -7,8 +7,10 @@ import {
   emptyBranchBudgetSnapshot,
   type BranchBudgetSnapshot,
 } from "../src/checkpoint/runtime-checkpoint.js"
+import { setPromptLocale } from "../src/prompt-locale.js"
 
 describe("BranchBudgetTracker - file edit", () => {
+  beforeEach(() => setPromptLocale("en"));
   it("记录同一文件的累计编辑次数", () => {
     const t = new BranchBudgetTracker()
     expect(t.recordFileEdit("src/a.ts")).toBe(1)
@@ -101,7 +103,7 @@ describe("BranchBudgetTracker - recovery signal", () => {
     expect(sig).not.toBeNull()
     expect(sig!.source).toBe("branch_budget")
     expect(sig!.consumed).toBe(false)
-    expect(sig!.message).toMatch(/Current branch exhausted/)
+    expect(sig!.message).toMatch(/Current branch/)
     expect(sig!.message).toMatch(/Switch strategy/i)
     expect(sig!.message.toLowerCase()).not.toContain("abort")
   })

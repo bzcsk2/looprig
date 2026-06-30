@@ -14,6 +14,8 @@ export interface SubagentDefinition {
   background?: boolean
   inheritContext?: boolean
   systemPrompt: string
+  /** Optional bilingual alternatives */
+  systemPromptByLocale?: Partial<Record<"zh-CN" | "en", string>>
 }
 
 export type SubagentRunStatus = "running" | "completed" | "failed" | "cancelled"

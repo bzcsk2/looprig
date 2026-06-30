@@ -2,6 +2,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { loadPromptLocaleFromDisk, savePromptLocaleToDisk } from '@deepreef/core';
 import type { Locale } from './strings.js';
 import { LangConfigSchema } from '../settings-schema.js';
 
@@ -29,4 +30,6 @@ export function saveLang(locale: Locale): void {
   const dir = getConfigDir();
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'lang.json'), JSON.stringify({ lang: locale }, null, 2), 'utf8');
+  // Sync core prompt locale
+  savePromptLocaleToDisk(locale as "zh-CN" | "en", process.cwd());
 }

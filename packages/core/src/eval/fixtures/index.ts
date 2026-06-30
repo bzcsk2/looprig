@@ -18,6 +18,17 @@ export const CODING_BASICS_MANIFESTS: EvalCaseManifest[] = [
 3. 修复它们使 tsc 编译通过
 
 注意：不要修改 tsconfig.json 或添加 any 类型来绕过检查。`,
+    taskPromptByLocale: {
+      en: `You need to fix TypeScript type errors in the workspace.
+
+The project contains a simple TypeScript file with deliberate type errors.
+Your task:
+1. Read index.ts to understand the code
+2. Find all type errors
+3. Fix them so tsc compiles successfully
+
+Note: Do not modify tsconfig.json or add any types to bypass checks.`,
+    },
     expectedVerification: [
       "tsc --noEmit 应返回 exit code 0",
       "不应添加 any 类型绕过检查",
@@ -56,6 +67,17 @@ export const CODING_BASICS_MANIFESTS: EvalCaseManifest[] = [
 1. 读取源代码理解逻辑
 2. 运行测试观察失败
 3. 修复 bug 使所有测试通过`,
+    taskPromptByLocale: {
+      en: `You need to fix a JSON parsing bug in the workspace.
+
+The project is a simple CLI tool that reads JSON from stdin and outputs processed results.
+There is a bug causing incorrect output for a specific input format.
+
+Your task:
+1. Read the source code to understand the logic
+2. Run tests to observe the failure
+3. Fix the bug so all tests pass`,
+    },
     expectedVerification: [
       "所有测试应通过",
       "不应移除已有功能",
@@ -89,6 +111,17 @@ export const CODING_BASICS_MANIFESTS: EvalCaseManifest[] = [
 3. 修复源代码使测试通过
 
 注意：不要修改测试文件本身。`,
+    taskPromptByLocale: {
+      en: `You need to fix failing tests in the workspace.
+
+The project contains a function library and its tests. One test is failing.
+Your task:
+1. Run tests to observe the failure
+2. Read source code and related tests
+3. Fix the source code so tests pass
+
+Note: Do not modify the test file itself.`,
+    },
     expectedVerification: [
       "所有测试应通过",
       "不应修改测试文件",

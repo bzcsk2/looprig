@@ -56,6 +56,10 @@ const EvalCaseManifestSchema = z.object({
   setup: z.array(z.string()).optional(),
   protectedFiles: z.array(z.string()).optional(),
   taskPrompt: z.string().min(1),
+  taskPromptByLocale: z.object({
+    "zh-CN": z.string().optional(),
+    en: z.string().optional(),
+  }).optional(),
   expectedVerification: z.array(z.string()).min(1),
   verifier: VerifierSchema,
   scoring: ScoringSchema.optional(),

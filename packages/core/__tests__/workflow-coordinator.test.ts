@@ -2,7 +2,9 @@ import { describe, it, expect, vi } from "vitest"
 import { WorkflowCoordinator } from "../src/workflow-coordinator/coordinator.js"
 import type { WorkflowSupervisorAdvice } from "../src/workflow-coordinator/types.js"
 
+import { setPromptLocale } from "../src/prompt-locale";
 describe("WorkflowCoordinator", () => {
+  beforeEach(() => setPromptLocale("en"));
   it("resumes a user-interrupted workflow with the user's instruction", async () => {
     const supervisorInputs: string[] = []
     let supervisorMessage = ""

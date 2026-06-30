@@ -32,6 +32,7 @@ import { ContextModal } from './ContextModal.js';
 import { formatStatus } from './status/format.js';
 import { t, setLocale, getLocale, dicts } from './i18n/index.js';
 import { loadLang } from './i18n/persist.js';
+import { setPromptLocale, savePromptLocaleToDisk } from '@deepreef/core';
 import type { Locale } from './i18n/strings.js';
 import { LocaleProvider } from './i18n/context.js';
 import { loadTuiSettings, saveTuiSettings, type WorkflowMode } from './settings.js';
@@ -228,6 +229,7 @@ interface AppProps {
   beforeSubmit?: () => Promise<void>;
   dualRuntime?: DualAgentRuntime;
   workflowCoordinator?: WorkflowCoordinator;
+  onPromptLocaleChange?: (locale: "zh-CN" | "en") => void;
 }
 
 /**
@@ -257,7 +259,7 @@ function AgentGroupDisplayFromStore({ terminalWidth }: { terminalWidth: number }
   );
 }
 
-export function App({ engine, config, pluginCount = 0, contentPackCount = 0, assetCounts, diagnosticCounts, onUserInput, beforeSubmit, dualRuntime, workflowCoordinator }: AppProps) {
+export function App({ engine, config, pluginCount = 0, contentPackCount = 0, assetCounts, diagnosticCounts, onUserInput, beforeSubmit, dualRuntime, workflowCoordinator, onPromptLocaleChange }: AppProps) {
   // TUI-FIX-20: 编排状态存储（引擎生命周期内持久）
   const [orchestrationStore] = useState(() => new OrchestrationStore());
 
@@ -1263,14 +1265,20 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
     appendMessage({ role: 'assistant' as const, content: `${t().switchedTo(label)}${roleLabel}` });
   }, [appendMessage, activeRole, dualRuntime, agentProfiles]);
 
-  /** 语言切换回调：设置界面语言 */
+  /** 语言切换回调：同步 TUI locale + core prompt locale + 持久化 */
   const handleLangChoose = useCallback((next: string) => {
     const nextLocale = next as Locale;
     setLocale(nextLocale);
     setLocaleState(nextLocale);
+    // Sync core prompt locale
+    const coreLocale = nextLocale === 'zh-CN' ? 'zh-CN' : 'en';
+    setPromptLocale(coreLocale);
+    savePromptLocaleToDisk(coreLocale);
     setShowLangMenu(false);
     appendMessage({ role: 'assistant' as const, content: dicts[nextLocale].switchedLang(next) });
-  }, [appendMessage]);
+    // Rebuild both engines' base system prompts via callback
+    onPromptLocaleChange?.(coreLocale);
+  }, [appendMessage, onPromptLocaleChange]);
 
   /** 推理档位选择回调：更新本地 thinkingMode 并清除 reasoningActive */
   const handleThinkingChoose = useCallback((mode: string) => {

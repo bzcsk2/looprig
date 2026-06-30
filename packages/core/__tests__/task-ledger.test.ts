@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import {
+import { setPromptLocale } from "../src/prompt-locale";
   TaskLedgerTracker,
   shouldCreateLedger,
   parsePlanSteps,
@@ -13,6 +14,7 @@ import {
 import { inferTaskIntent, shouldCreateLedgerByIntent } from "../src/governance/task-state.js"
 
 describe("shouldCreateLedger", () => {
+  beforeEach(() => setPromptLocale("en"));
   it("长消息触发 ledger", () => {
     expect(shouldCreateLedger("x".repeat(301))).toBe(true)
   })

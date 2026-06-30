@@ -34,6 +34,7 @@ import {
   shouldCreateLedger,
   planRequestInstruction,
 } from "./task-ledger.js"
+import { getPromptLocale, setPromptLocale } from "./prompt-locale.js"
 import { resolveDefaultHarness, resolveModelProfile } from "./model-profile/resolver.js"
 import { resolveHarnessStrictness, resolveEffectiveHarnessPolicy, readProjectHarnessConfig } from "./harness/index.js"
 import type { EffectiveHarnessPolicy, HarnessStrictness } from "./harness/index.js"
@@ -402,6 +403,19 @@ export class ReasonixEngine implements CoreEngine {
     this.ctx.prefix.build(prompt)
   }
 
+  /** Update the prompt locale and persist it for subsequent submits. */
+  setPromptLocale(locale: import("./prompt-locale.js").PromptLocale): void {
+    setPromptLocale(locale)
+  }
+
+  /** Trigger a system prompt rebuild so the next submit uses the new locale. */
+  updateSystemPrompt(): void {
+    // Base system prompt string is rebuilt by tui.ts on init.
+    // This signals the engine to re-resolve locale-dependent layers (mode prompts, skills, etc.)
+    // which are rebuilt in submit() via buildActiveSkillsPrompt(), buildSupervisorLoopModePrompt(), etc.
+    // No action needed here since submit() uses getPromptLocale() directly.
+  }
+
   /**
    * @deprecated 使用 AgentProfile 中的 skills 配置代替
    * 更新当前会话启用的技能列表
@@ -454,14 +468,17 @@ export class ReasonixEngine implements CoreEngine {
 
   private buildActiveSkillsPrompt(): string {
     if (this.activeSkills.length === 0) return ""
+    const isZh = getPromptLocale() === "zh-CN"
     const blocks = this.activeSkills.map(skill => [
       `### ${skill.name}`,
       skill.description,
       skill.content.trim(),
     ].filter(Boolean).join("\n"))
     return [
-      "## Enabled Skills",
-      "The following skills are enabled for this session. Use them as guidance when relevant.",
+      isZh ? "## 已启用的技能" : "## Enabled Skills",
+      isZh
+        ? "以下技能已在此会话中启用。在相关时将其用作指导。"
+        : "The following skills are enabled for this session. Use them as guidance when relevant.",
       "",
       blocks.join("\n\n"),
     ].join("\n")
@@ -675,8 +692,34 @@ export class ReasonixEngine implements CoreEngine {
   }
 
   private buildSupervisorLoopModePrompt(workflowPhase?: WorkflowPhase): string {
+    const isZh = getPromptLocale() === "zh-CN"
     if (workflowPhase === "supervisor_analyse") {
-      return `## Loop Mode — Supervisor Analyse
+      return isZh
+        ? `## 循环模式 —— Supervisor 分析
+
+你是规划阶段的 Supervisor。
+
+WorkflowCoordinator 控制执行顺序：
+supervisor_analyse -> worker_do -> worker_report -> supervisor_check
+
+你当前的任务：
+- 为 Worker 制定具体计划。
+- 不要自行执行计划。
+- 不要检查实现文件。
+- 不要验证代码。
+- 不要执行 Worker 任务。
+- 不要调用 read_file、grep、bash、edit、write、apply_patch、AgentTool 或调度工具。
+- 如果工具可用，最多使用 get_goal 和 list_dir 做浅层了解。
+- 不要重复调用工具。如果浅层了解不够，在计划中说明假设，让 Worker 去检查细节。
+- 制定计划后停止。协调器会将你的计划传递给 Worker。
+
+返回结构化计划，包含：
+- objective
+- 具体的 Worker 步骤
+- constraints
+- risks
+- expected evidence / verification criteria`
+        : `## Loop Mode — Supervisor Analyse
 
 You are the Supervisor in the planning phase.
 
@@ -703,7 +746,22 @@ Return a structured plan with:
     }
 
     if (workflowPhase === "supervisor_check") {
-      return `## Loop Mode — Supervisor Check
+      return isZh
+        ? `## 循环模式 —— Supervisor 审查
+
+你是审查阶段的 Supervisor。
+
+你当前的任务：
+- 审查 Worker 报告。
+- 对照计划和目标验证 Worker 输出。
+- 你可以使用 read_file 和 grep 检查证据。
+- 不要自行执行 Worker 任务。
+- 不要编辑文件。
+- 不要执行实现步骤。
+- 决定以下之一：continue、revise、approve、ask_user 或 blocked。
+
+除非你提供了逐需求的完成审核及具体证据，否则不要批准。`
+        : `## Loop Mode — Supervisor Check
 
 You are the Supervisor in the review phase.
 
@@ -720,7 +778,19 @@ Do not approve unless you provide a requirement-by-requirement completion audit 
     }
 
     if (workflowPhase === "supervisor_intervene") {
-      return `## Loop Mode — Supervisor Intervention
+      return isZh
+        ? `## 循环模式 —— Supervisor 干预
+
+你正在给 Worker 提供简要的中途指导。
+
+你当前的任务：
+- 诊断 Worker 的阻塞点。
+- 提供简洁的指导。
+- 不要自行执行 Worker 任务。
+- 不要批准或完成工作流。
+- 不要编辑文件。
+- 除非绝对必要，不使用工具。`
+        : `## Loop Mode — Supervisor Intervention
 
 You are giving brief mid-workflow guidance to the Worker.
 
@@ -733,7 +803,16 @@ Your current job:
 - Use no tools unless strictly necessary.`
     }
 
-    return `## Loop Mode — Supervisor
+    return isZh
+      ? `## 循环模式 —— Supervisor
+
+你是当前循环目标的 Supervisor。
+
+WorkflowCoordinator 控制执行顺序：
+supervisor_analyse -> worker_do -> worker_report -> supervisor_check
+
+遵循当前工作流阶段。不要自行执行 Worker 任务。`
+      : `## Loop Mode — Supervisor
 
 You are the Supervisor for the active loop goal.
 
@@ -766,8 +845,16 @@ Follow the current workflow phase. Do not perform Worker tasks yourself.`
     const baseLayer = this.baseSystemPrompt || this.ctx.prefix.messages[0]?.content || ""
     const roleLayer = ac.systemPrompt || ""
     const activeSkillsPrompt = this.buildActiveSkillsPrompt()
+    const promptLocale = getPromptLocale()
+    const isZh = promptLocale === "zh-CN"
     const modeLayer = role === "supervisor" && mode === "subagent"
-      ? `## Subagent Mode
+      ? isZh
+        ? `## 子代理模式
+你负责通过委派的 Worker 完成用户任务。
+当任务需要代码探索、实现、测试或其他工程工作时，主动调用 AgentTool。
+不要等待用户明确要求你委派。只将规划、综合、审查和用户沟通留给自己。
+给每个 Worker 完整自包含的任务，包含上下文、约束、相关文件和预期输出。`
+        : `## Subagent Mode
 You are responsible for completing the user's task through delegated Workers.
 Proactively call AgentTool whenever the task requires codebase exploration, implementation, testing, or other engineering work.
 Do not wait for the user to explicitly ask you to delegate. Keep only planning, synthesis, review, and user communication for yourself.
@@ -775,7 +862,14 @@ Give each Worker a complete, self-contained task with context, constraints, rele
       : role === "supervisor" && mode === "loop"
         ? this.buildSupervisorLoopModePrompt(workflowPhase)
         : role === "worker" && mode === "loop"
-          ? `## Loop Mode — Worker
+          ? isZh
+            ? `## 循环模式 —— Worker
+你是当前循环目标的 Worker。
+WorkflowCoordinator 直接传递当前任务给你。
+使用工程工具执行分配的任务。
+被要求时在 assistant 回复中报告结果。
+不要更改目标状态。`
+            : `## Loop Mode — Worker
 You are the Worker for the active loop goal.
 The WorkflowCoordinator passes you the current task directly.
 Use engineering tools to execute the assigned tasks.

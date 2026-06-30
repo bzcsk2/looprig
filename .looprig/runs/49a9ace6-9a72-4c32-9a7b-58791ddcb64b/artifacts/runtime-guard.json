@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "looprig.runtime-guard.v1",
+  "packetId": "49a9ace6-9a72-4c32-9a7b-58791ddcb64b:guard",
+  "runId": "49a9ace6-9a72-4c32-9a7b-58791ddcb64b",
+  "mode": "loop",
+  "role": "supervisor",
+  "createdAt": "2026-06-30T14:53:19.279Z",
+  "disposition": "allow",
+  "findings": [
+    {
+      "id": "GF1",
+      "kind": "source_provenance",
+      "severity": "minor",
+      "summary": "Prompt has no source reference for provenance tracking",
+      "evidence": [],
+      "recommendedChecks": [
+        "Attach source ref for traceability"
+      ]
+    }
+  ]
+}

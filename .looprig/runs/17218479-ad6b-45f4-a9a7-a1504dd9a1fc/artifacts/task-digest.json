@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "looprig.task-digest.v1",
+  "packetId": "17218479-ad6b-45f4-a9a7-a1504dd9a1fc:digest",
+  "runId": "17218479-ad6b-45f4-a9a7-a1504dd9a1fc",
+  "mode": "loop",
+  "role": "supervisor",
+  "createdAt": "2026-06-30T15:02:27.641Z",
+  "goal": "analyse and execute",
+  "acceptanceCriteria": [],
+  "repoFacts": {
+    "cwd": "/vol4/Agent/looprig",
+    "relevantConfigFiles": []
+  },
+  "contextFiles": [],
+  "constraints": [],
+  "verificationPlan": [],
+  "omittedContext": []
+}

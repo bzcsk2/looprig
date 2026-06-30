@@ -3,6 +3,7 @@ import type { AgentTool } from "../interface.js"
 import { ReasonixEngine } from "../engine.js"
 import type { DeepreefConfig } from "../config.js"
 import { agentConfigFor } from "../agent.js"
+import { getSubagentSystemPrompt } from "./definition.js"
 import { SubagentRegistry } from "./registry.js"
 import { checkSubagentPermission } from "./permission.js"
 import {
@@ -100,7 +101,7 @@ export class SubagentRunner {
       }
 
       const agentCfg = agentConfigFor("build", {
-        systemPrompt: def.systemPrompt,
+        systemPrompt: getSubagentSystemPrompt(def),
         toolNames: this.registry.getEffectiveTools(def) ?? undefined,
         model: def.model === "inherit" ? undefined : def.model,
       })

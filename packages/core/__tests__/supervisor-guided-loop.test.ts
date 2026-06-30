@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from "vitest"
+import { describe, expect, it, vi, beforeEach } from "vitest"
+import { setPromptLocale } from "../src/prompt-locale"
 
 import { ContextManager } from "../src/context/manager.js"
 import type { ChatClient } from "../src/interface.js"
@@ -316,6 +317,6 @@ describe("buildSupervisorDegradedMessage", () => {
       error: "x".repeat(300),
     })
     expect(msg.length).toBeLessThan(250)
-    expect(msg).toContain("Supervisor 降级")
+    expect(msg).toContain("Supervisor degraded")
   })
 })

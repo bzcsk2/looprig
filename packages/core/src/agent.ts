@@ -2,6 +2,8 @@ import type { AgentConfig } from "./interface.js"
 import { MAIN_MODES, getMainMode } from "./main-mode.js"
 import type { MainMode } from "./main-mode.js"
 import { defaultAgentRegistry } from "./agent-registry.js"
+import type { PromptLocale } from "./prompt-locale.js"
+import { getPromptLocale } from "./prompt-locale.js"
 
 export type { MainMode } from "./main-mode.js"
 export { MAIN_MODES, getMainMode } from "./main-mode.js"
@@ -14,12 +16,24 @@ export interface AgentDefinition {
   temperature?: number
   maxTokens?: number
   systemPrompt?: string
+  /** Optional bilingual alternatives. systemPrompt is the fallback. */
+  systemPromptByLocale?: Partial<Record<PromptLocale, string>>
   toolNames?: string[]
 }
 
+/** Resolve agent system prompt by locale. Falls back to systemPrompt if no locale match. */
+export function getAgentSystemPrompt(def: AgentDefinition, locale?: PromptLocale): string | undefined {
+  const resolvedLocale = locale ?? getPromptLocale()
+  if (resolvedLocale !== "zh-CN" && def.systemPromptByLocale?.en) {
+    return def.systemPromptByLocale.en
+  }
+  if (resolvedLocale === "zh-CN" && def.systemPromptByLocale?.["zh-CN"]) {
+    return def.systemPromptByLocale["zh-CN"]
+  }
+  return def.systemPrompt
+}
+
 // 原生 agent 身份：仅注册 worker / supervisor 两个。
-// build / plan 已移除（历史遗留 MAIN_MODES 仍保留作为工具清单来源，但不再注册为 agent 身份）。
-// 用户可通过插件注册自定义 agent 身份，并经 /agent 菜单绑定到任一 role。
 defaultAgentRegistry.register({
   name: "worker",
   label: "Worker",
@@ -28,13 +42,21 @@ You have access to a full engineering toolset: read, write, edit files, run bash
 search code, manage tasks, fetch the web, and invoke MCP tools.
 Always verify your changes — re-read files after editing when needed.
 When operating under a Supervisor, execute the assigned tasks faithfully and report results concisely.`,
+  systemPromptByLocale: {
+    "zh-CN": `你是 Worker Agent——双 Agent 系统中的主要执行角色。
+你拥有完整的工程工具集：读写编辑文件、运行 bash 命令、搜索代码、管理任务、访问网络和调用 MCP 工具。
+修改后务必验证——必要时重新读取文件确认变更结果。
+在 Supervisor 指导下工作时，忠实地执行分配的任务并简洁地报告结果。`,
+  },
   toolNames: [...MAIN_MODES.build.toolNames],
 })
 defaultAgentRegistry.register({
   name: "supervisor",
   label: "Supervisor",
   systemPrompt: "You are the Supervisor agent. Analyze goals, create plans, review evidence, delegate execution, and provide guidance. Follow the active workflow mode rules.",
-  // SFR-30: 工具过滤由 resolveEffectiveTools 根据 role/mode 统一计算
+  systemPromptByLocale: {
+    "zh-CN": "你是 Supervisor Agent。分析目标、制定计划、审查证据、委派执行并提供指导。遵循当前工作流模式规则。",
+  },
   // undefined 表示不在 agent 层额外限制，交由运行时场景策略决定
   toolNames: undefined,
 })
@@ -48,12 +70,13 @@ export function getAgent(name: string): AgentDefinition {
 
 export function agentConfigFor(name: string, overrides?: Partial<AgentConfig>): AgentConfig {
   const def = getAgent(name)
+  const locale = getPromptLocale()
   return {
     name: def.name,
     model: overrides?.model,
     temperature: overrides?.temperature,
     maxTokens: overrides?.maxTokens,
-    systemPrompt: overrides?.systemPrompt ?? def.systemPrompt,
+    systemPrompt: overrides?.systemPrompt ?? getAgentSystemPrompt(def, locale),
     toolNames: overrides?.toolNames ?? def.toolNames,
   }
 }

@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto"
+import type { PromptLocale } from "../prompt-locale.js"
+import { getPromptLocale } from "../prompt-locale.js"
 import type {
   WorkflowPhase,
   WorkflowDecision,
@@ -392,14 +394,21 @@ export class WorkflowCoordinator {
   }
 
   private async *runSupervisorAnalyse(): AsyncGenerator<WorkflowEvent> {
+    const isZh = getPromptLocale() === "zh-CN"
     const previousRound = this.state!.supervisorPlan || this.state!.workerReport || this.state!.supervisorFeedback
-      ? `\n\nPrevious Plan:\n${this.state!.supervisorPlan ?? ""}\n\nPrevious Worker Report:\n${this.state!.workerReport ?? ""}\n\nYour Previous Review:\n${this.state!.supervisorFeedback ?? ""}`
+      ? (isZh
+        ? `\n\n之前的计划:\n${this.state!.supervisorPlan ?? ""}\n\n之前的 Worker 报告:\n${this.state!.workerReport ?? ""}\n\n你之前的审查:\n${this.state!.supervisorFeedback ?? ""}`
+        : `\n\nPrevious Plan:\n${this.state!.supervisorPlan ?? ""}\n\nPrevious Worker Report:\n${this.state!.workerReport ?? ""}\n\nYour Previous Review:\n${this.state!.supervisorFeedback ?? ""}`)
       : ""
     const resumeInstruction = this.state!.resumeInstruction
-      ? `\n\nUser instruction for this workflow:\n${this.state!.resumeInstruction}`
+      ? (isZh
+        ? `\n\n用户对本工作流的指示:\n${this.state!.resumeInstruction}`
+        : `\n\nUser instruction for this workflow:\n${this.state!.resumeInstruction}`)
       : ""
     const steering = this.buildSteeringPrompt()
-    const supervisorInput = `Analyse the following goal and create a plan for iteration ${this.state!.iteration}:\n\nGoal: ${this.state!.goal}${previousRound}${resumeInstruction}${steering}\n\nProvide an updated structured plan with concrete next steps, constraints, and risks. Incorporate the previous Worker report, review, and user instruction when present.`
+    const supervisorInput = isZh
+      ? `分析以下目标并为第 ${this.state!.iteration} 轮创建计划:\n\n目标: ${this.state!.goal}${previousRound}${resumeInstruction}${steering}\n\n提供更新的结构化计划，包含具体的下一步操作、限制条件和风险。整合之前的 Worker 报告、审查和用户指示。`
+      : `Analyse the following goal and create a plan for iteration ${this.state!.iteration}:\n\nGoal: ${this.state!.goal}${previousRound}${resumeInstruction}${steering}\n\nProvide an updated structured plan with concrete next steps, constraints, and risks. Incorporate the previous Worker report, review, and user instruction when present.`
 
     let errorMessage = ""
     for await (const event of this.runtime!.getSupervisor().submit(supervisorInput, "loop", "supervisor_analyse")) {
@@ -447,7 +456,10 @@ export class WorkflowCoordinator {
 
     const planContent = taskContent || this.state!.supervisorPlan || ""
     const scoreAdjustment = this.buildScoreAdjustmentPrompt(this.state!.lastRunScore)
-    const workerInput = `Execute the following plan for iteration ${this.state!.iteration}:\n\n${planContent}\n\nGoal: ${this.state!.goal}${this.state!.supervisorFeedback ? `\n\nSupervisor feedback from the previous iteration:\n${this.state!.supervisorFeedback}` : ""}${scoreAdjustment}`
+    const isZh = getPromptLocale() === "zh-CN"
+    const workerInput = isZh
+      ? `执行第 ${this.state!.iteration} 轮的计划:\n\n${planContent}\n\n目标: ${this.state!.goal}${this.state!.supervisorFeedback ? `\n\n上一轮 Supervisor 反馈:\n${this.state!.supervisorFeedback}` : ""}${scoreAdjustment}`
+      : `Execute the following plan for iteration ${this.state!.iteration}:\n\n${planContent}\n\nGoal: ${this.state!.goal}${this.state!.supervisorFeedback ? `\n\nSupervisor feedback from the previous iteration:\n${this.state!.supervisorFeedback}` : ""}${scoreAdjustment}`
 
     let hasError = false
     let errorCount = 0
@@ -472,7 +484,8 @@ export class WorkflowCoordinator {
   }
 
   private async *runWorkerReport(): AsyncGenerator<WorkflowEvent> {
-    const workerInput = "Generate a summary report of what was accomplished."
+    const isZh = getPromptLocale() === "zh-CN"
+    const workerInput = isZh ? "生成已完成工作的摘要报告。" : "Generate a summary report of what was accomplished."
 
     for await (const event of this.runtime!.getWorker().submit(workerInput, "loop", "worker_report")) {
       yield event as any
@@ -506,7 +519,10 @@ export class WorkflowCoordinator {
     }
 
     const steering = this.buildSteeringPrompt()
-    const supervisorInput = `Review the following worker report and decide next action:\n\nPlan: ${this.state!.supervisorPlan ?? ""}\n\nReport: ${reportedContent}${steering}\n\nDecide: continue, revise, approve, ask_user, or blocked`
+    const isZh = getPromptLocale() === "zh-CN"
+    const supervisorInput = isZh
+      ? `审查以下 Worker 报告并决定下一步操作:\n\n计划: ${this.state!.supervisorPlan ?? ""}\n\n报告: ${reportedContent}${steering}\n\n决定: continue（继续）、revise（修改）、approve（批准）、ask_user（询问用户）或 blocked（阻塞）`
+      : `Review the following worker report and decide next action:\n\nPlan: ${this.state!.supervisorPlan ?? ""}\n\nReport: ${reportedContent}${steering}\n\nDecide: continue, revise, approve, ask_user, or blocked`
 
     for await (const event of this.runtime!.getSupervisor().submit(supervisorInput, "loop", "supervisor_check")) {
       yield event as any
@@ -637,7 +653,20 @@ export class WorkflowCoordinator {
     const recentMessages = workerState.messages.slice(-5)
     const contextSummary = recentMessages.map(m => `${m.role}: ${m.content?.slice(0, 200) ?? ""}`).join("\n")
 
-    const supervisorInput = `The Worker is struggling and needs mid-workflow guidance.
+    const isZh = getPromptLocale() === "zh-CN"
+    const supervisorInput = isZh
+      ? `Worker 遇到困难，需要工作流中途指导。
+
+目标: ${this.state.goal}
+当前计划: ${this.state.supervisorPlan ?? "暂无计划"}
+干预原因: ${reason}
+
+最近 Worker 上下文:
+${contextSummary}
+
+提供简要指导。不要决定批准或完成工作流。
+以结构化建议形式返回指导。`
+      : `The Worker is struggling and needs mid-workflow guidance.
 
 Goal: ${this.state.goal}
 Current Plan: ${this.state.supervisorPlan ?? "No plan yet"}
@@ -817,6 +846,7 @@ Return your guidance as structured advice.`
 
   private buildScoreAdjustmentPrompt(score?: AgentRunScore): string {
     if (!score) return ""
+    const isZh = getPromptLocale() === "zh-CN"
     const adjustment = score.adjustment
     const strategies = adjustment.promptStrategies
       .map(strategy => `- ${strategy.kind}: ${strategy.rationale}`)
@@ -828,6 +858,12 @@ Return your guidance as structured advice.`
       .map(d => `${d.dimension}=${Math.round(d.score)}`)
       .join(", ")
 
+    if (isZh) {
+      return `\n\n基于前一轮得分的 Worker 策略调整:
+- 总体得分: ${Math.round(score.overallScore)} (${score.grade})
+- 推荐 harness 严格度: ${adjustment.recommendedHarness ?? "保持当前"}
+- 推荐 thinking 模式: ${adjustment.recommendedThinking ?? "保持当前"}${dimensionSummary ? `\n- 低分维度: ${dimensionSummary}` : ""}${strategies ? `\n- 策略调整:\n${strategies}` : ""}\n将这些作为本轮执行策略。原始目标和 Supervisor 计划保持权威。`
+    }
     return `\n\nWorker strategy adjustment from the previous run score:
 - Overall score: ${Math.round(score.overallScore)} (${score.grade})
 - Recommended harness strictness: ${adjustment.recommendedHarness ?? "keep current"}

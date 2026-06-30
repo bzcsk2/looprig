@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "looprig.review-packet.v1",
+  "packetId": "89bfba4c-4470-4409-aaf4-5c1b18b473dc:review",
+  "runId": "89bfba4c-4470-4409-aaf4-5c1b18b473dc",
+  "mode": "subagent",
+  "role": "supervisor",
+  "createdAt": "2026-06-30T15:06:26.966Z",
+  "verdict": "ACCEPTED",
+  "findings": [],
+  "requiredChecks": [],
+  "evidenceRefs": [],
+  "confidence": 1,
+  "issues": []
+}

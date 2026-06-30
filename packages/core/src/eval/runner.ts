@@ -3,6 +3,8 @@ import { existsSync, rmSync, createWriteStream } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { execSync } from "node:child_process";
+import { getPromptLocale } from "../prompt-locale.js";
+import type { PromptLocale } from "../prompt-locale.js";
 import { evalToolTracker } from "./tool-tracker";
 import { resolveProfile } from "./profile/resolver";
 import { getBenchmarkToolchainStatus, type BenchmarkToolchainStatus } from "./profile/installer";
@@ -923,16 +925,44 @@ async function runSingleCase(
   };
 }
 
+/** Resolve task prompt from manifest, respecting locale. */
+function resolveTaskPrompt(manifest: EvalCaseManifest, locale?: PromptLocale): string {
+  const resolvedLocale = locale ?? getPromptLocale();
+  if (resolvedLocale === "en" && manifest.taskPromptByLocale?.en) {
+    return manifest.taskPromptByLocale.en;
+  }
+  if (resolvedLocale === "zh-CN" && manifest.taskPromptByLocale?.["zh-CN"]) {
+    return manifest.taskPromptByLocale["zh-CN"];
+  }
+  return manifest.taskPrompt;
+}
+
 function buildWorkerPrompt(
   manifest: EvalCaseManifest,
   workspaceDir: string,
+  locale?: PromptLocale,
 ): string {
+  const isZh = (locale ?? getPromptLocale()) === "zh-CN"
+  const taskPrompt = resolveTaskPrompt(manifest, locale);
+  if (isZh) {
+    return `你正在 ${workspaceDir} 的隔离工作区中执行评估任务。
+
+所有文件操作和 shell 命令必须在此工作区内进行。不要访问此目录之外的文件。
+
+## 任务
+${taskPrompt}
+
+## 要求
+${manifest.expectedVerification.map((v) => `- ${v}`).join("\n")}
+
+使用可用工具完成任务。完成后请验证你的工作。`
+  }
   return `You are working on an evaluation task in an isolated workspace at ${workspaceDir}.
 
 All file operations and shell commands must operate within this workspace. Do not access files outside this directory.
 
 ## Task
-${manifest.taskPrompt}
+${taskPrompt}
 
 ## Requirements
 ${manifest.expectedVerification.map((v) => `- ${v}`).join("\n")}
@@ -948,38 +978,48 @@ function buildSupervisorPrompt(
   verifierResult?: VerifierResult | null,
   toolStats?: { calls: number; failures: number },
   changedFiles?: string[],
+  locale?: PromptLocale,
 ): string {
+  const isZh = (locale ?? getPromptLocale()) === "zh-CN"
+  const taskPrompt = resolveTaskPrompt(manifest, locale);
   const patchSection = patchDiff
-    ? `\n## Code Changes (Patch Diff)\n\`\`\`diff\n${patchDiff.length > 2000 ? patchDiff.slice(0, 2000) + "\n[... truncated]" : patchDiff}\n\`\`\``
-    : "\n## Code Changes\nNo changes were made.";
+    ? `\n## ${isZh ? "代码变更" : "Code Changes (Patch Diff)"}\n\`\`\`diff\n${patchDiff.length > 2000 ? patchDiff.slice(0, 2000) + "\n[... truncated]" : patchDiff}\n\`\`\``
+    : `\n## ${isZh ? "代码变更" : "Code Changes"}\n${isZh ? "未做任何更改。" : "No changes were made."}`;
   const verifierSection = verifierResult
-    ? `\n## Verification Result\nVerdict: ${verifierResult.verdict}\n${verifierResult.stdout ? `Stdout: ${verifierResult.stdout.slice(0, 500)}` : ""}`
-    : "\n## Verification Result\nNot executed.";
+    ? `\n## ${isZh ? "验证结果" : "Verification Result"}\n${isZh ? "裁定" : "Verdict"}: ${verifierResult.verdict}\n${verifierResult.stdout ? `${isZh ? "标准输出" : "Stdout"}: ${verifierResult.stdout.slice(0, 500)}` : ""}`
+    : `\n## ${isZh ? "验证结果" : "Verification Result"}\n${isZh ? "未执行。" : "Not executed."}`;
   const policySection = policyGates && policyGates.length > 0
-    ? `\n## Policy Gates\n${policyGates.map(g => `- ${g.gate}: ${g.passed ? "PASS" : "FAIL"} (${g.detail})`).join("\n")}`
+    ? `\n## ${isZh ? "策略门禁" : "Policy Gates"}\n${policyGates.map(g => `- ${g.gate}: ${g.passed ? "PASS" : "FAIL"} (${g.detail})`).join("\n")}`
     : "";
   const toolSection = toolStats
-    ? `\n## Tool Usage\nTotal calls: ${toolStats.calls}, failures: ${toolStats.failures}`
+    ? `\n## ${isZh ? "工具使用" : "Tool Usage"}\n${isZh ? "总调用" : "Total calls"}: ${toolStats.calls}, ${isZh ? "失败" : "failures"}: ${toolStats.failures}`
     : "";
   const filesSection = changedFiles && changedFiles.length > 0
-    ? `\n## Changed Files\n${changedFiles.map(f => `- ${f}`).join("\n")}`
+    ? `\n## ${isZh ? "修改的文件" : "Changed Files"}\n${changedFiles.map(f => `- ${f}`).join("\n")}`
     : "";
 
-  return `You are evaluating the work of another agent on this task:
+  const header = isZh
+    ? `你正在评估另一个 Agent 在此任务上的工作：`
+    : `You are evaluating the work of another agent on this task:`;
+
+  return `${header}
 
 ## Task
-${manifest.taskPrompt}
+${taskPrompt}
 
 ## Expected Verification
 ${manifest.expectedVerification.map((v) => `- ${v}`).join("\n")}
 
-## Worker Output
+## ${isZh ? "Worker 输出" : "Worker Output"}
 ${workerOutput}
 ${patchSection}${verifierSection}${policySection}${toolSection}${filesSection}
 
-Please provide a structured assessment with scores (0-100) for dimensions: taskCompletion, verification, toolUse, efficiency, safety.
+${isZh
+  ? `请提供结构化评估，对以下维度的打分（0-100）：taskCompletion、verification、toolUse、efficiency、safety。
+将评估结果以 JSON 对象形式返回，包含包含各维度得分的 "dimensions" 字段。`
+  : `Please provide a structured assessment with scores (0-100) for dimensions: taskCompletion, verification, toolUse, efficiency, safety.
 
-Return your assessment as JSON object with a "dimensions" field containing scores for each dimension.`;
+Return your assessment as JSON object with a "dimensions" field containing scores for each dimension.`}`;
 }
 
 function extractAssessment(

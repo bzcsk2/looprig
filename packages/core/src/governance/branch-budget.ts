@@ -18,6 +18,8 @@ import {
 } from "./branch-budget-path.js"
 import { isHarnessVerificationCommand } from "./verification-command.js"
 import { workspaceFileExists } from "./path-scope.js"
+import { getPromptLocale } from "../prompt-locale.js"
+import type { PromptLocale } from "../prompt-locale.js"
 
 /** 默认预算上限 */
 export const DEFAULT_BRANCH_BUDGET = {
@@ -77,6 +79,7 @@ export class BranchBudgetTracker {
   private enabled = true
   private readonly limits: BranchBudgetLimits
   private budgetWorkspaceRoot?: string
+  private _locale: PromptLocale = getPromptLocale()
 
   /**
    * @param limits 可选自定义上限；默认使用 DEFAULT_BRANCH_BUDGET。
@@ -87,6 +90,14 @@ export class BranchBudgetTracker {
       commandRetryMax: limits.commandRetryMax ?? DEFAULT_BRANCH_BUDGET.commandRetryMax,
       errorRepeatMax: limits.errorRepeatMax ?? DEFAULT_BRANCH_BUDGET.errorRepeatMax,
     }
+  }
+
+  setLocale(locale: PromptLocale): void {
+    this._locale = locale
+  }
+
+  getLocale(): PromptLocale {
+    return this._locale
   }
 
   /** 绑定 workspace 并合并绝对/相对路径下的重复计数。 */
@@ -217,30 +228,24 @@ export class BranchBudgetTracker {
     currentCount: number,
     fileExists = true,
   ): string {
+    const isZh = this._locale === "zh-CN"
     if (!fileExists) {
-      return [
-        `[BranchBudget / Blocked] 工具未执行：${path} 编辑计数 ${currentCount} 次（上限 ${this.limits.fileEditMax}），但磁盘上不存在该文件（多为 patch 失败仍计次）。`,
-        "用 write_file 写入完整文件以创建；可参考同目录已有文件作模板。",
-        "禁止 read_file / patch_file / edit_file 此路径。",
-        "Do NOT read or patch a missing path — use write_file (full body).",
-      ].join("\n")
+      return isZh
+        ? `[BranchBudget/Blocked] 工具未执行：${path} 编辑计数 ${currentCount} 次（上限 ${this.limits.fileEditMax}），但磁盘上不存在该文件。用 write_file 写入完整文件以创建。`
+        : `[BranchBudget/Blocked] Not executed: ${path} edit count ${currentCount}/${this.limits.fileEditMax}, but file does not exist on disk. Use write_file to create it.`
     }
-
-    return [
-      `[BranchBudget / Blocked] 工具未执行：${path} 已编辑 ${currentCount} 次（上限 ${this.limits.fileEditMax}）。`,
-      "Read failing test output first; fix only what verification requires.",
-      "Do not rewrite this file again until you have read the failing test and documented expected vs actual behavior.",
-    ].join("\n")
+    return isZh
+      ? `[BranchBudget/Blocked] 工具未执行：${path} 已编辑 ${currentCount} 次（上限 ${this.limits.fileEditMax}）。先读取失败的测试输出，仅修复验证所需内容。在读取失败测试并记录预期/实际行为之前不要重写此文件。`
+      : `[BranchBudget/Blocked] Not executed: ${path} edited ${currentCount}/${this.limits.fileEditMax}. Read failing test output first; fix only what verification requires. Do not rewrite this file again until you have read the failing test and documented expected vs actual behavior.`
   }
 
   buildCommandBlockMessage(command: string, failedAttempts: number): string {
-    const short = command.length > 120 ? `${command.slice(0, 117)}...` : command
-    return [
-      `[BranchBudget / Blocked] 工具未执行：该命令已失败 ${failedAttempts} 次（拦截阈值 ${this.limits.commandRetryMax}）。`,
-      `命令: ${short}`,
-      "先 read_file 失败输出中引用的源码/测试，分析错误后再改代码；不要原样重跑 build/test。",
-      "Do not rerun the same command until you have new evidence from source or compiler output.",
-    ].join("\n")
+    const isZh = this._locale === "zh-CN"
+    const short = command.length > 200 ? command.slice(0, 200) + "…" : command
+    if (isZh) {
+      return `[BranchBudget/Blocked] 工具未执行：该命令已失败 ${failedAttempts} 次（拦截阈值 ${this.limits.commandRetryMax}）。\n命令: ${short}\n先读取失败输出中引用的源码/测试，分析错误后再改代码；不要原样重试。`
+    }
+    return `[BranchBudget/Blocked] Not executed: command failed ${failedAttempts}/${this.limits.commandRetryMax}.\nCommand: ${short}\nRead source/test files referenced in failure output first; do not rerun the same command.`
   }
 
   /**
@@ -257,7 +262,9 @@ export class BranchBudgetTracker {
         key: fileOver.key,
         currentCount: fileOver.count,
         limit: this.limits.fileEditMax,
-        reason: `同一文件 ${fileOver.key} 已编辑 ${fileOver.count} 次（上限 ${this.limits.fileEditMax}）`,
+        reason: this._locale === "zh-CN"
+          ? `同一文件 ${fileOver.key} 已编辑 ${fileOver.count} 次（上限 ${this.limits.fileEditMax}）`
+          : `File ${fileOver.key} edited ${fileOver.count} times (limit ${this.limits.fileEditMax})`,
       }
     }
     const cmdOver = this.findOverLimit(this.commandRetries, this.limits.commandRetryMax)
@@ -268,7 +275,9 @@ export class BranchBudgetTracker {
         key: cmdOver.key,
         currentCount: cmdOver.count,
         limit: this.limits.commandRetryMax,
-        reason: `同一命令失败后已累积 ${cmdOver.count} 次（上限 ${this.limits.commandRetryMax}）`,
+        reason: this._locale === "zh-CN"
+          ? `同一命令失败后已累积 ${cmdOver.count} 次（上限 ${this.limits.commandRetryMax}）`
+          : `Command failed ${cmdOver.count} times (limit ${this.limits.commandRetryMax})`,
       }
     }
     const errOver = this.findOverLimit(this.errorRepeats, this.limits.errorRepeatMax)
@@ -279,7 +288,9 @@ export class BranchBudgetTracker {
         key: errOver.key,
         currentCount: errOver.count,
         limit: this.limits.errorRepeatMax,
-        reason: `同一错误重复出现 ${errOver.count} 次（上限 ${this.limits.errorRepeatMax}）`,
+        reason: this._locale === "zh-CN"
+          ? `同一错误重复出现 ${errOver.count} 次（上限 ${this.limits.errorRepeatMax}）`
+          : `Same error repeated ${errOver.count} times (limit ${this.limits.errorRepeatMax})`,
       }
     }
     return { triggered: false }
@@ -292,15 +303,22 @@ export class BranchBudgetTracker {
   buildRecoverySignal(decision?: BranchRecoverDecision): RecoverySignal | null {
     const d = decision ?? this.shouldBranchRecover()
     if (!d.triggered) return null
+    const isZh = this._locale === "zh-CN"
     return {
       source: "branch_budget",
-      message: [
-        "[System / Runtime Warning] Current branch exhausted.",
-        d.reason ? `原因: ${d.reason}` : "",
-        "当前策略已达到分支预算上限。请立刻切换策略：换工具 / 换路径 / 换参数 / 拆分子任务；",
-        "不要再原样重试同一操作。若确实无法继续，请向用户说明具体阻塞点与已尝试的证据。",
-        "Switch strategy. Do not retry the same failed branch.",
-      ].filter(Boolean).join("\n"),
+      message: isZh
+        ? [
+            "[系统/运行时警告] 当前分支预算已耗尽。",
+            d.reason ? `原因: ${d.reason}` : "",
+            "请立即切换策略：换工具/换路径/换参数/拆分子任务。",
+            "不要原样重试同一操作。若无法继续，向用户说明具体阻塞点和已尝试的证据。",
+          ].filter(Boolean).join("\n")
+        : [
+            "[System/Runtime Warning] Current branch budget exhausted.",
+            d.reason ? `Reason: ${d.reason}` : "",
+            "Switch strategy immediately: different tool, different path, different parameters, or sub-task breakdown.",
+            "Do not retry the same failed operation. If you cannot proceed, explain the exact blocker and evidence tried to the user.",
+          ].filter(Boolean).join("\n"),
       at: Date.now(),
       consumed: false,
     }

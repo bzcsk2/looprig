@@ -3,6 +3,8 @@
  */
 
 import type { AgentBenchmarkCase } from "./types.js"
+import { getPromptLocale } from "../prompt-locale.js"
+import type { PromptLocale } from "../prompt-locale.js"
 
 export interface EvalPromptOptions {
   objective: string
@@ -16,26 +18,43 @@ export interface EvalPromptOptions {
  */
 export function buildWorkerEvalPrompt(
   benchmarkCase: AgentBenchmarkCase,
-  options: EvalPromptOptions = { objective: "" }
+  options: EvalPromptOptions = { objective: "" },
+  locale?: PromptLocale,
 ): string {
   const objective = options.objective || benchmarkCase.prompt
   const maxRounds = options.maxRounds ?? 10
   const tokenBudget = options.tokenBudget ?? 0
+  const isZh = (locale ?? getPromptLocale()) === "zh-CN"
 
-  const parts: string[] = [
-    `You are being evaluated as a coding Worker.`,
-    ``,
-    `## Case`,
-    `ID: ${benchmarkCase.id}`,
-    `Title: ${benchmarkCase.title}`,
-    `Type: ${benchmarkCase.taskType}`,
-    `Difficulty: ${benchmarkCase.difficulty}`,
-    ``,
-    `## Task`,
-    ``,
-    objective,
-    ``,
-  ]
+  const parts: string[] = isZh
+    ? [
+        `你正在作为编码 Worker 接受评估。`,
+        ``,
+        `## 用例`,
+        `ID: ${benchmarkCase.id}`,
+        `标题: ${benchmarkCase.title}`,
+        `类型: ${benchmarkCase.taskType}`,
+        `难度: ${benchmarkCase.difficulty}`,
+        ``,
+        `## 任务`,
+        ``,
+        objective,
+        ``,
+      ]
+    : [
+        `You are being evaluated as a coding Worker.`,
+        ``,
+        `## Case`,
+        `ID: ${benchmarkCase.id}`,
+        `Title: ${benchmarkCase.title}`,
+        `Type: ${benchmarkCase.taskType}`,
+        `Difficulty: ${benchmarkCase.difficulty}`,
+        ``,
+        `## Task`,
+        ``,
+        objective,
+        ``,
+      ]
 
   if (benchmarkCase.repository) {
     parts.push(`### Repository`)
@@ -52,21 +71,23 @@ export function buildWorkerEvalPrompt(
   }
 
   if (benchmarkCase.verification && benchmarkCase.verification.length > 0) {
-    parts.push(`### Verification Required`)
+    parts.push(`### ${isZh ? "验证要求" : "Verification Required"}`)
     for (const v of benchmarkCase.verification) {
       parts.push(`- ${v}`)
     }
     parts.push(``)
   }
 
-  parts.push(`### Instructions`)
+  parts.push(`### ${isZh ? "说明" : "Instructions"}`)
   parts.push(``)
-  parts.push(`Complete the objective above. Use the available tools to read, write, and edit files.`)
+  parts.push(isZh
+    ? "完成上述目标。使用可用工具读写和编辑文件。"
+    : "Complete the objective above. Use the available tools to read, write, and edit files.")
   if (maxRounds > 0) {
-    parts.push(`Maximum rounds: ${maxRounds}`)
+    parts.push(isZh ? `最大轮次: ${maxRounds}` : `Maximum rounds: ${maxRounds}`)
   }
   parts.push(``)
-  parts.push(`When done, return a structured JSON report in a code block:`)
+  parts.push(isZh ? "完成后，在代码块中返回结构化的 JSON 报告：" : "When done, return a structured JSON report in a code block:")
   parts.push(`\`\`\`json`)
   parts.push(`{`)
   parts.push(`  "summary": "brief summary of what was accomplished",`)
@@ -91,15 +112,21 @@ export function buildWorkerEvalPrompt(
 export function buildSupervisorEvalPrompt(
   benchmarkCase: AgentBenchmarkCase,
   workerReport: string,
-  options: EvalPromptOptions = { objective: "" }
+  options: EvalPromptOptions = { objective: "" },
+  locale?: PromptLocale,
 ): string {
   const objective = options.objective || benchmarkCase.prompt
+  const isZh = (locale ?? getPromptLocale()) === "zh-CN"
 
   const parts: string[] = [
-    `## Supervisor Assessment`,
+    isZh ? `## Supervisor 评估` : `## Supervisor Assessment`,
     ``,
-    `You are evaluating a coding Worker. Do NOT execute tools or repeat the work.`,
-    `Read the task, the Worker report, and provide a structured assessment.`,
+    isZh
+      ? "你正在评估一个编码 Worker。不要执行工具或重复工作。"
+      : "You are evaluating a coding Worker. Do NOT execute tools or repeat the work.",
+    isZh
+      ? "阅读任务、Worker 报告并提供结构化评估。"
+      : "Read the task, the Worker report, and provide a structured assessment.",
     ``,
     `### Original Objective`,
     objective,
@@ -107,34 +134,43 @@ export function buildSupervisorEvalPrompt(
   ]
 
   if (benchmarkCase.repository) {
-    parts.push(`### Repository`)
+    parts.push(`### ${isZh ? "仓库" : "Repository"}`)
     parts.push(``)
     parts.push(benchmarkCase.repository)
     parts.push(``)
   }
 
-  parts.push(`### Worker Report`)
-  parts.push(workerReport || "(no report provided)")
+  parts.push(`### ${isZh ? "Worker 报告" : "Worker Report"}`)
+  parts.push(workerReport || (isZh ? "（未提供报告）" : "(no report provided)"))
   parts.push(``)
 
   if (benchmarkCase.verification && benchmarkCase.verification.length > 0) {
-    parts.push(`### Verification Criteria`)
+    parts.push(`### ${isZh ? "验证标准" : "Verification Criteria"}`)
     for (const criterion of benchmarkCase.verification) {
       parts.push(`- ${criterion}`)
     }
     parts.push(``)
   }
 
-  parts.push(`### Assessment Instructions`)
+  parts.push(`### ${isZh ? "评估说明" : "Assessment Instructions"}`)
   parts.push(``)
-  parts.push(`Evaluate whether the Worker successfully completed the objective.`)
-  parts.push(`Consider:`)
-  parts.push(`- Did the Worker complete all required steps?`)
-  parts.push(`- Were all verification criteria met? Are the verification results credible?`)
-  parts.push(`- Does the implementation match the objective requirements?`)
-  parts.push(`- Are there any critical issues, gaps, or blockers?`)
+  if (isZh) {
+    parts.push(`评估 Worker 是否成功完成了目标。`)
+    parts.push(`考虑以下方面：`)
+    parts.push(`- Worker 是否完成了所有必需步骤？`)
+    parts.push(`- 验证标准是否全部满足？验证结果是否可信？`)
+    parts.push(`- 实现是否符合目标要求？`)
+    parts.push(`- 是否存在关键问题、遗漏或阻塞项？`)
+  } else {
+    parts.push(`Evaluate whether the Worker successfully completed the objective.`)
+    parts.push(`Consider:`)
+    parts.push(`- Did the Worker complete all required steps?`)
+    parts.push(`- Were all verification criteria met? Are the verification results credible?`)
+    parts.push(`- Does the implementation match the objective requirements?`)
+    parts.push(`- Are there any critical issues, gaps, or blockers?`)
+  }
   parts.push(``)
-  parts.push(`Return a structured JSON assessment in a code block:`)
+  parts.push(isZh ? "在代码块中返回结构化的 JSON 评估：" : "Return a structured JSON assessment in a code block:")
   parts.push(`\`\`\`json`)
   parts.push(`{`)
   parts.push(`  "summary": "overall assessment of the Worker's performance",`)
@@ -155,7 +191,7 @@ export function buildSupervisorEvalPrompt(
   parts.push(`}`)
   parts.push(`\`\`\``)
   parts.push(``)
-  parts.push(`Each dimension is scored 0-100. Higher is better.`)
+  parts.push(isZh ? "各维度得分 0-100，越高越好。" : "Each dimension is scored 0-100. Higher is better.")
 
   return parts.join("\n")
 }

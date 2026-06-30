@@ -20,7 +20,9 @@ import { DualAgentRuntime } from "../src/dual-agent-runtime/dual-runtime.js"
 import type { DualAgentRuntimeConfig } from "../src/dual-agent-runtime/types.js"
 import type { WorkflowPhase } from "../src/workflow-coordinator/types.js"
 
+import { setPromptLocale } from "../src/prompt-locale";
 describe("DA-R7: 端到端双角色运行时测试", () => {
+  beforeEach(() => setPromptLocale("en"));
   let workflowCoordinator: WorkflowCoordinator
   let sessionStore: DualSessionStore
 

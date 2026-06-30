@@ -14,7 +14,9 @@ import { WorkflowCoordinator } from "../src/workflow-coordinator/coordinator.js"
 import { QuestionService } from "../src/question/service.js"
 import type { WorkflowSupervisorAdvice } from "../src/workflow-coordinator/types.js"
 
+import { setPromptLocale } from "../src/prompt-locale";
 describe("WF-30: 中途求助与正式检查融合测试", () => {
+  beforeEach(() => setPromptLocale("en"));
   describe("测试 1: QuestionService 在 Workflow 中暂停", () => {
     it("应该支持在 Workflow 中创建 QuestionService", () => {
       const coordinator = new WorkflowCoordinator()

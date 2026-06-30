@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "looprig.review-packet.v1",
+  "packetId": "71a8db63-4805-4e5d-8272-2c468004d4ad:review",
+  "runId": "71a8db63-4805-4e5d-8272-2c468004d4ad",
+  "mode": "loop",
+  "role": "supervisor",
+  "createdAt": "2026-06-30T15:06:35.781Z",
+  "verdict": "ACCEPTED",
+  "findings": [],
+  "requiredChecks": [],
+  "evidenceRefs": [],
+  "confidence": 1,
+  "issues": []
+}

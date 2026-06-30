@@ -9,6 +9,8 @@ import { createHash } from "node:crypto"
 
 import { isHarnessVerificationCommand } from "./governance/verification-command.js"
 import { processVerificationCommandResult } from "./governance/verification-gate.js"
+import { getPromptLocale } from "./prompt-locale.js"
+import type { PromptLocale } from "./prompt-locale.js"
 
 /** 计划步骤状态 */
 export type PlanStepStatus = "pending" | "active" | "done" | "blocked"
@@ -155,10 +157,11 @@ export function serializePlan(steps: PlanStep[]): string {
 /**
  * 将 TaskLedger 格式化为可变上下文注入片段。
  */
-export function formatLedgerForContext(ledger: TaskLedger): string {
+export function formatLedgerForContext(ledger: TaskLedger, locale?: PromptLocale): string {
   const parts: string[] = []
+  const isZh = (locale ?? getPromptLocale()) === "zh-CN"
 
-  parts.push(`TASK GOAL:\n${ledger.goal.trim()}`)
+  parts.push(isZh ? `## 任务目标\n${ledger.goal.trim()}` : `## TASK GOAL\n${ledger.goal.trim()}`)
 
   if (ledger.plan.length > 0) {
     parts.push(formatPlanForContext(ledger.plan))
@@ -167,30 +170,34 @@ export function formatLedgerForContext(ledger: TaskLedger): string {
   if (ledger.changedFiles.length > 0) {
     const listed = ledger.changedFiles.slice(0, 12)
     const more = ledger.changedFiles.length > 12
-      ? `\n- … and ${ledger.changedFiles.length - 12} more`
+      ? isZh ? `\n- … 以及其他 ${ledger.changedFiles.length - 12} 个文件`
+            : `\n- … and ${ledger.changedFiles.length - 12} more`
       : ""
-    parts.push(`CHANGED FILES (${ledger.changedFiles.length}):\n${listed.map(f => `- ${f}`).join("\n")}${more}`)
+    parts.push(`${isZh ? "修改的文件" : "CHANGED FILES"} (${ledger.changedFiles.length}):\n${listed.map(f => `- ${f}`).join("\n")}${more}`)
   }
 
   if (ledger.verificationPending) {
-    parts.push("VERIFICATION: pending — run tests/build/typecheck before claiming completion.")
+    parts.push(isZh
+      ? "验证：待验证——在声明完成前先运行测试/类型检查/构建"
+      : "VERIFICATION: pending — run tests/build/typecheck before claiming completion.")
   } else if (ledger.lastVerification) {
     const v = ledger.lastVerification
-    parts.push(`LAST VERIFICATION: exit ${v.exitCode} — ${v.summary}\nCommand: ${v.command}`)
+    parts.push(`${isZh ? "上次验证" : "LAST VERIFICATION"}: 退出码 ${v.exitCode} — ${v.summary}\n${isZh ? "命令" : "Command"}: ${v.command}`)
   }
 
   if (ledger.blockers.length > 0) {
-    parts.push(`BLOCKERS:\n${ledger.blockers.map(b => `- ${b}`).join("\n")}`)
+    parts.push(`${isZh ? "阻塞项" : "BLOCKERS"}:\n${ledger.blockers.map(b => `- ${b}`).join("\n")}`)
   }
 
-  return `\n\n${parts.join("\n\n")}`
+  return isZh ? `\n\n## 任务上下文\n${parts.join("\n\n")}` : `\n\n${parts.join("\n\n")}`
 }
 
 /**
  * 将计划步骤渲染为 ACTIVE PLAN 锚点文本。
  */
-export function formatPlanForContext(steps: PlanStep[]): string {
+export function formatPlanForContext(steps: PlanStep[], locale?: PromptLocale): string {
   if (steps.length === 0) return ""
+  const isZh = (locale ?? getPromptLocale()) === "zh-CN"
 
   const total = steps.length
   const doneCount = steps.filter(s => s.status === "done").length
@@ -199,8 +206,8 @@ export function formatPlanForContext(steps: PlanStep[]): string {
   const cur = allDone ? total : (activeIndex >= 0 ? activeIndex + 1 : 1)
 
   let out = allDone
-    ? `\n\nCOMPLETED PLAN (all ${total} steps done):`
-    : `\n\nACTIVE PLAN (step ${cur} of ${total}):`
+    ? isZh ? `\n\n## 已完成计划（共 ${total} 步）` : `\n\nCOMPLETED PLAN (all ${total} steps done):`
+    : isZh ? `\n\n## 当前计划（第 ${cur}/${total} 步）` : `\n\nACTIVE PLAN (step ${cur} of ${total}):`
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i]
@@ -212,14 +219,20 @@ export function formatPlanForContext(steps: PlanStep[]): string {
   }
 
   if (!allDone) {
-    out += `\n\nWork on the current step (→). When done, mention "step ${cur} done" or move on naturally.`
+    out += isZh
+      ? `\n\n执行当前步骤（→）。完成后简要说明。`
+      : `\n\nWork on the current step (→). When done, mention "step ${cur} done" or move on naturally.`
   }
 
   return out
 }
 
 /** 计划请求指令（注入到首轮上下文） */
-export function planRequestInstruction(maxSteps = DEFAULT_MAX_STEPS): string {
+export function planRequestInstruction(maxSteps = DEFAULT_MAX_STEPS, locale?: PromptLocale): string {
+  const isZh = (locale ?? getPromptLocale()) === "zh-CN"
+  if (isZh) {
+    return `\n\n这是一个多步骤任务。在工具调用之前，先简要给出编号计划，格式如下：\n\n计划：\n1. <第一步>\n2. <第二步>\n3. <第三步>\n\n不超过 ${maxSteps} 步。\n\n重要：列出计划后立即开始执行第 1 步，不要只列计划就停止。`
+  }
   return `\n\nThis is a multi-step task. Before any tool calls, briefly emit a numbered plan in this format:\n\nPLAN:\n1. <first step>\n2. <second step>\n3. <third step>\n\nKeep it to ${maxSteps} steps or fewer.\n\nIMPORTANT: After the plan, IMMEDIATELY start executing step 1 with the appropriate tool call. Do NOT stop after writing the plan.`
 }
 

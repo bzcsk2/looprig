@@ -92,6 +92,8 @@ export interface EvalCaseManifest {
   sourceMeta?: RealCaseSourceMeta;
   setup?: string[];
   taskPrompt: string;
+  /** Optional bilingual alternative task prompts. Resolved by locale in prompt builders. */
+  taskPromptByLocale?: Partial<Record<"zh-CN" | "en", string>>;
   expectedVerification: string[];
   verifier: {
     type: VerifierType;

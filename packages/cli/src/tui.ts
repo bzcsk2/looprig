@@ -2,7 +2,7 @@ import { stdin as input, stdout as output, stderr as errorOutput } from "node:pr
 import { readFileSync, writeSync } from "node:fs"
 import { resolve } from "node:path"
 import { loadConfig, loadRoleConfig, getModelContextWindow, ReasonixEngine, SessionLoader, defaultAgentRegistry, loadAgentProfiles, getAgentProfile, resolveApiKey, ConfigManager, setGlobalConfigManager } from "@deepreef/core"
-import { buildSystemPrompt } from "@deepreef/core"
+import { buildSystemPrompt, loadPromptLocaleFromDisk, setPromptLocale, getPromptLocale } from "@deepreef/core"
 import { DualAgentRuntime } from "@deepreef/core/dual-agent-runtime/dual-runtime.js"
 import { WorkflowCoordinator } from "@deepreef/core/workflow-coordinator/coordinator.js"
 import { QuestionService } from "@deepreef/core/question/service.js"
@@ -68,9 +68,13 @@ async function main(): Promise<void> {
   SessionLoader.cleanup().catch(() => {})
   const platform = normalizePlatform()
   const shellBackend = await resolveShellBackend(platform)
+  // Load persisted prompt locale at startup
+  const promptLocale = loadPromptLocaleFromDisk(process.cwd()) ?? "zh-CN"
+  setPromptLocale(promptLocale)
   let baseSystemPrompt = buildSystemPrompt(process.cwd(), {
     osPlatform: platform,
     shellBackend: `${shellBackend.id} (${shellBackend.executable})`,
+    locale: promptLocale,
   })
 
   // Render-first startup: plugins/default tools are loaded in the background.
@@ -378,6 +382,7 @@ async function main(): Promise<void> {
       memoryReady,
       dualRuntime,
       workflowCoordinator,
+      { os: platform, shell: shellBackend.id, shellBackend: `${shellBackend.id} (${shellBackend.executable})` },
     )
   } finally {
     await Promise.allSettled([pluginReady, memoryReady])
@@ -459,6 +464,7 @@ async function runTUIMode(
   memoryReady?: Promise<void>,
   dualRuntime?: DualAgentRuntime,
   workflowCoordinator?: WorkflowCoordinator,
+  platformInfo?: { os: string; shell: string; shellBackend: string },
 ): Promise<void> {
   const status = pluginRuntime.getStatus()
   const pluginCount = status.loadedPlugins.length
@@ -478,7 +484,17 @@ async function runTUIMode(
 
   try {
     const { waitUntilExit } = await render(
-      React.createElement(App, { engine, config, pluginCount, contentPackCount, assetCounts, diagnosticCounts, onUserInput, beforeSubmit, dualRuntime, workflowCoordinator }),
+      React.createElement(App, { engine, config, pluginCount, contentPackCount, assetCounts, diagnosticCounts, onUserInput, beforeSubmit, dualRuntime, workflowCoordinator, onPromptLocaleChange: (locale: "zh-CN" | "en") => {
+        const newPrompt = buildSystemPrompt(process.cwd(), {
+          osPlatform: platformInfo?.os ?? "linux",
+          shellBackend: platformInfo?.shellBackend ?? "",
+          locale,
+        })
+        engine.setSystemPrompt(newPrompt)
+        if (dualRuntime) {
+          dualRuntime.getSupervisor().getEngine().setSystemPrompt(newPrompt)
+        }
+      } }),
       { exitOnCtrlC: false, onFrame: createFrameMetricsHandler() },
     );
     await waitUntilExit();

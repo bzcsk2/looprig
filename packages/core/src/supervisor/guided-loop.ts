@@ -8,6 +8,8 @@ import type { ContextManager } from "../context/manager.js"
 import { estimateTokens } from "../context/token-estimator.js"
 import type { ChatClient } from "../interface.js"
 import type { ChatMessage } from "../types.js"
+import { getPromptLocale } from "../prompt-locale.js"
+import type { PromptLocale } from "../prompt-locale.js"
 import type { ModelTarget } from "../model-target.js"
 import { createClientForTarget } from "../model-target.js"
 import type { TaskLedger } from "../task-ledger.js"
@@ -134,8 +136,23 @@ const MAX_RECENT_FAILURES = 10
 /**
  * 构建发给 Supervisor 的请求消息。
  */
-export function buildSupervisorRequestMessages(evidence: EvidenceBundle): ChatMessage[] {
-  const schemaHint = `Respond with ONLY valid JSON matching SupervisorAdvice v${SUPERVISOR_ADVICE_VERSION}:
+export function buildSupervisorRequestMessages(evidence: EvidenceBundle, locale?: PromptLocale): ChatMessage[] {
+  const isZh = (locale ?? getPromptLocale()) === "zh-CN"
+  const schemaHint = isZh
+    ? `请仅以符合 SupervisorAdvice v${SUPERVISOR_ADVICE_VERSION} 的有效 JSON 格式回复：
+{
+  "version": ${SUPERVISOR_ADVICE_VERSION},
+  "diagnosis": "简要诊断",
+  "failureClass": "tool_format|wrong_strategy|missing_context|verification_failure|goal_drift|provider_failure|unknown",
+  "nextActions": ["操作 1", "操作 2"],
+  "constraints": ["限制条件"],
+  "verification": ["验证方式"],
+  "confidence": 0.0-1.0,
+  "shouldContinue": true,
+  "requiresUser": false
+}
+仅提供建议，不执行工具或输出补丁。`
+    : `Respond with ONLY valid JSON matching SupervisorAdvice v${SUPERVISOR_ADVICE_VERSION}:
 {
   "version": ${SUPERVISOR_ADVICE_VERSION},
   "diagnosis": "brief diagnosis",
@@ -152,7 +169,9 @@ Do not execute tools or emit patches. Advice only.`
   return [
     {
       role: "system",
-      content: "You are a Supervisor advisor for a coding agent. Analyze bounded evidence and return structured JSON advice only.",
+      content: isZh
+        ? "你是编码 Agent 的 Supervisor 顾问。分析有限的证据并仅返回结构化 JSON 建议。"
+        : "You are a Supervisor advisor for a coding agent. Analyze bounded evidence and return structured JSON advice only.",
     },
     {
       role: "user",
@@ -167,30 +186,49 @@ Do not execute tools or emit patches. Advice only.`
 export function formatSupervisorAdviceForScratch(
   advice: SupervisorAdvice,
   meta: SupervisorAdviceScratchMeta,
+  locale?: PromptLocale,
 ): string {
-  const lines: string[] = [
-    "[SUPERVISOR ADVICE]",
-    `source: ${meta.source}`,
-    `timestamp: ${meta.timestamp}`,
-    `evidence_hash: ${meta.evidenceHash}`,
-    `failure_class: ${meta.failureClass}`,
-    "",
-    `Diagnosis: ${advice.diagnosis}`,
-    "",
-    "Suggested next actions:",
-    ...advice.nextActions.map((a, i) => `${i + 1}. ${a}`),
-    "",
-    "Before executing, briefly state which next action you choose and why.",
-  ]
+  const isZh = (locale ?? getPromptLocale()) === "zh-CN"
+  const lines: string[] = isZh
+    ? [
+        "[Supervisor 建议]",
+        `来源: ${meta.source}`,
+        `时间: ${meta.timestamp}`,
+        `证据哈希: ${meta.evidenceHash}`,
+        `失败类别: ${meta.failureClass}`,
+        "",
+        `诊断: ${advice.diagnosis}`,
+        "",
+        "建议的下一步操作:",
+        ...advice.nextActions.map((a, i) => `${i + 1}. ${a}`),
+        "",
+        "执行前简要说明选择哪一步及理由。",
+      ]
+    : [
+        "[SUPERVISOR ADVICE]",
+        `source: ${meta.source}`,
+        `timestamp: ${meta.timestamp}`,
+        `evidence_hash: ${meta.evidenceHash}`,
+        `failure_class: ${meta.failureClass}`,
+        "",
+        `Diagnosis: ${advice.diagnosis}`,
+        "",
+        "Suggested next actions:",
+        ...advice.nextActions.map((a, i) => `${i + 1}. ${a}`),
+        "",
+        "Before executing, briefly state which next action you choose and why.",
+      ]
 
   if (advice.constraints.length > 0) {
-    lines.push("", "Constraints:", ...advice.constraints.map(c => `- ${c}`))
+    lines.push("", isZh ? "限制条件:" : "Constraints:", ...advice.constraints.map(c => `- ${c}`))
   }
   if (advice.verification.length > 0) {
-    lines.push("", "Verification:", ...advice.verification.map(v => `- ${v}`))
+    lines.push("", isZh ? "验证:" : "Verification:", ...advice.verification.map(v => `- ${v}`))
   }
   if (advice.requiresUser) {
-    lines.push("", "Note: Supervisor flagged requiresUser=true — pause for user if blocked.")
+    lines.push("", isZh
+      ? "注意: Supervisor 标记 requiresUser=true — 如遇阻塞请等待用户输入。"
+      : "Note: Supervisor flagged requiresUser=true — pause for user if blocked.")
   }
 
   return lines.join("\n")
@@ -497,12 +535,15 @@ export function buildSupervisorTriggerContext(
 }
 
 /** Supervisor 降级消息（不污染 Worker 对话） */
-export function buildSupervisorDegradedMessage(result: SupervisorAdviceResult): string {
+export function buildSupervisorDegradedMessage(result: SupervisorAdviceResult, locale?: PromptLocale): string {
+  const isZh = (locale ?? getPromptLocale()) === "zh-CN"
   if (result.error?.includes("已请求过")) {
-    return "Supervisor: 跳过重复 evidence，继续当前策略"
+    return isZh ? "Supervisor: 跳过重复 evidence，继续当前策略" : "Supervisor: skipping duplicate evidence, continuing current strategy."
   }
-  const detail = result.error ?? "Supervisor 不可用"
-  return `Supervisor 降级: ${detail.slice(0, 200)}`
+  const detail = result.error ?? (isZh ? "Supervisor 不可用" : "Supervisor unavailable")
+  return isZh
+    ? `Supervisor 降级: ${detail.slice(0, 200)}`
+    : `Supervisor degraded: ${detail.slice(0, 200)}`
 }
 
 /**

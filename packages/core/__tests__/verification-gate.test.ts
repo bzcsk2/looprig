@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import {
+import { setPromptLocale } from "../src/prompt-locale";
   isVerificationBlockingFinal,
   buildVerificationGatePrompt,
   evaluateVerificationGate,
@@ -32,6 +33,7 @@ function makeLedger(overrides: Partial<TaskLedger> = {}): TaskLedger {
 }
 
 describe("isVerificationBlockingFinal", () => {
+  beforeEach(() => setPromptLocale("en"));
   it("无改动时不拦截", () => {
     expect(isVerificationBlockingFinal(makeLedger(), true)).toBe(false)
   })
