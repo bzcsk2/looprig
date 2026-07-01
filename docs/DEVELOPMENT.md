@@ -328,6 +328,74 @@ These items are lower priority. Fix only after higher-priority packs unless they
 - `packages/core/src/sandbox/bwrap.ts`: uses synchronous process calls in several places. **(Skipped per guidance — only if measurable.)**
 - `packages/security/src/permission.ts`: **Fixed.** Added optional `id` field to `DenyRule`/`AllowRule` interfaces; added `removeDenyRuleById(id)` and `removeAllowRuleById(id)` for targeting RegExp rules by identifier.
 
+## Eval Assets (Self-Contained NPM)
+
+LoopRig now ships eval benchmark assets inside the npm package. No external bundle downloads or manual `.pt` file placement needed.
+
+### Directory Structure
+
+```
+resources/eval-assets/
+├── assets.lock.json            # Integrity manifest (sha256 for all assets)
+├── category-map.json            # Category/suite metadata
+├── swe-bench/
+│   ├── lock.json                # SWE-bench instance metadata
+│   └── snapshots/               # baseCommit snapshots (tar.gz, no git history)
+│       └── <safeRepoName>/
+│           └── <baseCommit>.tar.gz
+└── terminal-bench/
+    ├── lock.json                # Terminal-Bench instance metadata
+    ├── tasks/                   # Task directories (copied from curated)
+    │   └── <taskId>/
+    └── assets/                  # Optional small generated assets
+```
+
+### Key Changes
+
+1. **No more git bundles**: SWE-bench materializer uses `baseCommit` snapshots (`tar.gz`) instead of full git history bundles. Repos are checked out at the base commit, `.git` removed, and packed reproducibly.
+2. **No PyTorch large-weight tasks**: `pytorch-model-recovery` and `pytorch-model-cli` removed from packaged lock. They required ~10MB `.pt`/`.pth` files. If re-added, they must use small generated assets (`< 2MB`).
+3. **Asset resolver**: `getEvalAssetsRoot()` searches `LOOPRIG_EVAL_ASSETS_DIR` → npm package root → repo root → dev fallback (`curated/`).
+4. **Safe extraction**: `extractSafeTarGz()` validates all tar entries for path traversal before extracting.
+
+### Build Commands
+
+```bash
+# Build SWE-bench snapshots from upstream repos (requires network)
+bun run eval:assets:build
+
+# Verify asset integrity
+bun run eval:assets:verify
+
+# Check asset size budgets (target: 35MB, max: 45MB)
+bun run eval:assets:size
+```
+
+### Asset Integrity
+
+All assets in `assets.lock.json` are tracked by sha256. The verify script checks:
+- Every file exists at its declared path
+- sha256 matches the lock
+- No `*.bundle`, `*.pack`, `*.idx`, or `.git/` files
+- No PyTorch large-weight tasks in lock
+- Every SWE-bench lock instance has a corresponding snapshot
+- Every Terminal-Bench lock task has a task directory
+
+### Adding a New SWE-bench Snapshot
+
+```bash
+# The build script handles this automatically:
+bun run eval:assets:build
+# It deduplicates by repo+baseCommit, caches repos locally,
+# and updates assets.lock.json with sha256 and size.
+```
+
+### Removing a Case
+
+1. Remove the instance from `swe-bench/lock.json` or `terminal-bench/lock.json`
+2. Delete the snapshot/task directory if applicable
+3. Update `assets.lock.json` to remove the asset entry
+4. Run `bun run eval:assets:verify` to confirm integrity
+
 ## Do Not Fix Without New Evidence
 
 These previous audit claims were checked against the current tree and are false, stale, or not actionable as written.
