@@ -54,6 +54,7 @@ describe("ReasonixEngine submit system prompt locale", () => {
     const zhSystemMsg = messages.find((m) => m.role === "system");
     expect(zhSystemMsg).toBeDefined();
     expect(zhSystemMsg!.content).toContain("你是 LoopRig");
+    expect(zhSystemMsg!.content).toContain("## 循环模式 —— Worker");
 
     // Clear and switch to English
     messages.length = 0;
@@ -69,31 +70,47 @@ describe("ReasonixEngine submit system prompt locale", () => {
     const enSystemMsg = messages.find((m) => m.role === "system");
     expect(enSystemMsg).toBeDefined();
     expect(enSystemMsg!.content).toContain("You are LoopRig");
+    expect(enSystemMsg!.content).toContain("## Loop Mode — Worker");
     expect(enSystemMsg!.content).not.toContain("你是 LoopRig");
 
     engine.shutdown().catch(() => {});
   });
 
-  test("subagent system prompt is localized via spawnSubagent", async () => {
+  test("spawnSubagent child engine gets localized system prompt", async () => {
     const { client, messages } = makeFakeClient();
     const engine = new ReasonixEngine(MINIMAL_CONFIG, undefined, undefined, client);
 
     setPromptLocale("zh-CN");
     engine.setSystemPrompt(buildSystemPrompt(".", { locale: "zh-CN" }));
 
-    // Spawn a general-purpose subagent
-    const result = await engine.spawnSubagent({
-      description: "test subagent",
+    let result = await engine.spawnSubagent({
+      description: "test zh subagent",
       prompt: "do something",
       subagentType: "general-purpose",
     });
-
-    // The subagent's engine should have system prompt in Chinese
-    // We can check via getSubagentSystemPrompt behavior indirectly
-    // The subagent system prompt was localized by getSubagentSystemPrompt
     expect(result.status).toBe("completed");
-    // The fake client returns empty text, so the result should be empty string
-    expect(result.result).toBe("");
+
+    // The child engine pushes messages to the shared client
+    const zhMsg = messages.find((m) => m.role === "system");
+    expect(zhMsg).toBeDefined();
+    expect(zhMsg!.content).toContain("你是一个通用子代理");
+
+    // Clear and switch to English
+    messages.length = 0;
+    setPromptLocale("en");
+    engine.setSystemPrompt(buildSystemPrompt(".", { locale: "en" }));
+
+    result = await engine.spawnSubagent({
+      description: "test en subagent",
+      prompt: "do something else",
+      subagentType: "general-purpose",
+    });
+    expect(result.status).toBe("completed");
+
+    const enMsg = messages.find((m) => m.role === "system");
+    expect(enMsg).toBeDefined();
+    expect(enMsg!.content).toContain("You are a general-purpose sub-agent");
+    expect(enMsg!.content).not.toContain("你是一个");
 
     engine.shutdown().catch(() => {});
   });

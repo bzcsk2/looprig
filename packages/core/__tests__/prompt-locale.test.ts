@@ -194,6 +194,9 @@ describe("eval prompts locale", () => {
     const prompt = buildWorkerEvalPrompt(fakeCase, { objective: "" }, "zh-CN");
     expect(prompt).toContain("编码 Worker");
     expect(prompt).toContain("Fix the bug"); // task prompt kept in original
+    expect(prompt).not.toContain("Repository");
+    expect(prompt).not.toContain("Constraints");
+    expect(prompt).not.toContain("Token budget");
   });
 
   test("buildWorkerEvalPrompt en is English wrapper", () => {
@@ -205,6 +208,8 @@ describe("eval prompts locale", () => {
   test("buildSupervisorEvalPrompt zh-CN includes Chinese wrapper", () => {
     const prompt = buildSupervisorEvalPrompt(fakeCase, "Worker completed", { objective: "" }, "zh-CN");
     expect(prompt).toContain("评估一个编码 Worker");
+    expect(prompt).not.toContain("Original Objective");
+    expect(prompt).not.toContain("Repository");
   });
 
   test("buildSupervisorEvalPrompt en is English wrapper", () => {
