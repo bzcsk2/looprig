@@ -1,5 +1,5 @@
 import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import type { EvalCaseManifest, EvalCategoryId, EvalSuiteId } from "../types";
 
 interface LockInstance {
@@ -25,13 +25,17 @@ interface TerminalBenchLock {
 let _lock: TerminalBenchLock | null = null;
 
 function loadLock(): TerminalBenchLock {
-  const lockPath = join(
+  const lockDir = resolve(
     import.meta.dirname ?? __dirname,
     "..",
     "curated",
-    "terminal-bench.lock.json",
   );
-  return JSON.parse(readFileSync(lockPath, "utf-8")) as TerminalBenchLock;
+  const lockPath = join(lockDir, "terminal-bench.lock.json");
+  const lock = JSON.parse(readFileSync(lockPath, "utf-8")) as TerminalBenchLock;
+  if (lock.source.repoPath.startsWith("./")) {
+    lock.source.repoPath = resolve(lockDir, lock.source.repoPath);
+  }
+  return lock;
 }
 
 function readTaskYaml(taskPath: string): Record<string, unknown> {

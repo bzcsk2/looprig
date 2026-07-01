@@ -1,41 +1,40 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { execSync } from "node:child_process";
-import { homedir } from "node:os";
 import type { EvalCaseManifest } from "../types";
 import type { Materializer } from "./shared";
 
 const SWE_PREFIX = "__swe__";
-const CACHE_DIR = join(homedir(), ".cache", "looprig", "swebench");
 
-const REPO_URLS: Record<string, string> = {
-  "psf/requests": "https://github.com/psf/requests.git",
-  "pallets/flask": "https://github.com/pallets/flask.git",
-  "pytest-dev/pytest": "https://github.com/pytest-dev/pytest.git",
+function getLocalReposDir(): string {
+  return resolve(
+    import.meta.dirname ?? __dirname,
+    "..",
+    "curated",
+    "swebench-repos",
+  );
+}
+
+const REPO_BUNDLES: Record<string, string> = {
+  "psf/requests": "psf_requests.bundle",
+  "pallets/flask": "pallets_flask.bundle",
+  "pytest-dev/pytest": "pytest-dev_pytest.bundle",
 };
 
 function getRepoName(sourceMeta: Record<string, unknown>): string | null {
   const url = sourceMeta?.sourceRepoPath as string | undefined;
   if (!url) return null;
-  for (const [name, repoUrl] of Object.entries(REPO_URLS)) {
-    if (url === repoUrl || url.endsWith(name)) return name;
+  for (const name of Object.keys(REPO_BUNDLES)) {
+    if (url.endsWith(name)) return name;
   }
   const m = url.match(/github\.com[/:](.+?)\.git$/);
   return m ? m[1] : null;
 }
 
-function getCachePath(repoName: string): string {
-  return join(CACHE_DIR, repoName.replace("/", "_"));
-}
-
-function ensureRepoCached(repoName: string): void {
-  const cachePath = getCachePath(repoName);
-  const repoUrl = REPO_URLS[repoName];
-  if (!repoUrl) throw new Error(`Unknown repo: ${repoName}`);
-  if (!existsSync(cachePath)) {
-    mkdirSync(CACHE_DIR, { recursive: true });
-    execSync(`git clone "${repoUrl}" "${cachePath}"`, { stdio: "pipe", timeout: 180000 });
-  }
+function getLocalBundlePath(repoName: string): string {
+  const bundleName = REPO_BUNDLES[repoName];
+  if (!bundleName) throw new Error(`Unknown repo: ${repoName}`);
+  return join(getLocalReposDir(), bundleName);
 }
 
 function getLockInstanceData(instanceId: string): { patch: string; testPatch: string } | null {
@@ -82,22 +81,19 @@ export const sweBenchMaterializer: Materializer = {
       return;
     }
 
-    try {
-      ensureRepoCached(repoName);
-    } catch (e) {
-      console.error(`[swe-materializer] Failed to cache repo ${repoName}: ${e}`);
+    const bundlePath = getLocalBundlePath(repoName);
+    if (!existsSync(bundlePath)) {
+      console.error(`[swe-materializer] Local bundle not found at ${bundlePath} for ${manifest.id}`);
       return;
     }
 
-    const cachePath = getCachePath(repoName);
-
     try {
-      execSync(`git clone "${cachePath}" "${workspaceDir}"`, {
+      execSync(`git clone "${bundlePath}" "${workspaceDir}"`, {
         stdio: "pipe",
         timeout: 60000,
       });
     } catch (e) {
-      console.error(`[swe-materializer] Failed to clone from cache for ${manifest.id}: ${e}`);
+      console.error(`[swe-materializer] Failed to clone from bundle for ${manifest.id}: ${e}`);
       return;
     }
 

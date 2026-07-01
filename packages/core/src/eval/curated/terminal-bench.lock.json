@@ -2,8 +2,8 @@
   "version": "1",
   "source": {
     "kind": "terminal-bench",
-    "repoPath": "/vol4/Agent/terminal-bench",
-    "tasksDir": "original-tasks",
+    "repoPath": "./",
+    "tasksDir": "terminal-bench-tasks",
     "commit": "5540a73173a3ab90bf9fc7f8106fddb4fba6bd5e",
     "datasetName": "terminal-bench-core",
     "datasetVersion": "0.1.0"
