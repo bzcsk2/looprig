@@ -1,5 +1,4 @@
 import { resolve } from "node:path"
-import { realpathSync } from "node:fs"
 import { spawn } from "node:child_process"
 import type { AgentTool } from "@deepreef/core"
 import { resolvePath, PathContainmentError } from "./resolve-path.js"
