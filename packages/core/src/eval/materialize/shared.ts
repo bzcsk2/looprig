@@ -3,6 +3,7 @@ import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 import type { EvalCaseManifest } from "../types";
+import { MissingEvalAssetError } from "../types";
 
 export interface Materializer {
   canHandle(manifest: EvalCaseManifest): boolean;
@@ -28,6 +29,9 @@ export async function runMaterializers(
       return;
     }
   }
+  throw new MissingEvalAssetError(
+    `No materializer found for fixture source "${manifest.fixtureSource}" in case ${manifest.id}`,
+  );
 }
 
 export async function initDefaultMaterializers(): Promise<void> {

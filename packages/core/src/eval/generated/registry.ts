@@ -1,6 +1,8 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { EvalCategory, EvalCategoryId, EvalSuite, EvalSuiteId, EvalCaseRef } from "../types";
 import { getRealManifests } from "./manifests";
-import categoryMap from "../curated/category-map.json";
+import { getEvalAssetsRoot } from "../assets/resolve-assets-root";
 
 interface CategoryMapData {
   version: string;
@@ -15,7 +17,31 @@ interface CategoryMapData {
   }>;
 }
 
-const mapData = categoryMap as unknown as CategoryMapData;
+function loadCategoryMap(): unknown {
+  const assetsRoot = (() => {
+    try {
+      return getEvalAssetsRoot();
+    } catch {
+      return null;
+    }
+  })();
+
+  if (assetsRoot) {
+    const pkgPath = join(assetsRoot, "category-map.json");
+    if (existsSync(pkgPath)) {
+      return JSON.parse(readFileSync(pkgPath, "utf-8"));
+    }
+  }
+
+  const devPath = join(import.meta.dirname ?? __dirname, "..", "curated", "category-map.json");
+  if (existsSync(devPath)) {
+    return JSON.parse(readFileSync(devPath, "utf-8"));
+  }
+
+  throw new Error("Cannot locate category-map.json");
+}
+
+const mapData = loadCategoryMap() as CategoryMapData;
 
 type EnvGroupKey = `${EvalSuiteId}::${string}`;
 

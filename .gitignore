@@ -20,6 +20,11 @@ api-key
 .looprig/
 .looprig/runs/
 
+# Forbidden git history / bundle artifacts
+*.bundle
+*.pack
+*.idx
+
 # Local agent/editor state
 .serena/
 

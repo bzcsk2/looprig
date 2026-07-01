@@ -293,3 +293,31 @@ export interface FixedEvalOptions {
   writeObservability?: (event: string, level: string, overrides?: Record<string, unknown>) => void;
   logger?: import("../runtime-logger").RuntimeLogger;
 }
+
+export class MissingEvalAssetError extends Error {
+  constructor(msg: string) {
+    super(msg);
+    this.name = "MissingEvalAssetError";
+  }
+}
+
+export class CorruptEvalAssetError extends Error {
+  constructor(msg: string) {
+    super(msg);
+    this.name = "CorruptEvalAssetError";
+  }
+}
+
+export class UnsafeEvalAssetPathError extends Error {
+  constructor(msg: string) {
+    super(msg);
+    this.name = "UnsafeEvalAssetPathError";
+  }
+}
+
+export class EvalAssetExtractionError extends Error {
+  constructor(msg: string) {
+    super(msg);
+    this.name = "EvalAssetExtractionError";
+  }
+}

@@ -1,6 +1,7 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { EvalCaseManifest, EvalCategoryId, EvalSuiteId } from "../types";
+import { getEvalAssetsRoot } from "../assets/resolve-assets-root";
 
 export interface SweBenchInstance {
   instanceId: string;
@@ -32,13 +33,32 @@ interface SweBenchLock {
 let _lock: SweBenchLock | null = null;
 
 function loadLock(): SweBenchLock {
-  const lockPath = join(
+  const assetsRoot = (() => {
+    try {
+      return getEvalAssetsRoot();
+    } catch {
+      return null;
+    }
+  })();
+
+  if (assetsRoot) {
+    const pkgPath = join(assetsRoot, "swe-bench", "lock.json");
+    if (existsSync(pkgPath)) {
+      return JSON.parse(readFileSync(pkgPath, "utf-8")) as SweBenchLock;
+    }
+  }
+
+  const devPath = join(
     import.meta.dirname ?? __dirname,
     "..",
     "curated",
     "swe-bench.lock.json",
   );
-  return JSON.parse(readFileSync(lockPath, "utf-8")) as SweBenchLock;
+  if (existsSync(devPath)) {
+    return JSON.parse(readFileSync(devPath, "utf-8")) as SweBenchLock;
+  }
+
+  throw new Error("Cannot locate swe-bench lock.json");
 }
 
 const INSTALL_COMMANDS: Record<string, string[]> = {

@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import type { EvalCaseManifest, EvalCategoryId, EvalSuiteId } from "../types";
+import { getEvalAssetsRoot } from "../assets/resolve-assets-root";
 
 interface LockInstance {
   taskId: string;
@@ -22,20 +23,49 @@ interface TerminalBenchLock {
   instances: LockInstance[];
 }
 
-let _lock: TerminalBenchLock | null = null;
+function resolveLock(): { lock: TerminalBenchLock; tasksRoot: string } {
+  const assetsRoot = (() => {
+    try {
+      return getEvalAssetsRoot();
+    } catch {
+      return null;
+    }
+  })();
 
-function loadLock(): TerminalBenchLock {
-  const lockDir = resolve(
+  if (assetsRoot) {
+    const pkgPath = join(assetsRoot, "terminal-bench", "lock.json");
+    if (existsSync(pkgPath)) {
+      const lock = JSON.parse(readFileSync(pkgPath, "utf-8")) as TerminalBenchLock;
+      const tasksRoot = join(assetsRoot, "terminal-bench", "tasks");
+      return { lock, tasksRoot };
+    }
+  }
+
+  const curatedDir = resolve(
     import.meta.dirname ?? __dirname,
     "..",
     "curated",
   );
-  const lockPath = join(lockDir, "terminal-bench.lock.json");
-  const lock = JSON.parse(readFileSync(lockPath, "utf-8")) as TerminalBenchLock;
-  if (lock.source.repoPath.startsWith("./")) {
-    lock.source.repoPath = resolve(lockDir, lock.source.repoPath);
+  const devPath = join(curatedDir, "terminal-bench.lock.json");
+  if (existsSync(devPath)) {
+    const lock = JSON.parse(readFileSync(devPath, "utf-8")) as TerminalBenchLock;
+    if (lock.source.repoPath.startsWith("./")) {
+      lock.source.repoPath = resolve(curatedDir, lock.source.repoPath);
+    }
+    const tasksRoot = resolve(curatedDir, lock.source.tasksDir);
+    return { lock, tasksRoot };
   }
-  return lock;
+
+  throw new Error("Cannot locate terminal-bench lock.json");
+}
+
+let _cached: { lock: TerminalBenchLock; tasksRoot: string } | null = null;
+
+function loadLock(): { lock: TerminalBenchLock; tasksRoot: string } {
+  if (!_cached) {
+    _cached = resolveLock();
+  }
+  return _cached;
 }
 
 function readTaskYaml(taskPath: string): Record<string, unknown> {
@@ -182,11 +212,12 @@ export function buildCaseId(taskId: string, scenario?: string): string {
 export function buildManifest(
   instance: LockInstance,
   lock: TerminalBenchLock,
+  tasksRoot: string,
 ): EvalCaseManifest {
   const taskId = instance.taskId;
   const scenario = instance.scenario;
   const caseId = buildCaseId(taskId, scenario);
-  const taskPath = join(lock.source.repoPath, lock.source.tasksDir, taskId);
+  const taskPath = join(tasksRoot, taskId);
   const taskYaml = readTaskYaml(taskPath);
 
   const title = (taskYaml.title as string) ?? taskId;
@@ -244,10 +275,7 @@ export function buildManifest(
 }
 
 export function loadTerminalBenchManifests(): EvalCaseManifest[] {
-  if (!_lock) {
-    _lock = loadLock();
-  }
-  const lock = _lock!;
+  const { lock, tasksRoot } = loadLock();
 
   const seen = new Set<string>();
   return lock.instances
@@ -256,7 +284,7 @@ export function loadTerminalBenchManifests(): EvalCaseManifest[] {
       if (seen.has(caseId)) return null;
       seen.add(caseId);
       try {
-        return buildManifest(inst, lock);
+        return buildManifest(inst, lock, tasksRoot);
       } catch (err) {
         console.warn(`[eval] Skipping terminal-bench task "${inst.taskId}": ${(err as Error).message}`);
         return null;

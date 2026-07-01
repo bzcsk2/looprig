@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "createdAt": "2026-07-01T00:00:00.000Z",
+  "sweBench": {
+    "dataset": "SWE-bench_Lite",
+    "datasetVersion": "20240627",
+    "snapshots": {}
+  },
+  "terminalBench": {
+    "dataset": "terminal-bench-core",
+    "datasetVersion": "0.1.0",
+    "tasksRoot": "terminal-bench/tasks",
+    "assets": {}
+  }
+}

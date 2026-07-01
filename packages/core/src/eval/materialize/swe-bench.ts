@@ -1,19 +1,13 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
 import { execSync } from "node:child_process";
 import type { EvalCaseManifest } from "../types";
 import type { Materializer } from "./shared";
+import { getEvalAssetsRoot } from "../assets/resolve-assets-root";
+import { resolveSweBenchSnapshot, materializeSweBenchSnapshot } from "./swe-bench-snapshot";
+import { MissingEvalAssetError, EvalAssetExtractionError } from "../types";
 
 const SWE_PREFIX = "__swe__";
-
-function getLocalReposDir(): string {
-  return resolve(
-    import.meta.dirname ?? __dirname,
-    "..",
-    "curated",
-    "swebench-repos",
-  );
-}
 
 const REPO_BUNDLES: Record<string, string> = {
   "psf/requests": "psf_requests.bundle",
@@ -31,24 +25,41 @@ function getRepoName(sourceMeta: Record<string, unknown>): string | null {
   return m ? m[1] : null;
 }
 
-function getLocalBundlePath(repoName: string): string {
-  const bundleName = REPO_BUNDLES[repoName];
-  if (!bundleName) throw new Error(`Unknown repo: ${repoName}`);
-  return join(getLocalReposDir(), bundleName);
-}
-
 function getLockInstanceData(instanceId: string): { patch: string; testPatch: string } | null {
-  const lockPath = join(
+  const assetsRoot = (() => {
+    try {
+      return getEvalAssetsRoot();
+    } catch {
+      return null;
+    }
+  })();
+
+  if (assetsRoot) {
+    const pkgPath = join(assetsRoot, "swe-bench", "lock.json");
+    if (existsSync(pkgPath)) {
+      const lock = JSON.parse(readFileSync(pkgPath, "utf-8")) as {
+        instances: Array<{ instanceId: string; patch: string; testPatch: string }>;
+      };
+      const inst = lock.instances.find((i) => i.instanceId === instanceId);
+      if (inst) return { patch: inst.patch, testPatch: inst.testPatch };
+    }
+  }
+
+  const devPath = join(
     import.meta.dirname ?? __dirname,
     "..",
     "curated",
     "swe-bench.lock.json",
   );
-  if (!existsSync(lockPath)) return null;
-  const lock = JSON.parse(readFileSync(lockPath, "utf-8")) as { instances: Array<{ instanceId: string; patch: string; testPatch: string }> };
-  const inst = lock.instances.find((i) => i.instanceId === instanceId);
-  if (!inst) return null;
-  return { patch: inst.patch, testPatch: inst.testPatch };
+  if (existsSync(devPath)) {
+    const lock = JSON.parse(readFileSync(devPath, "utf-8")) as {
+      instances: Array<{ instanceId: string; patch: string; testPatch: string }>;
+    };
+    const inst = lock.instances.find((i) => i.instanceId === instanceId);
+    if (inst) return { patch: inst.patch, testPatch: inst.testPatch };
+  }
+
+  return null;
 }
 
 export const sweBenchMaterializer: Materializer = {
@@ -65,48 +76,21 @@ export const sweBenchMaterializer: Materializer = {
 
     const repoName = getRepoName(sourceMeta ?? {});
     if (!repoName) {
-      console.error(`[swe-materializer] Cannot determine repo for ${manifest.id}`);
-      return;
+      throw new MissingEvalAssetError(`Cannot determine SWE-bench repo for ${manifest.id}`);
     }
 
     const baseCommit = sourceMeta?.sourceCommit as string | undefined;
     if (!baseCommit) {
-      console.error(`[swe-materializer] No baseCommit in sourceMeta for ${manifest.id}`);
-      return;
+      throw new MissingEvalAssetError(`Missing SWE-bench baseCommit for ${manifest.id}`);
     }
 
     const lockData = getLockInstanceData(instanceId);
     if (!lockData) {
-      console.error(`[swe-materializer] No lock data for ${instanceId}`);
-      return;
+      throw new MissingEvalAssetError(`Missing SWE-bench lock data for ${instanceId}`);
     }
 
-    const bundlePath = getLocalBundlePath(repoName);
-    if (!existsSync(bundlePath)) {
-      console.error(`[swe-materializer] Local bundle not found at ${bundlePath} for ${manifest.id}`);
-      return;
-    }
-
-    try {
-      execSync(`git clone "${bundlePath}" "${workspaceDir}"`, {
-        stdio: "pipe",
-        timeout: 60000,
-      });
-    } catch (e) {
-      console.error(`[swe-materializer] Failed to clone from bundle for ${manifest.id}: ${e}`);
-      return;
-    }
-
-    try {
-      execSync(`git checkout ${baseCommit}`, {
-        cwd: workspaceDir,
-        stdio: "pipe",
-        timeout: 30000,
-      });
-    } catch (e) {
-      console.error(`[swe-materializer] Failed to checkout ${baseCommit} for ${manifest.id}: ${e}`);
-      return;
-    }
+    const snapshot = resolveSweBenchSnapshot(repoName, baseCommit);
+    await materializeSweBenchSnapshot(snapshot, workspaceDir);
 
     const patchFile = join(workspaceDir, "__test.patch");
     writeFileSync(patchFile, lockData.testPatch, "utf-8");
@@ -117,12 +101,14 @@ export const sweBenchMaterializer: Materializer = {
         timeout: 30000,
       });
     } catch (e) {
-      console.error(`[swe-materializer] Failed to apply test_patch for ${manifest.id}: ${e}`);
+      throw new EvalAssetExtractionError(
+        `Failed to apply test_patch for ${manifest.id}: ${e}`,
+      );
     }
     try {
-      execSync(`rm -f "__test.patch"`, { cwd: workspaceDir, stdio: "pipe" });
+      unlinkSync(patchFile);
     } catch {
-      // ignore
+      // ignore cleanup failures
     }
   },
 };
