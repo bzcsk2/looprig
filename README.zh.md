@@ -64,13 +64,13 @@ Supervisor 使用更强的模型，负责规划、审查、失败识别、恢复
 ### 全局安装
 
 ```bash
-npm install -g @covalo/cli
+npm install -g covalo
 ```
 
 也可以使用 Bun：
 
 ```bash
-bun install -g @covalo/cli
+bun install -g covalo
 ```
 
 ### 在项目中启动
@@ -241,7 +241,9 @@ bun run build
 npm pack --dry-run
 ```
 
-发布包名是 `@covalo/cli`，命令行入口是 `covalo`。
+发布前请运行 `npm pack --dry-run`，确认包名是 `covalo`，并且包含 `covalo` 命令行入口。
+
+发布包名是 `covalo`，命令行入口是 `covalo`。`looprig` 命令保留为兼容别名。
 
 ---
 
