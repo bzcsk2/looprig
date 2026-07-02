@@ -5,7 +5,8 @@
   "type": "module",
   "license": "MIT",
   "bin": {
-    "covalo": "./dist/index.js"
+    "covalo": "./dist/index.js",
+    "looprig": "./dist/index.js"
   },
   "files": [
     "dist",
