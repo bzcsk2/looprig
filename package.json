@@ -1,6 +1,6 @@
 {
   "name": "covalo",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "A dual-role agent harness for traceable loop engineering, evals, weak-model supervision, and self-improving agent workflows.",
   "type": "module",
   "license": "MIT",
