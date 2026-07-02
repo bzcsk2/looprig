@@ -10,6 +10,7 @@
   "files": [
     "dist",
     "resources",
+    "resources/eval-assets",
     "README.md",
     "README.zh.md",
     "LICENSE",

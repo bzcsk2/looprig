@@ -17,8 +17,8 @@ function findPackageRoot(startDir: string): string | null {
 }
 
 function getScriptDir(): string {
-  if (typeof __dirname !== "undefined") return __dirname;
   if (import.meta?.url) return dirname(fileURLToPath(import.meta.url));
+  if (typeof __dirname !== "undefined") return __dirname;
   return process.cwd();
 }
 
