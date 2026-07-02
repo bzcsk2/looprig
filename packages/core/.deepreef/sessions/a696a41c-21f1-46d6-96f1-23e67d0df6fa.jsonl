@@ -1,0 +1,5 @@
+{"ts":1781249714335,"type":"messages","payload":[{"role":"system","content":"You are a general-purpose sub-agent.\nYou can read and write files, search code, and run bash commands.\nYou CANNOT spawn sub-agents.\nReturn your results in a clear, structured format. Do not guess or fabricate information."},{"role":"user","content":"task"}]}
+{"ts":1781249714336,"type":"event","payload":{"role":"assistant_delta","content":"ok"}}
+{"ts":1781249714336,"type":"stats","payload":{"promptTokens":1,"completionTokens":1,"cacheHitTokens":0,"cacheMissTokens":0,"apiCalls":0,"toolCalls":0,"totalCost":0.0000024999999999999998}}
+{"ts":1781249714336,"type":"messages","payload":[{"role":"system","content":"You are a general-purpose sub-agent.\nYou can read and write files, search code, and run bash commands.\nYou CANNOT spawn sub-agents.\nReturn your results in a clear, structured format. Do not guess or fabricate information."},{"role":"user","content":"task"},{"role":"assistant","content":"ok"}]}
+{"ts":1781249714336,"type":"event","payload":{"role":"done","metadata":{"reason":"stop"}}}

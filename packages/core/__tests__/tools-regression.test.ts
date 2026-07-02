@@ -15,7 +15,7 @@ describe("write_file tool (B2: new tool)", () => {
   let tmpDir: string
 
   beforeEach(async () => {
-    tmpDir = resolve(tmpdir(), `deepreef-test-wf-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tmpDir = resolve(tmpdir(), `covalo-test-wf-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     await mkdir(tmpDir, { recursive: true })
   })
 
@@ -131,7 +131,7 @@ describe("list_dir tool (C1: new tool)", () => {
   let tmpDir: string
 
   beforeEach(async () => {
-    tmpDir = resolve(tmpdir(), `deepreef-test-ld-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tmpDir = resolve(tmpdir(), `covalo-test-ld-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     await mkdir(tmpDir, { recursive: true })
     await writeFile(resolve(tmpDir, "a.txt"), "aaa", "utf-8")
     await writeFile(resolve(tmpDir, "b.txt"), "bbb", "utf-8")

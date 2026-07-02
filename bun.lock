@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "deepreef",
+      "name": "covalo",
       "dependencies": {
         "@alcalzone/ansi-tokenize": "^0.3.0",
         "@iarna/toml": "^2.2.5",
@@ -48,30 +48,33 @@
       },
     },
     "packages/cli": {
-      "name": "@deepreef/cli",
+      "name": "@covalo/cli",
       "version": "0.1.0",
       "bin": {
-        "deepreef": "src/index.ts",
+        "covalo": "src/index.ts",
       },
       "dependencies": {
-        "@deepreef/core": "workspace:*",
-        "@deepreef/mcp": "workspace:*",
-        "@deepreef/memory": "workspace:*",
-        "@deepreef/plugin": "workspace:*",
-        "@deepreef/tools": "workspace:*",
-        "@deepreef/tui": "workspace:*",
+        "@covalo/core": "workspace:*",
+        "@covalo/mcp": "workspace:*",
+        "@covalo/memory": "workspace:*",
+        "@covalo/plugin": "workspace:*",
+        "@covalo/tools": "workspace:*",
+        "@covalo/tui": "workspace:*",
+        "smol-toml": "^1.7.0",
       },
     },
     "packages/core": {
-      "name": "@deepreef/core",
+      "name": "@covalo/core",
       "version": "0.1.0",
       "dependencies": {
-        "@deepreef/security": "workspace:*",
+        "@covalo/security": "workspace:*",
+        "@covalo/tools": "workspace:*",
+        "smol-toml": "^1.7.0",
         "zod": "4.4.3",
       },
     },
     "packages/ink": {
-      "name": "@deepreef/ink",
+      "name": "@covalo/ink",
       "version": "1.0.0",
       "dependencies": {
         "auto-bind": "^5.0.1",
@@ -94,19 +97,19 @@
       },
     },
     "packages/mcp": {
-      "name": "@deepreef/mcp",
+      "name": "@covalo/mcp",
       "version": "0.1.0",
       "dependencies": {
-        "@deepreef/core": "workspace:*",
-        "@deepreef/tools": "workspace:*",
+        "@covalo/core": "workspace:*",
+        "@covalo/tools": "workspace:*",
         "zod": "4.4.3",
       },
     },
     "packages/memory": {
-      "name": "@deepreef/memory",
+      "name": "@covalo/memory",
       "version": "0.1.0",
       "dependencies": {
-        "@deepreef/core": "workspace:*",
+        "@covalo/core": "workspace:*",
         "zod": "4.4.3",
       },
       "devDependencies": {
@@ -124,10 +127,10 @@
       ],
     },
     "packages/plugin": {
-      "name": "@deepreef/plugin",
+      "name": "@covalo/plugin",
       "version": "0.1.0",
       "dependencies": {
-        "@deepreef/core": "workspace:*",
+        "@covalo/core": "workspace:*",
         "zod": "4.4.3",
       },
       "devDependencies": {
@@ -135,30 +138,30 @@
       },
     },
     "packages/security": {
-      "name": "@deepreef/security",
+      "name": "@covalo/security",
       "version": "0.1.0",
     },
     "packages/shell": {
-      "name": "@deepreef/shell",
+      "name": "@covalo/shell",
       "version": "0.1.0",
     },
     "packages/tools": {
-      "name": "@deepreef/tools",
+      "name": "@covalo/tools",
       "version": "0.1.0",
       "dependencies": {
-        "@deepreef/core": "workspace:*",
+        "@covalo/core": "workspace:*",
         "htmlparser2": "^8.0.2",
         "turndown": "^7.2.0",
         "vscode-jsonrpc": "^8.2.1",
       },
     },
     "packages/tui": {
-      "name": "@deepreef/tui",
+      "name": "@covalo/tui",
       "version": "0.1.0",
       "dependencies": {
-        "@deepreef/core": "workspace:*",
-        "@deepreef/ink": "workspace:*",
-        "@deepreef/tools": "workspace:*",
+        "@covalo/core": "workspace:*",
+        "@covalo/ink": "workspace:*",
+        "@covalo/tools": "workspace:*",
         "@types/figlet": "^1.7.0",
         "cli-highlight": "^2.1.11",
         "figlet": "^1.11.0",
@@ -178,25 +181,25 @@
   "packages": {
     "@alcalzone/ansi-tokenize": ["@alcalzone/ansi-tokenize@0.3.0", "https://registry.npmmirror.com/@alcalzone/ansi-tokenize/-/ansi-tokenize-0.3.0.tgz", { "dependencies": { "ansi-styles": "^6.2.1", "is-fullwidth-code-point": "^5.0.0" } }, "sha512-p+CMKJ93HFmLkjXKlXiVGlMQEuRb6H0MokBSwUsX+S6BRX8eV5naFZpQJFfJHjRZY0Hmnqy1/r6UWl3x+19zYA=="],
 
-    "@deepreef/cli": ["@deepreef/cli@workspace:packages/cli"],
+    "@covalo/cli": ["@covalo/cli@workspace:packages/cli"],
 
-    "@deepreef/core": ["@deepreef/core@workspace:packages/core"],
+    "@covalo/core": ["@covalo/core@workspace:packages/core"],
 
-    "@deepreef/ink": ["@deepreef/ink@workspace:packages/ink"],
+    "@covalo/ink": ["@covalo/ink@workspace:packages/ink"],
 
-    "@deepreef/mcp": ["@deepreef/mcp@workspace:packages/mcp"],
+    "@covalo/mcp": ["@covalo/mcp@workspace:packages/mcp"],
 
-    "@deepreef/memory": ["@deepreef/memory@workspace:packages/memory"],
+    "@covalo/memory": ["@covalo/memory@workspace:packages/memory"],
 
-    "@deepreef/plugin": ["@deepreef/plugin@workspace:packages/plugin"],
+    "@covalo/plugin": ["@covalo/plugin@workspace:packages/plugin"],
 
-    "@deepreef/security": ["@deepreef/security@workspace:packages/security"],
+    "@covalo/security": ["@covalo/security@workspace:packages/security"],
 
-    "@deepreef/shell": ["@deepreef/shell@workspace:packages/shell"],
+    "@covalo/shell": ["@covalo/shell@workspace:packages/shell"],
 
-    "@deepreef/tools": ["@deepreef/tools@workspace:packages/tools"],
+    "@covalo/tools": ["@covalo/tools@workspace:packages/tools"],
 
-    "@deepreef/tui": ["@deepreef/tui@workspace:packages/tui"],
+    "@covalo/tui": ["@covalo/tui@workspace:packages/tui"],
 
     "@emnapi/core": ["@emnapi/core@1.10.0", "", { "dependencies": { "@emnapi/wasi-threads": "1.2.1", "tslib": "^2.4.0" } }, "sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw=="],
 

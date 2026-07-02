@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Text } from '@deepreef/ink';
+import { Box, Text } from '@covalo/ink';
 
 // 10 帧 Braille 点旋转动画序列，逐帧形成旋转视觉
 const FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];

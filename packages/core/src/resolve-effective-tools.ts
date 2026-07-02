@@ -3,7 +3,7 @@ import type { ToolSpec } from "./types.js"
 import type { AgentRole } from "./agent-profile/types.js"
 import type { WorkflowMode } from "./dual-agent-runtime/types.js"
 import type { WorkflowPhase } from "./workflow-coordinator/types.js"
-import type { DeepReefConfig } from "./config/schema.js"
+import type { CovaloConfig } from "./config/schema.js"
 import { isHardDeniedForSupervisorLoop, isHardDeniedForWorkerLoop, isToolAllowed } from "./config/adapter.js"
 
 const SUPERVISOR_TOOLS_SUBAGENT = new Set([
@@ -58,7 +58,7 @@ export interface ResolveEffectiveToolsOpts {
   agentToolNames?: string[]
   workflowPhase?: WorkflowPhase
   /** 新配置系统配置（可选） */
-  config?: DeepReefConfig
+  config?: CovaloConfig
 }
 
 export interface ResolveEffectiveToolsResult {

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import { loadPlugins } from "../src/loader.js"
 import { PluginHookRegistry } from "../src/hook-adapter.js"
-import { HookManager } from "@deepreef/security"
+import { HookManager } from "@covalo/security"
 import { mkdirSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"

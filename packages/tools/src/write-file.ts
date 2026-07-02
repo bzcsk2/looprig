@@ -1,6 +1,6 @@
 import { writeFile as fsWriteFile, mkdir, stat } from "node:fs/promises"
 import { dirname } from "node:path"
-import type { AgentTool } from "@deepreef/core"
+import type { AgentTool } from "@covalo/core"
 import { resolvePath, PathContainmentError } from "./resolve-path.js"
 import { checkStale } from "./stale-read.js"
 import { isSensitive } from "./sensitive.js"

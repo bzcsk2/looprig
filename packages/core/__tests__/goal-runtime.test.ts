@@ -66,7 +66,7 @@ describe("GoalRuntime", () => {
     const { WorkflowCoordinator } = await import("../src/workflow-coordinator/coordinator.js")
     const { rmSync, mkdirSync, existsSync } = await import("node:fs")
     const { resolve } = await import("node:path")
-    const testDir = resolve(process.cwd(), ".deepreef-test-rt-idle")
+    const testDir = resolve(process.cwd(), ".covalo-test-rt-idle")
     if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true })
     mkdirSync(testDir, { recursive: true })
 
@@ -88,7 +88,7 @@ describe("GoalRuntime", () => {
     const { WorkflowCoordinator } = await import("../src/workflow-coordinator/coordinator.js")
     const { rmSync, mkdirSync, existsSync } = await import("node:fs")
     const { resolve } = await import("node:path")
-    const testDir = resolve(process.cwd(), ".deepreef-test-rt-active")
+    const testDir = resolve(process.cwd(), ".covalo-test-rt-active")
     if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true })
     mkdirSync(testDir, { recursive: true })
 
@@ -109,7 +109,7 @@ describe("GoalRuntime", () => {
     const { WorkflowCoordinator } = await import("../src/workflow-coordinator/coordinator.js")
     const { rmSync, mkdirSync, existsSync } = await import("node:fs")
     const { resolve } = await import("node:path")
-    const testDir = resolve(process.cwd(), ".deepreef-test-rt-max")
+    const testDir = resolve(process.cwd(), ".covalo-test-rt-max")
     if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true })
     mkdirSync(testDir, { recursive: true })
 
@@ -136,7 +136,7 @@ describe("GoalRuntime", () => {
     const { WorkflowCoordinator } = await import("../src/workflow-coordinator/coordinator.js")
     const { rmSync, mkdirSync, existsSync } = await import("node:fs")
     const { resolve } = await import("node:path")
-    const testDir = resolve(process.cwd(), ".deepreef-test-rt-budget")
+    const testDir = resolve(process.cwd(), ".covalo-test-rt-budget")
     if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true })
     mkdirSync(testDir, { recursive: true })
 

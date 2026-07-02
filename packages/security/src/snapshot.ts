@@ -8,7 +8,7 @@ export class FileSnapshot {
   private sequence = 0
 
   constructor(patchesDir?: string) {
-    this.patchesDir = patchesDir ?? join(process.cwd(), ".deepreef_patches")
+    this.patchesDir = patchesDir ?? join(process.cwd(), ".covalo_patches")
   }
 
   async snapshot(filepath: string): Promise<string> {

@@ -71,7 +71,7 @@ export async function deleteImage(filePath: string | undefined): Promise<{ delet
       return { deletedBytes: size };
     }
   } catch (err) {
-    console.error("[deepreef:memory] Failed to delete image context:", err);
+    console.error("[covalo:memory] Failed to delete image context:", err);
   }
   return { deletedBytes: 0 };
 }

@@ -17,7 +17,7 @@
  */
 
 import React from 'react';
-import type { PermissionRequest, QuestionRequest, PermissionReply } from '@deepreef/core';
+import type { PermissionRequest, QuestionRequest, PermissionReply } from '@covalo/core';
 import { PermissionPrompt } from '../../PermissionPrompt.js';
 import { QuestionPrompt } from '../../QuestionPrompt.js';
 

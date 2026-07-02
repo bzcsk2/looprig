@@ -1,8 +1,8 @@
-import { loadConfig } from "@deepreef/core"
-import { ReasonixEngine } from "@deepreef/core"
-import { buildSystemPrompt } from "@deepreef/core"
-import { clearReadTracker, normalizePlatform, resolveShellBackend } from "@deepreef/tools"
-import { McpHost, setMcpHost } from "@deepreef/mcp"
+import { loadConfig } from "@covalo/core"
+import { ReasonixEngine } from "@covalo/core"
+import { buildSystemPrompt } from "@covalo/core"
+import { clearReadTracker, normalizePlatform, resolveShellBackend } from "@covalo/tools"
+import { McpHost, setMcpHost } from "@covalo/mcp"
 
 const config = loadConfig()
 const mcpHost = new McpHost()

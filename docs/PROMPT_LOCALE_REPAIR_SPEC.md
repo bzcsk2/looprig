@@ -10,7 +10,7 @@
 - 不要修改用户输入、工具输出、日志、外部 benchmark 原始题面。
 - 不要翻译 JSON schema key、工具名、命令名、文件路径、代码标识符。
 - 不要改模型选择、provider、cache、eval scoring 语义。
-- 不要提交 `.looprig/runs/**` 运行产物。
+- 不要提交 `.covalo/runs/**` 运行产物。
 - 不要把已有脏工作树当成自己的修改。修复前先用 `git status --short` 区分现有变更。
 
 ## Priority
@@ -143,7 +143,7 @@ function rebuildBaseSystemPrompt(locale = currentPromptLocale): string {
 
 `docs/PROMPT_LOCALE_SPEC.md` 明确要求默认 locale 维持 `zh-CN`。
 
-当前 `packages/core/src/prompt-locale.ts` 中 `DEFAULT_LOCALE` 是 `"en"`。这会导致无 `.deepreef/lang.json` 的非 TUI core 使用场景默认英文，违背 spec。
+当前 `packages/core/src/prompt-locale.ts` 中 `DEFAULT_LOCALE` 是 `"en"`。这会导致无 `.covalo/lang.json` 的非 TUI core 使用场景默认英文，违背 spec。
 
 测试中的 `default locale is zh-CN` 被 `beforeEach(() => setPromptLocale("zh-CN"))` 掩盖，并没有真正验证模块默认值。
 
@@ -181,7 +181,7 @@ test("default locale is zh-CN", () => {
 
 - 独立进程中 import `getPromptLocale()` 返回 `zh-CN`。
 - `normalizePromptLocale("fr")` 返回 `zh-CN`。
-- TUI 仍然从 `.deepreef/lang.json` 覆盖 locale。
+- TUI 仍然从 `.covalo/lang.json` 覆盖 locale。
 - 现有英文预期测试通过必要的 `setPromptLocale("en")` 保持兼容。
 
 ## Repair Pack D: Real Fake-Client Integration Test
@@ -229,14 +229,14 @@ setPromptLocale -> buildSystemPrompt/setSystemPrompt -> ReasonixEngine.submit ->
 
 ### Problem
 
-`packages/core/src/scoring/eval-prompts.ts` 已经把部分中文分支改成中文，但仍存在 LoopRig-authored 英文框架词。例如：
+`packages/core/src/scoring/eval-prompts.ts` 已经把部分中文分支改成中文，但仍存在 Covalo-authored 英文框架词。例如：
 
 - `Repository`
 - `Constraints`
 - `Token budget`
 - `Original Objective`
 
-这些不是 JSON schema key，也不是用户 payload，属于 LoopRig 自己构造的 prompt heading/instruction，中文 locale 下应为中文。
+这些不是 JSON schema key，也不是用户 payload，属于 Covalo 自己构造的 prompt heading/instruction，中文 locale 下应为中文。
 
 ### Target Files
 
@@ -245,7 +245,7 @@ setPromptLocale -> buildSystemPrompt/setSystemPrompt -> ReasonixEngine.submit ->
 
 ### Required Fix
 
-在中文分支中本地化所有 LoopRig-authored headings/instructions。
+在中文分支中本地化所有 Covalo-authored headings/instructions。
 
 不要翻译：
 
@@ -302,19 +302,19 @@ setPromptLocale -> buildSystemPrompt/setSystemPrompt -> ReasonixEngine.submit ->
 
 ### Problem
 
-`3bd6155` 包含大量 `.looprig/runs/**` 运行产物。这些文件不是 prompt locale 实现，不能留在修复提交中。
+`3bd6155` 包含大量 `.covalo/runs/**` 运行产物。这些文件不是 prompt locale 实现，不能留在修复提交中。
 
 ### Required Fix
 
-- 从提交范围中移除 `.looprig/runs/**`。
-- 确认 `.gitignore` 是否应忽略 `.looprig/runs/` 或具体运行产物目录。
+- 从提交范围中移除 `.covalo/runs/**`。
+- 确认 `.gitignore` 是否应忽略 `.covalo/runs/` 或具体运行产物目录。
 - 不要删除用户需要保留的本地运行数据，除非用户明确允许。提交清理应通过 staging 范围控制完成。
 
 ### Acceptance
 
 修复提交中：
 
-- 不包含 `.looprig/runs/**`。
+- 不包含 `.covalo/runs/**`。
 - 只包含实现、测试和必要文档。
 
 ## Suggested Verification Commands
@@ -341,7 +341,7 @@ bun run typecheck
 建议补充：
 
 ```bash
-git diff --name-only --cached | grep '^.looprig/runs/' && echo "unexpected run artifacts"
+git diff --name-only --cached | grep '^.covalo/runs/' && echo "unexpected run artifacts"
 ```
 
 ## Done Criteria
@@ -352,5 +352,5 @@ git diff --name-only --cached | grep '^.looprig/runs/' && echo "unexpected run a
 - 真实 fake-client engine submit 集成测试覆盖 locale 切换。
 - prompt-locale 相关测试通过。
 - typecheck 通过，或明确证明失败来自无关预先存在变更。
-- 提交范围不包含 `.looprig/runs/**`。
+- 提交范围不包含 `.covalo/runs/**`。
 - 最终说明不再声称未覆盖的 P1 项已完成。

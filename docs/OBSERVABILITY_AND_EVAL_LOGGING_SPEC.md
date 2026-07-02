@@ -1,8 +1,8 @@
-# LoopRig Observability and Eval Logging Spec
+# Covalo Observability and Eval Logging Spec
 
-本文档是给后续 agent 实施的开发规范。目标是让 LoopRig 的普通运行日志、loop 模式日志、eval 模式日志能够精确反映系统状态，支持开发者快速判断问题属于 Worker、Supervisor、模型、工具、sandbox、verifier、registry 还是 LoopRig 自身架构。
+本文档是给后续 agent 实施的开发规范。目标是让 Covalo 的普通运行日志、loop 模式日志、eval 模式日志能够精确反映系统状态，支持开发者快速判断问题属于 Worker、Supervisor、模型、工具、sandbox、verifier、registry 还是 Covalo 自身架构。
 
-本 spec 不采用 OpenFugu 式 learned router 方案。这里只处理 LoopRig 自身的日志、trace、report、cache 命中观测和 eval 失败归因。
+本 spec 不采用 OpenFugu 式 learned router 方案。这里只处理 Covalo 自身的日志、trace、report、cache 命中观测和 eval 失败归因。
 
 ## Current Problems
 
@@ -14,12 +14,12 @@
 - Verifier 基础设施失败会被当作普通 Worker fail。例如 `No tests found`、`Script not found`、缺 binary/module 等不应计入 Worker 能力失败。
 - `provider-env.json` 记录 host 环境多，记录 sandbox 实际隔离策略少，不能证明本次 eval 的真实 sandbox 状态。
 - Tool tracking 只有全局 calls/failures，缺工具名、cwd、permission decision、exit code、stdout/stderr 摘要。
-- Cache 命中是 LoopRig 关键设计，但 eval report 没有按 run/case/submit 聚合 `cacheHitTokens/cacheMissTokens`，也没有记录 prefix cache 是否命中。
+- Cache 命中是 Covalo 关键设计，但 eval report 没有按 run/case/submit 聚合 `cacheHitTokens/cacheMissTokens`，也没有记录 prefix cache 是否命中。
 - Report summary 的 breakdown 依赖 `suiteSummary.results`，但部分错误路径没有进入 results，导致 infrastructure/task failure 统计不可信。
 
 ## Target Outcome
 
-每一次 LoopRig 运行，尤其是 eval 运行，必须能回答这些问题：
+每一次 Covalo 运行，尤其是 eval 运行，必须能回答这些问题：
 
 ```text
 这次运行用的是什么模式、模型、provider、workflow phase？
@@ -83,7 +83,7 @@ Rules:
 Each eval run must write:
 
 ```text
-.deepreef/evals/<runId>/
+.covalo/evals/<runId>/
   meta.json
   summary.json
   summary.md
@@ -278,14 +278,14 @@ contextWindow
 Full content logging should require:
 
 ```text
-LOOPRIG_LOG_CONTENT=1
+COVALO_LOG_CONTENT=1
 ```
 
 or the current project config equivalent.
 
 ## Cache Observability
 
-LoopRig cache behavior must be first-class in logs and eval reports.
+Covalo cache behavior must be first-class in logs and eval reports.
 
 For every submit, record:
 
@@ -344,7 +344,7 @@ Eval run must write `cache-summary.json`:
 }
 ```
 
-This is required because cache hit rate is a core LoopRig architecture metric. A pass/fail eval without cache data is incomplete.
+This is required because cache hit rate is a core Covalo architecture metric. A pass/fail eval without cache data is incomplete.
 
 ## Sandbox Fingerprint
 
@@ -558,10 +558,10 @@ Rules:
 
 ### P2: Developer UX
 
-- Add `looprig logs doctor` or equivalent diagnostic command.
-- Add `looprig eval inspect <runId>` to summarize failure classes, last event, cache metrics, sandbox fingerprint, and case artifacts.
+- Add `covalo logs doctor` or equivalent diagnostic command.
+- Add `covalo eval inspect <runId>` to summarize failure classes, last event, cache metrics, sandbox fingerprint, and case artifacts.
 - Add retention policy for eval observability files separate from runtime logs.
-- Add compatibility alias for old `.deepreef` paths if/when storage root is renamed.
+- Add compatibility alias for old `.covalo` paths if/when storage root is renamed.
 
 ## Acceptance Tests
 
@@ -612,4 +612,4 @@ Interrupt eval with Ctrl+C:
 An eval report is valid only if it can explain both the result and the system state that produced it.
 ```
 
-If a developer cannot tell whether a failure came from Worker behavior, verifier contract, sandbox setup, model/provider execution, or LoopRig registry/configuration, the observability implementation is incomplete.
+If a developer cannot tell whether a failure came from Worker behavior, verifier contract, sandbox setup, model/provider execution, or Covalo registry/configuration, the observability implementation is incomplete.

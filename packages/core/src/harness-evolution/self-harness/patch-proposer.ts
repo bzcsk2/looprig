@@ -74,7 +74,7 @@ export class PatchProposer {
     const beforeHash = await this.surfaceStore.getHash(surface);
 
     const patch: HarnessPatchPacket = {
-      schemaVersion: "looprig.harness-patch.v1",
+      schemaVersion: "covalo.harness-patch.v1",
       packetId: generatePatchId(weakness.id, surface),
       patchId: generatePatchId(weakness.id, surface),
       surface,

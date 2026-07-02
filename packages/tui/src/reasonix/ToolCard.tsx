@@ -11,7 +11,7 @@
  *   - 非拒绝且输出非空时展示预览行
  */
 
-import { Box, Text } from '@deepreef/ink';
+import { Box, Text } from '@covalo/ink';
 import React from 'react';
 import { Markdown } from './markdown.js';
 import { Card } from './Card.js';

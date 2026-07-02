@@ -215,9 +215,9 @@ function getModelEnvVar(provider: string): string {
   return envKey(provider, "MODEL")
 }
 
-const LAST_CONFIG_FILE = ".deepreef/last-config.json"
-const MODEL_TARGETS_FILE = ".deepreef/model-targets.json"
-const ROLE_CONFIG_FILE = ".deepreef/role-config.json"
+const LAST_CONFIG_FILE = ".covalo/last-config.json"
+const MODEL_TARGETS_FILE = ".covalo/model-targets.json"
+const ROLE_CONFIG_FILE = ".covalo/role-config.json"
 
 /** per-role 模型配置（worker / supervisor 各自的 provider/model/baseUrl） */
 export interface RoleConfig {
@@ -238,7 +238,7 @@ function loadModelTargets(): Record<string, Partial<ModelTarget>> | undefined {
 
 export function saveLastConfig(cfg: { provider: string; model: string; baseUrl: string }): void {
   try {
-    const dir = join(process.cwd(), ".deepreef")
+    const dir = join(process.cwd(), ".covalo")
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, "last-config.json"), JSON.stringify(cfg, null, 2), "utf8")
   } catch {}
@@ -267,7 +267,7 @@ function loadLastConfig(): { provider?: string; model?: string; baseUrl?: string
  */
 export function saveRoleConfig(role: "worker" | "supervisor", cfg: RoleConfig): void {
   try {
-    const dir = join(process.cwd(), ".deepreef")
+    const dir = join(process.cwd(), ".covalo")
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
     const filePath = join(dir, "role-config.json")
     let existing: { worker?: RoleConfig; supervisor?: RoleConfig } = {}
@@ -455,7 +455,7 @@ export function loadConfig(): DeepreefConfig {
   // Priority: env vars > persisted last-config > defaults
   const last = loadLastConfig()
 
-  const provider = process.env.DEEPREEF_PROVIDER ?? last?.provider ?? "zen"
+  const provider = process.env.COVALO_PROVIDER ?? last?.provider ?? "zen"
   const providerCfg = PROVIDERS[provider]
   const lastForProvider = last?.provider === provider ? last : null
 

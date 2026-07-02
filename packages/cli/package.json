@@ -1,5 +1,5 @@
 {
-  "name": "@deepreef/cli",
+  "name": "@covalo/cli",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -12,19 +12,19 @@
     }
   },
   "bin": {
-    "looprig": "src/index.ts"
+    "covalo": "src/index.ts"
   },
   "scripts": {
     "dev": "bun run src/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@deepreef/core": "workspace:*",
-    "@deepreef/tools": "workspace:*",
-    "@deepreef/mcp": "workspace:*",
-    "@deepreef/tui": "workspace:*",
-    "@deepreef/plugin": "workspace:*",
-    "@deepreef/memory": "workspace:*",
+    "@covalo/core": "workspace:*",
+    "@covalo/tools": "workspace:*",
+    "@covalo/mcp": "workspace:*",
+    "@covalo/tui": "workspace:*",
+    "@covalo/plugin": "workspace:*",
+    "@covalo/memory": "workspace:*",
     "smol-toml": "^1.7.0"
   }
 }

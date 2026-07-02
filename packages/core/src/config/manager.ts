@@ -6,7 +6,7 @@ import { DEFAULT_CONFIG, CONFIG_TEMPLATES } from "./defaults.js"
 import { migrateConfig, needsMigration, getLatestVersion } from "./migrations.js"
 import { ConfigError } from "./errors.js"
 import type {
-  DeepReefConfig,
+  CovaloConfig,
   ConfigSource,
   ConfigWarning,
   ConfigLoadOptions,
@@ -17,10 +17,10 @@ import type {
   ToolRoleModePolicy,
 } from "./schema.js"
 
-export type ConfigChangeListener = (config: DeepReefConfig) => void
+export type ConfigChangeListener = (config: CovaloConfig) => void
 
 export class ConfigManager {
-  private config: DeepReefConfig = DEFAULT_CONFIG
+  private config: CovaloConfig = DEFAULT_CONFIG
   private sources: ConfigSource[] = []
   private warnings: ConfigWarning[] = []
   private listeners: Set<ConfigChangeListener> = new Set()
@@ -34,7 +34,7 @@ export class ConfigManager {
     this.projectConfigPath = getConfigPath("project", options.cwd)
   }
 
-  async load(cliOverrides?: Partial<DeepReefConfig>): Promise<void> {
+  async load(cliOverrides?: Partial<CovaloConfig>): Promise<void> {
     const options: ConfigLoadOptions = {
       cwd: this.cwd,
       userConfigPath: this.userConfigPath,
@@ -46,7 +46,7 @@ export class ConfigManager {
     
     // 处理配置迁移
     if (needsMigration(result.config.version)) {
-      const migrated = migrateConfig(result.config) as DeepReefConfig
+      const migrated = migrateConfig(result.config) as CovaloConfig
       result.config = migrated
       result.warnings.push({
         path: "version",
@@ -59,7 +59,7 @@ export class ConfigManager {
     this.warnings = result.warnings
   }
 
-  get(): DeepReefConfig {
+  get(): CovaloConfig {
     return this.config
   }
 
@@ -84,12 +84,12 @@ export class ConfigManager {
     return roleConfig[mode]
   }
 
-  update(partial: Partial<DeepReefConfig>, source: "tui" | "cli"): void {
+  update(partial: Partial<CovaloConfig>, source: "tui" | "cli"): void {
     this.config = this.mergeConfigs(this.config, partial)
     this.notifyListeners()
   }
 
-  private mergeConfigs(base: DeepReefConfig, override: Partial<DeepReefConfig>): DeepReefConfig {
+  private mergeConfigs(base: CovaloConfig, override: Partial<CovaloConfig>): CovaloConfig {
     const result = { ...base }
 
     for (const [key, value] of Object.entries(override)) {
@@ -104,8 +104,8 @@ export class ConfigManager {
         const baseValue = (result as Record<string, unknown>)[key]
         if (typeof baseValue === 'object' && !Array.isArray(baseValue) && baseValue !== null) {
           ;(result as Record<string, unknown>)[key] = this.mergeConfigs(
-            baseValue as DeepReefConfig,
-            value as Partial<DeepReefConfig>
+            baseValue as CovaloConfig,
+            value as Partial<CovaloConfig>
           )
         } else {
           ;(result as Record<string, unknown>)[key] = value
@@ -126,7 +126,7 @@ export class ConfigManager {
     await this.saveConfig(this.projectConfigPath, this.config)
   }
 
-  private async saveConfig(filePath: string, config: DeepReefConfig): Promise<void> {
+  private async saveConfig(filePath: string, config: CovaloConfig): Promise<void> {
     const dir = dirname(filePath)
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true })

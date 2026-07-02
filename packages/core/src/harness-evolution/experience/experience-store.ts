@@ -7,7 +7,7 @@ export class ExperienceStore {
   private jsonlPath: string;
 
   constructor(baseDir: string) {
-    this.jsonlPath = join(baseDir, ".looprig", "experience", "experiences.jsonl");
+    this.jsonlPath = join(baseDir, ".covalo", "experience", "experiences.jsonl");
   }
 
   async init(): Promise<void> {

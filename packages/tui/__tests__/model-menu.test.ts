@@ -1,6 +1,6 @@
 import { describe, it, expect } from "bun:test"
 import { buildMenuRows, getPrevSelectableIndex, getNextSelectableIndex, clampWindow, GROUP_ORDER, resolveLocalBaseUrl } from "../src/model-menu.js"
-import type { ApiKeySource } from "@deepreef/core"
+import type { ApiKeySource } from "@covalo/core"
 
 describe("buildMenuRows", () => {
   it("should include Free group with correct order", () => {

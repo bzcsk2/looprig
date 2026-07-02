@@ -2,7 +2,7 @@ import type { AgentScoreGrade, AgentScoreRubric, AgentScoringDimension } from ".
 
 export const DEFAULT_AGENT_SCORE_RUBRIC: AgentScoreRubric = {
   version: 1,
-  id: "deepreef-agent-run-v1",
+  id: "covalo-agent-run-v1",
   dimensions: {
     taskCompletion: {
       weight: 0.24,

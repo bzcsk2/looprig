@@ -1,4 +1,4 @@
-import type { AgentTool } from "@deepreef/core"
+import type { AgentTool } from "@covalo/core"
 import { safeStringify } from "./safe-stringify.js"
 import { existsSync } from "node:fs"
 import { readFile } from "node:fs/promises"
@@ -80,7 +80,7 @@ const VALID_ACTIONS: LspAction[] = [
 export function createLspTool(): AgentTool {
   return {
     name: "LSP",
-    description: "Query a configured Language Server Protocol process for definitions, references, hover info, diagnostics, completion, and more. Configure servers in .deepreef/lsp.json.",
+    description: "Query a configured Language Server Protocol process for definitions, references, hover info, diagnostics, completion, and more. Configure servers in .covalo/lsp.json.",
     parameters: {
       type: "object",
       properties: {

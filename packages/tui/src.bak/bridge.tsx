@@ -1,5 +1,5 @@
-import type { ReasonixEngine } from '@deepreef/core';
-import type { ChatMessage } from '@deepreef/core';
+import type { ReasonixEngine } from '@covalo/core';
+import type { ChatMessage } from '@covalo/core';
 import { setTUIState } from './App.js';
 
 export interface ToolStatus {

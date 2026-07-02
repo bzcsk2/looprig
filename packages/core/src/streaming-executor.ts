@@ -1,6 +1,6 @@
 import type { AgentTool, LoopEvent, ToolContext, ToolResult, ToolProgressUpdate } from "./interface.js"
 import type { ToolCall } from "./types.js"
-import type { PermissionEngine, HookManager } from "@deepreef/security"
+import type { PermissionEngine, HookManager } from "@covalo/security"
 import { type ResultPersistenceConfig } from "./result-persistence.js"
 import { noopRuntimeLogger, type RuntimeLogger } from "./runtime-logger.js"
 import { evaluatePermission, resolveDenyMessage, createSettleLedger, createProgressQueue, applyResultPersistence, parseToolCallArgs } from "./executor-helpers.js"
@@ -311,7 +311,7 @@ export class StreamingToolExecutor {
             try {
               const { mkdir, writeFile } = await import("node:fs/promises");
               const { join } = await import("node:path");
-              const certDir = join(process.cwd(), ".looprig", "harness", "certificates");
+              const certDir = join(process.cwd(), ".covalo", "harness", "certificates");
               await mkdir(certDir, { recursive: true });
               await writeFile(join(certDir, `${completedCert.packetId}.json`), JSON.stringify(completedCert, null, 2), "utf-8");
             } catch {

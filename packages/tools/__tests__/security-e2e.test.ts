@@ -12,7 +12,7 @@ describe("S14: path traversal protection across tools", () => {
   let tmpDir: string
 
   beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "deepreef-sec-e2e-"))
+    tmpDir = mkdtempSync(join(tmpdir(), "covalo-sec-e2e-"))
   })
   afterEach(() => {
     try { rmSync(tmpDir, { recursive: true, force: true }) } catch {}

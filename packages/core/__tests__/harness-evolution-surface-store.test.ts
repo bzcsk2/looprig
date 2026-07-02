@@ -4,7 +4,7 @@ import { mkdirSync, writeFileSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
-const TEST_BASE = "/tmp/looprig-test-surfaces-" + Math.random().toString(36).slice(2, 8);
+const TEST_BASE = "/tmp/covalo-test-surfaces-" + Math.random().toString(36).slice(2, 8);
 
 describe("SurfaceStore", () => {
   let store: SurfaceStore;
@@ -76,7 +76,7 @@ describe("SurfaceStore", () => {
   });
 
   test("user override takes precedence over default", async () => {
-    const overrideDir = join(TEST_BASE, ".looprig", "harness", "surfaces");
+    const overrideDir = join(TEST_BASE, ".covalo", "harness", "surfaces");
     mkdirSync(overrideDir, { recursive: true });
     writeFileSync(join(overrideDir, "supervisor-system-prompt.md"), "Custom supervisor content", "utf-8");
 

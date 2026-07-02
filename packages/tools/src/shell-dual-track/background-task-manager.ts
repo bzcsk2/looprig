@@ -111,7 +111,7 @@ export class BackgroundTaskManager extends EventEmitter {
     super()
     this.workDir = path.resolve(workDir)
     this.sessionId = sessionId
-    this.logDir = logDir ?? path.join(this.workDir, ".deepreef", "sessions", sessionId, "bg")
+    this.logDir = logDir ?? path.join(this.workDir, ".covalo", "sessions", sessionId, "bg")
   }
 
   /** 当前命令执行 cwd */

@@ -1,8 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Box, Text } from '@deepreef/ink';
-import type { EvalCategory, EvalSuite, EvalEnvironmentId, EvalCategoryId } from '@deepreef/core';
-import { getCategories, getCategory, getSuite, getFilteredSuites } from '@deepreef/core/eval/registry.js';
-import { resolveEvalEnvironment } from '@deepreef/core/sandbox/types.js';
+import { Box, Text } from '@covalo/ink';
+import type { EvalCategory, EvalSuite, EvalEnvironmentId, EvalCategoryId } from '@covalo/core';
+import { getCategories, getCategory, getSuite, getFilteredSuites } from '@covalo/core/eval/registry.js';
+import { resolveEvalEnvironment } from '@covalo/core/sandbox/types.js';
 import { EvalCategorySelect } from './EvalCategorySelect.js';
 import { EvalSuiteSelect } from './EvalSuiteSelect.js';
 import { EvalEnvironmentSelect } from './EvalEnvironmentSelect.js';

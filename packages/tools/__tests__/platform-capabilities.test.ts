@@ -12,8 +12,8 @@ describe("OS-10: platform capabilities", () => {
   const expectedPosixSignals = platform !== "win32"
 
   afterEach(() => {
-    delete process.env.DEEPREEF_SHELL
-    delete process.env.DEEPREEF_SHELL_ARGS
+    delete process.env.COVALO_SHELL
+    delete process.env.COVALO_SHELL_ARGS
     clearShellBackendCache()
     setShellBackendLogger(noopToolDiagnosticLogger)
   })
@@ -48,7 +48,7 @@ describe("OS-10: platform capabilities", () => {
   })
 
   it("rejects an unavailable explicit shell override", async () => {
-    process.env.DEEPREEF_SHELL = "deepreef-shell-that-does-not-exist"
+    process.env.COVALO_SHELL = "covalo-shell-that-does-not-exist"
     await expect(resolveShellBackend(platform)).rejects.toThrow("not available")
   })
 

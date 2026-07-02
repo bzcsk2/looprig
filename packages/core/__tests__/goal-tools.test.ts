@@ -6,7 +6,7 @@ import { GoalStore } from "../src/goal/store.js"
 import { createGetGoalTool, createUpdateGoalTool, createGoalTools } from "../src/goal/tools.js"
 import type { GoalToolProvider } from "../src/goal/tools.js"
 
-const TEST_DIR = resolve(process.cwd(), ".deepreef-test-goal-tools")
+const TEST_DIR = resolve(process.cwd(), ".covalo-test-goal-tools")
 
 function makeStore(): GoalStore {
   return new GoalStore(TEST_DIR)

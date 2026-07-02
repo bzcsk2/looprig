@@ -97,14 +97,14 @@ describe("mergeSupervisorPool", () => {
 
 describe("loadSupervisorPool", () => {
   it("ADV-HAR-04: 无文件时返回空池（无候选）", () => {
-    const dir = mkdtempSync(join(tmpdir(), "deepreef-pool-"))
+    const dir = mkdtempSync(join(tmpdir(), "covalo-pool-"))
     const pool = loadSupervisorPool(dir)
     expect(pool.candidates.length).toBe(0)
   })
 
-  it("从 .deepreef/supervisor-pool.json 加载并合并", () => {
-    const dir = mkdtempSync(join(tmpdir(), "deepreef-pool-"))
-    const configDir = join(dir, ".deepreef")
+  it("从 .covalo/supervisor-pool.json 加载并合并", () => {
+    const dir = mkdtempSync(join(tmpdir(), "covalo-pool-"))
+    const configDir = join(dir, ".covalo")
     mkdirSync(configDir, { recursive: true })
     writeFileSync(
       join(configDir, "supervisor-pool.json"),
@@ -134,8 +134,8 @@ describe("loadSupervisorPool", () => {
   })
 
   it("ADV-HAR-04: 解析失败时返回空池", () => {
-    const dir = mkdtempSync(join(tmpdir(), "deepreef-pool-"))
-    const configDir = join(dir, ".deepreef")
+    const dir = mkdtempSync(join(tmpdir(), "covalo-pool-"))
+    const configDir = join(dir, ".covalo")
     mkdirSync(configDir, { recursive: true })
     writeFileSync(join(configDir, "supervisor-pool.json"), "{ invalid", "utf8")
 
@@ -164,7 +164,7 @@ describe("getEnabledSupervisorCandidates", () => {
 })
 
 describe("SUPERVISOR_POOL_FILE", () => {
-  it("路径为 .deepreef/supervisor-pool.json", () => {
-    expect(SUPERVISOR_POOL_FILE).toBe(".deepreef/supervisor-pool.json")
+  it("路径为 .covalo/supervisor-pool.json", () => {
+    expect(SUPERVISOR_POOL_FILE).toBe(".covalo/supervisor-pool.json")
   })
 })

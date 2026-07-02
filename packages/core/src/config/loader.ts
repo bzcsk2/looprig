@@ -2,16 +2,16 @@ import { readFileSync, existsSync } from "node:fs"
 import { resolve, join } from "node:path"
 import { homedir } from "node:os"
 import { parse } from "smol-toml"
-import { DeepReefConfigSchema, parseConfig } from "./schema.js"
+import { CovaloConfigSchema, parseConfig } from "./schema.js"
 import { DEFAULT_CONFIG } from "./defaults.js"
-import type { DeepReefConfig, ConfigSource, ConfigWarning, ConfigLoadOptions } from "./schema.js"
+import type { CovaloConfig, ConfigSource, ConfigWarning, ConfigLoadOptions } from "./schema.js"
 
-const DEFAULT_USER_CONFIG_PATH = join(homedir(), ".deepreef", "config.toml")
-const DEFAULT_PROJECT_CONFIG_DIR = ".deepreef"
+const DEFAULT_USER_CONFIG_PATH = join(homedir(), ".covalo", "config.toml")
+const DEFAULT_PROJECT_CONFIG_DIR = ".covalo"
 const DEFAULT_PROJECT_CONFIG_FILE = "config.toml"
 
 export interface ConfigLoadResult {
-  config: DeepReefConfig
+  config: CovaloConfig
   sources: ConfigSource[]
   warnings: ConfigWarning[]
 }
@@ -83,17 +83,17 @@ export async function loadConfig(options: ConfigLoadOptions): Promise<ConfigLoad
   }
 }
 
-function loadTomlFile(filePath: string): Partial<DeepReefConfig> {
+function loadTomlFile(filePath: string): Partial<CovaloConfig> {
   const content = readFileSync(filePath, "utf-8")
   try {
     const parsed = parse(content)
-    return parsed as Partial<DeepReefConfig>
+    return parsed as Partial<CovaloConfig>
   } catch (error) {
     throw new Error(`TOML 解析失败: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
-function mergeConfigs(base: DeepReefConfig, override: Partial<DeepReefConfig>): DeepReefConfig {
+function mergeConfigs(base: CovaloConfig, override: Partial<CovaloConfig>): CovaloConfig {
   const result = { ...base }
 
   for (const [key, value] of Object.entries(override)) {
@@ -110,8 +110,8 @@ function mergeConfigs(base: DeepReefConfig, override: Partial<DeepReefConfig>): 
       const baseValue = (result as Record<string, unknown>)[key]
       if (typeof baseValue === 'object' && !Array.isArray(baseValue) && baseValue !== null) {
         ;(result as Record<string, unknown>)[key] = mergeConfigs(
-          baseValue as DeepReefConfig,
-          value as Partial<DeepReefConfig>
+          baseValue as CovaloConfig,
+          value as Partial<CovaloConfig>
         )
       } else {
         ;(result as Record<string, unknown>)[key] = value
@@ -125,7 +125,7 @@ function mergeConfigs(base: DeepReefConfig, override: Partial<DeepReefConfig>): 
   return result
 }
 
-function applyEnvironmentVariables(config: DeepReefConfig): DeepReefConfig {
+function applyEnvironmentVariables(config: CovaloConfig): CovaloConfig {
   const result = { ...config }
 
   // 处理 provider 的 apiKeyEnv
@@ -153,7 +153,7 @@ export function getConfigPath(type: "user" | "project", cwd?: string): string {
 
 export function getConfigDir(type: "user" | "project", cwd?: string): string {
   if (type === "user") {
-    return join(homedir(), ".deepreef")
+    return join(homedir(), ".covalo")
   }
   return join(cwd || process.cwd(), DEFAULT_PROJECT_CONFIG_DIR)
 }

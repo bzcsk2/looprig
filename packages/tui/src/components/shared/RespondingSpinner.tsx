@@ -14,7 +14,7 @@
  */
 
 import type React from 'react';
-import { Text, type HexColor } from '@deepreef/ink';
+import { Text, type HexColor } from '@covalo/ink';
 import { getSemanticColors } from '../../theme/semantic-colors.js';
 import { GradientSpinner } from './GradientSpinner.js';
 

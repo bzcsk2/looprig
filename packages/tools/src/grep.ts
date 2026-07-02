@@ -1,6 +1,6 @@
 import { resolve } from "node:path"
 import { spawn } from "node:child_process"
-import type { AgentTool } from "@deepreef/core"
+import type { AgentTool } from "@covalo/core"
 import { resolvePath, PathContainmentError } from "./resolve-path.js"
 import { isSensitive } from "./sensitive.js"
 import { safeStringify } from "./safe-stringify.js"

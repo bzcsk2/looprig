@@ -403,8 +403,8 @@ export class SurfaceStore {
 
   constructor(baseDir?: string) {
     this.overrideDir = baseDir
-      ? join(baseDir, ".looprig", "harness", "surfaces")
-      : join(homedir(), ".looprig", "harness", "surfaces");
+      ? join(baseDir, ".covalo", "harness", "surfaces")
+      : join(homedir(), ".covalo", "harness", "surfaces");
   }
 
   /** List all available surface names. */

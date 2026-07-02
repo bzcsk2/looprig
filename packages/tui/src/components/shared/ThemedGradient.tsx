@@ -13,7 +13,7 @@
  */
 
 import type React from 'react';
-import { Text } from '@deepreef/ink';
+import { Text } from '@covalo/ink';
 import tinygradient from 'tinygradient';
 import { getSemanticColors } from '../../theme/semantic-colors.js';
 

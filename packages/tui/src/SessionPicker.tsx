@@ -9,8 +9,8 @@
  * @param onCancel - 用户取消时的回调
  */
 import { useState, useEffect, useCallback } from 'react';
-import { Box, Text, useInput } from '@deepreef/ink';
-import { SessionLoader, type SessionSummary } from '@deepreef/core';
+import { Box, Text, useInput } from '@covalo/ink';
+import { SessionLoader, type SessionSummary } from '@covalo/core';
 import { t } from './i18n/index.js';
 
 interface SessionPickerProps {

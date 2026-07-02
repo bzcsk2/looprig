@@ -7,7 +7,7 @@
  * - Environment variables: EXA_API_KEY, PARALLEL_API_KEY
  * - Provider selection: OPENCODE_WEBSEARCH_PROVIDER (exa|parallel)
  */
-import type { AgentTool } from "@deepreef/core"
+import type { AgentTool } from "@covalo/core"
 import { safeStringify } from "./safe-stringify.js"
 
 const SEARCH_TIMEOUT = 25_000
@@ -210,7 +210,7 @@ async function callParallelMCP(
       arguments: {
         objective: query,
         search_queries: [query],
-        session_id: `deepreef-${Date.now()}`,
+        session_id: `covalo-${Date.now()}`,
       },
     },
   })

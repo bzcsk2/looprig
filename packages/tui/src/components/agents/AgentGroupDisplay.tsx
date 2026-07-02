@@ -14,7 +14,7 @@
  */
 
 import React from 'react';
-import { Box, Text, type HexColor } from '@deepreef/ink';
+import { Box, Text, type HexColor } from '@covalo/ink';
 import { getSemanticColors } from '../../theme/semantic-colors.js';
 import { AgentProgressDisplay } from './AgentProgressDisplay.js';
 import { t } from '../../i18n/index.js';

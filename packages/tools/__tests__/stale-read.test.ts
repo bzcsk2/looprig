@@ -9,7 +9,7 @@ describe("stale-read", () => {
   const testFile = "test-stale.txt"
 
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `deepreef-stale-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tmpDir = join(tmpdir(), `covalo-stale-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     await mkdir(tmpDir, { recursive: true })
     await writeFile(join(tmpDir, testFile), "hello", "utf-8")
     clearReadTracker()

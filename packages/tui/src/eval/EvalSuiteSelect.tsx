@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Box, Text, useInput } from '@deepreef/ink';
-import type { EvalCategory, EvalSuite, EvalEnvironmentId, EvalCategoryId } from '@deepreef/core';
-import { getFilteredSuites } from '@deepreef/core/eval/registry.js';
+import { Box, Text, useInput } from '@covalo/ink';
+import type { EvalCategory, EvalSuite, EvalEnvironmentId, EvalCategoryId } from '@covalo/core';
+import { getFilteredSuites } from '@covalo/core/eval/registry.js';
 import { ModalShell } from '../ModalShell.js';
 import { FG, TONE } from '../reasonix/tokens.js';
 

@@ -15,7 +15,7 @@ let testCwd: string
 
 beforeEach(() => {
   originalCwd = process.cwd()
-  testCwd = mkdtempSync(join(tmpdir(), "deepreef-context-policy-"))
+  testCwd = mkdtempSync(join(tmpdir(), "covalo-context-policy-"))
   process.chdir(testCwd)
 })
 

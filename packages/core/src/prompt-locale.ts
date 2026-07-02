@@ -2,7 +2,7 @@
  * Core prompt locale module.
  *
  * Provides a singleton locale state that both core and TUI can read/write.
- * Persisted to .deepreef/lang.json so language choice survives restarts.
+ * Persisted to .covalo/lang.json so language choice survives restarts.
  *
  * This module has zero dependencies on React, TUI, or any UI framework.
  */
@@ -35,10 +35,10 @@ export function isChinesePromptLocale(locale?: PromptLocale): boolean {
   return (locale ?? currentLocale) === "zh-CN";
 }
 
-/** Load locale from .deepreef/lang.json. Returns null if file missing or invalid. */
+/** Load locale from .covalo/lang.json. Returns null if file missing or invalid. */
 export function loadPromptLocaleFromDisk(cwd?: string): PromptLocale | null {
   try {
-    const filePath = join(cwd ?? process.cwd(), ".deepreef", "lang.json");
+    const filePath = join(cwd ?? process.cwd(), ".covalo", "lang.json");
     if (!existsSync(filePath)) return null;
     const raw = readFileSync(filePath, "utf-8");
     const parsed = JSON.parse(raw) as { lang?: string };
@@ -51,10 +51,10 @@ export function loadPromptLocaleFromDisk(cwd?: string): PromptLocale | null {
   }
 }
 
-/** Save locale to .deepreef/lang.json. */
+/** Save locale to .covalo/lang.json. */
 export function savePromptLocaleToDisk(locale: PromptLocale, cwd?: string): void {
   try {
-    const dirPath = join(cwd ?? process.cwd(), ".deepreef");
+    const dirPath = join(cwd ?? process.cwd(), ".covalo");
     mkdirSync(dirPath, { recursive: true });
     const filePath = join(dirPath, "lang.json");
     writeFileSync(filePath, JSON.stringify({ lang: locale }, null, 2), "utf-8");

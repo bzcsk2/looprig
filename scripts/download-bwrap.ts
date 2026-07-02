@@ -178,7 +178,7 @@ async function main(): Promise<void> {
   if (copySystemBwrap(outputPath)) return;
 
   console.warn("Could not bundle bwrap. Users can install it via: sudo apt install bubblewrap");
-  console.warn("LoopRig will fall back to soft-workspace (diagnostic mode)");
+  console.warn("Covalo will fall back to soft-workspace (diagnostic mode)");
 }
 
 await main();

@@ -8,7 +8,7 @@ export class OutcomeStore {
   private jsonlPath: string;
 
   constructor(baseDir: string) {
-    this.jsonlPath = join(baseDir, ".looprig", "outcomes", "model-outcomes.jsonl");
+    this.jsonlPath = join(baseDir, ".covalo", "outcomes", "model-outcomes.jsonl");
   }
 
   async init(): Promise<void> {

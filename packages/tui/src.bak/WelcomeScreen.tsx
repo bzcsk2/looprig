@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Text } from '@deepreef/ink';
+import { Box, Text } from '@covalo/ink';
 import { FG, TONE } from './reasonix/tokens.js';
 import figlet from 'figlet';
 
@@ -8,7 +8,7 @@ import figlet from 'figlet';
  *
  * 【组件职责】
  * 在对话开始前显示欢迎信息，包括：
- * - 应用 Logo（DEEPREEF 渐变色字母）
+ * - 应用 Logo（COVALO 渐变色字母）
  * - 标语 "探索未至之境"
  * - 当前模型信息
  * - Agent 设置面板（推理档位、上下文裁剪、子代理）
@@ -39,20 +39,20 @@ interface WelcomeScreenProps {
 }
 
 /**
- * Logo 组件 - Figlet ASCII Art DEEPREEF 文字
+ * Logo 组件 - Figlet ASCII Art COVALO 文字
  *
  * 使用 figlet ANSI Regular 字体渲染（实心方块字符），
  * 每行使用不同的渐变色，从蓝色过渡到紫色。
  */
 // 静态缓存：figlet 渲染结果在模块加载时计算一次，避免每次 WelcomeScreen 渲染时同步阻塞
-const DEEPREEF_ASCII = figlet.textSync('deepseek', { font: 'ANSI Regular' }).trim().split('\n');
-const DEEPREEF_COLORS: any[] = ['#4FA3F7', '#5C94F9', '#6985FA', '#7676FC', '#866FFB', '#9868F9', '#B064F6', '#C15FF3', '#CA5FF2'];
+const COVALO_ASCII = figlet.textSync('deepseek', { font: 'ANSI Regular' }).trim().split('\n');
+const COVALO_COLORS: any[] = ['#4FA3F7', '#5C94F9', '#6985FA', '#7676FC', '#866FFB', '#9868F9', '#B064F6', '#C15FF3', '#CA5FF2'];
 
 function Title(): React.ReactElement {
   return (
     <Box flexDirection="column" justifyContent="center">
-      {DEEPREEF_ASCII.map((line, i) => (
-        <Text key={i} bold color={DEEPREEF_COLORS[i % DEEPREEF_COLORS.length]}>{line}</Text>
+      {COVALO_ASCII.map((line, i) => (
+        <Text key={i} bold color={COVALO_COLORS[i % COVALO_COLORS.length]}>{line}</Text>
       ))}
     </Box>
   );
@@ -121,7 +121,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }): React
  * 欢迎界面主组件
  *
  * 布局结构（从上到下）：
- * 1. Logo 区域（渐变色 DEEPREEF）
+ * 1. Logo 区域（渐变色 COVALO）
  * 2. 标语
  * 3. 模型信息
  * 4. 双列面板（Agent 设置 | 组件状态）

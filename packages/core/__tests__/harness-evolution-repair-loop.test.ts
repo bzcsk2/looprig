@@ -8,14 +8,14 @@ const RUN_ID = "test-repair-loop";
 
 describe("BoundedRepairLoop", () => {
   test("starts with planned state", () => {
-    const loop = new BoundedRepairLoop({ baseDir: "/tmp/looprig-test", runId: RUN_ID, mode: "eval", maxRounds: 3, role: "system" });
+    const loop = new BoundedRepairLoop({ baseDir: "/tmp/covalo-test", runId: RUN_ID, mode: "eval", maxRounds: 3, role: "system" });
     const round = loop.startRound(1);
     expect(round.state).toBe("planned");
     expect(round.roundNumber).toBe(1);
   });
 
   test("accepts when review passes and no incidents", () => {
-    const loop = new BoundedRepairLoop({ baseDir: "/tmp/looprig-test", runId: RUN_ID, mode: "eval", maxRounds: 3, role: "system" });
+    const loop = new BoundedRepairLoop({ baseDir: "/tmp/covalo-test", runId: RUN_ID, mode: "eval", maxRounds: 3, role: "system" });
     loop.startRound(1);
     loop.completeWorker("some output");
     loop.setReview(createReviewPacket({
@@ -36,7 +36,7 @@ describe("BoundedRepairLoop", () => {
   });
 
   test("repairs when review fails with incidents", () => {
-    const loop = new BoundedRepairLoop({ baseDir: "/tmp/looprig-test", runId: RUN_ID, mode: "eval", maxRounds: 3, role: "system" });
+    const loop = new BoundedRepairLoop({ baseDir: "/tmp/covalo-test", runId: RUN_ID, mode: "eval", maxRounds: 3, role: "system" });
     loop.startRound(1);
     loop.completeWorker("bad output");
     loop.setReview(createReviewPacket({
@@ -75,7 +75,7 @@ describe("BoundedRepairLoop", () => {
   });
 
   test("blocks recovery when incidents lack evidence", () => {
-    const loop = new BoundedRepairLoop({ baseDir: "/tmp/looprig-test", runId: RUN_ID, mode: "eval", maxRounds: 3, role: "system" });
+    const loop = new BoundedRepairLoop({ baseDir: "/tmp/covalo-test", runId: RUN_ID, mode: "eval", maxRounds: 3, role: "system" });
     loop.startRound(1);
     loop.completeWorker("bad output");
     loop.setReview(createReviewPacket({
@@ -113,7 +113,7 @@ describe("BoundedRepairLoop", () => {
   });
 
   test("escalates when max rounds exceeded", () => {
-    const loop = new BoundedRepairLoop({ baseDir: "/tmp/looprig-test", runId: RUN_ID, mode: "eval", maxRounds: 1, role: "system" });
+    const loop = new BoundedRepairLoop({ baseDir: "/tmp/covalo-test", runId: RUN_ID, mode: "eval", maxRounds: 1, role: "system" });
     loop.startRound(1);
     loop.completeWorker("bad output");
     loop.setReview(createReviewPacket({
@@ -150,7 +150,7 @@ describe("BoundedRepairLoop", () => {
   });
 
   test("closes round with accepted state", async () => {
-    const loop = new BoundedRepairLoop({ baseDir: "/tmp/looprig-test", runId: RUN_ID, mode: "eval", maxRounds: 3, role: "system" });
+    const loop = new BoundedRepairLoop({ baseDir: "/tmp/covalo-test", runId: RUN_ID, mode: "eval", maxRounds: 3, role: "system" });
     loop.startRound(1);
     await loop.close(true);
     expect(loop.currentRound?.state).toBe("accepted");
@@ -158,7 +158,7 @@ describe("BoundedRepairLoop", () => {
   });
 
   test("keep-best returns best round by gate failures", () => {
-    const loop = new BoundedRepairLoop({ baseDir: "/tmp/looprig-test", runId: RUN_ID, mode: "eval", maxRounds: 3, role: "system" });
+    const loop = new BoundedRepairLoop({ baseDir: "/tmp/covalo-test", runId: RUN_ID, mode: "eval", maxRounds: 3, role: "system" });
     loop.startRound(1);
     loop.setGateResults([{ gateId: "v1", passed: false, durationMs: 0, failureClass: "verifier_failure" }]);
     loop.startRound(2);
@@ -168,7 +168,7 @@ describe("BoundedRepairLoop", () => {
   });
 
   test("escalation reports best round number", () => {
-    const loop = new BoundedRepairLoop({ baseDir: "/tmp/looprig-test", runId: RUN_ID, mode: "eval", maxRounds: 1, role: "system", keepBest: true });
+    const loop = new BoundedRepairLoop({ baseDir: "/tmp/covalo-test", runId: RUN_ID, mode: "eval", maxRounds: 1, role: "system", keepBest: true });
     loop.startRound(1);
     loop.setGateResults([{ gateId: "v1", passed: true, durationMs: 0 }]);
     loop.completeWorker("good output");

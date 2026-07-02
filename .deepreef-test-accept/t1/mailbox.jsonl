@@ -1,0 +1,1 @@
+{"threadId":"t1","goalId":"g1","workflowId":"w1","iteration":0,"from":"supervisor","to":"worker","kind":"task","delivery":"queue_only","content":"good","id":"ced9d3fa-9c28-477c-97ab-b09e5af12c9b","createdAt":1782908456018}

@@ -7,9 +7,9 @@
  * 3. 三种模式的 routeWorkflowInput → bridge 动作一致性
  */
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test';
-import type { WorkflowCoordinator } from '@deepreef/core/workflow-coordinator/coordinator.js';
-import type { WorkflowEvent } from '@deepreef/core/workflow-coordinator/types.js';
-import type { LoopEvent } from '@deepreef/core';
+import type { WorkflowCoordinator } from '@covalo/core/workflow-coordinator/coordinator.js';
+import type { WorkflowEvent } from '@covalo/core/workflow-coordinator/types.js';
+import type { LoopEvent } from '@covalo/core';
 import { createBridge } from '../src/bridge.js';
 import { routeWorkflowInput } from '../src/workflow-mode-router.js';
 import type { BridgeState, TimelineItem } from '../src/bridge.js';

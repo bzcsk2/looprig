@@ -1,4 +1,4 @@
-# LoopRig
+# Covalo
 
 <p align="center">
   <strong>English</strong> |
@@ -13,17 +13,17 @@
   <img src="https://img.shields.io/badge/license-MIT-yellow?style=flat-square" alt="License" />
 </p>
 
-**LoopRig is a terminal-native AI loop agent for making cheap, free, and local models complete real engineering work through supervised execution loops.**
+**Covalo is a terminal-native AI loop agent for making cheap, free, and local models complete real engineering work through supervised execution loops.**
 
-Most coding agents assume a strong frontier model is always available. LoopRig takes a different position: use stronger models for planning, supervision, and recovery; use cheaper or local models for the bulk of the execution; keep the loop observable, resumable, and governed by explicit safety boundaries.
+Most coding agents assume a strong frontier model is always available. Covalo takes a different position: use stronger models for planning, supervision, and recovery; use cheaper or local models for the bulk of the execution; keep the loop observable, resumable, and governed by explicit safety boundaries.
 
 > The goal is not to replace good models. The goal is to make low-cost models useful enough to keep working.
 
 ---
 
-## What LoopRig Is
+## What Covalo Is
 
-LoopRig is a TypeScript/Bun CLI and TUI agent runtime with:
+Covalo is a TypeScript/Bun CLI and TUI agent runtime with:
 
 - a cache-aware agent loop optimized for low-cost model usage
 - a Supervisor / Worker workflow for long-running engineering tasks
@@ -34,13 +34,13 @@ LoopRig is a TypeScript/Bun CLI and TUI agent runtime with:
 - deny-first permission handling for shell commands and file modifications
 - session persistence and recovery for interrupted work
 
-LoopRig is currently **pre-1.0**. Core CLI, tools, security, memory, plugin, skills, MCP, and workflow foundations are implemented, but public APIs and configuration formats may still change.
+Covalo is currently **pre-1.0**. Core CLI, tools, security, memory, plugin, skills, MCP, and workflow foundations are implemented, but public APIs and configuration formats may still change.
 
 ---
 
 ## Core Idea: Supervisor + Worker Loop
 
-LoopRig avoids the fragile pattern of one agent wandering through an unbounded loop. The intended workflow is a fixed two-role execution structure:
+Covalo avoids the fragile pattern of one agent wandering through an unbounded loop. The intended workflow is a fixed two-role execution structure:
 
 ```text
 Supervisor plans
@@ -65,23 +65,23 @@ The Supervisor uses a stronger model. It is responsible for planning, reviewing 
 ### Install the CLI
 
 ```bash
-npm install -g @deepreef/cli
+npm install -g @covalo/cli
 ```
 
 You can also use Bun:
 
 ```bash
-bun install -g @deepreef/cli
+bun install -g @covalo/cli
 ```
 
 ### Start inside a project
 
 ```bash
 cd your-project
-looprig
+covalo
 ```
 
-Inside LoopRig, run:
+Inside Covalo, run:
 
 ```text
 /help
@@ -94,8 +94,8 @@ Inside LoopRig, run:
 ### Develop from source
 
 ```bash
-git clone https://github.com/bzcsk2/looprig.git
-cd looprig
+git clone https://github.com/bzcsk2/covalo.git
+cd covalo
 bun install
 bun run dev
 ```
@@ -118,11 +118,11 @@ bun run dev
 
 ---
 
-## Why LoopRig Exists
+## Why Covalo Exists
 
 ### Low-cost model economics
 
-Most AI coding tools rely on expensive models to compensate for weak orchestration. LoopRig focuses on orchestration first:
+Most AI coding tools rely on expensive models to compensate for weak orchestration. Covalo focuses on orchestration first:
 
 - put expensive intelligence where it matters: planning, review, recovery, verification
 - let cheap/free/local models do repeatable implementation work
@@ -131,7 +131,7 @@ Most AI coding tools rely on expensive models to compensate for weak orchestrati
 
 ### Local and weak-model reliability
 
-LoopRig treats model weakness as a runtime condition, not a fatal limitation. The harness system lets the user choose stricter execution rails for weaker models:
+Covalo treats model weakness as a runtime condition, not a fatal limitation. The harness system lets the user choose stricter execution rails for weaker models:
 
 - smaller steps
 - stronger verification gates
@@ -141,7 +141,7 @@ LoopRig treats model weakness as a runtime condition, not a fatal limitation. Th
 
 ### Terminal-native engineering
 
-LoopRig is built for developers working in repositories, not for generic chatbot sessions. It emphasizes:
+Covalo is built for developers working in repositories, not for generic chatbot sessions. It emphasizes:
 
 - file-aware edits
 - shell execution with permission checks
@@ -154,7 +154,7 @@ LoopRig is built for developers working in repositories, not for generic chatbot
 
 ## Architecture
 
-LoopRig uses a kernel/shell separation:
+Covalo uses a kernel/shell separation:
 
 ```text
 packages/core      -> agent loop, API adaptation, context, cache, retry, workflow primitives
@@ -189,7 +189,7 @@ CLI / TUI / future IDE shell
 
 ### Tools
 
-LoopRig includes tools for:
+Covalo includes tools for:
 
 - reading, writing, editing, and listing files
 - grep and project search
@@ -203,7 +203,7 @@ LoopRig includes tools for:
 
 ### Editing safety
 
-LoopRig uses layered edit safeguards:
+Covalo uses layered edit safeguards:
 
 - hash-anchored editing
 - fuzzy fallback matching
@@ -214,17 +214,17 @@ LoopRig uses layered edit safeguards:
 
 ### Skills and MCP
 
-Skills are reusable domain instruction packages. MCP support lets LoopRig connect to external tools and data sources through JSON-RPC 2.0 / stdio MCP servers.
+Skills are reusable domain instruction packages. MCP support lets Covalo connect to external tools and data sources through JSON-RPC 2.0 / stdio MCP servers.
 
 ### AgentMemory
 
-LoopRig includes memory integration for project and agent continuity. Memory behavior should be treated as configurable runtime state and reviewed before using LoopRig in sensitive repositories.
+Covalo includes memory integration for project and agent continuity. Memory behavior should be treated as configurable runtime state and reviewed before using Covalo in sensitive repositories.
 
 ---
 
 ## Model Providers
 
-LoopRig is designed around multiple model classes:
+Covalo is designed around multiple model classes:
 
 | Class | Intended role |
 | --- | --- |
@@ -235,7 +235,7 @@ LoopRig is designed around multiple model classes:
 
 Provider configuration is available through `/model`. Local models are routed through OpenAI-compatible configuration.
 
-LoopRig does not require one fixed provider. The runtime state is effectively:
+Covalo does not require one fixed provider. The runtime state is effectively:
 
 ```ts
 {
@@ -250,7 +250,7 @@ LoopRig does not require one fixed provider. The runtime state is effectively:
 
 ## Safety Model
 
-LoopRig is an agent that can read files, edit files, run commands, and call tools. Treat it as a powerful local development assistant, not as a sandboxed security boundary.
+Covalo is an agent that can read files, edit files, run commands, and call tools. Treat it as a powerful local development assistant, not as a sandboxed security boundary.
 
 Key safeguards:
 
@@ -262,7 +262,7 @@ Key safeguards:
 - isolated sub-agent permissions
 - API key files ignored by Git
 
-Do not run LoopRig in a repository where you are not willing to review agent-generated changes.
+Do not run Covalo in a repository where you are not willing to review agent-generated changes.
 
 ---
 
@@ -276,7 +276,7 @@ bun run build
 npm pack --dry-run
 ```
 
-The package is published as `@deepreef/cli` and exposes the `looprig` binary.
+The package is published as `@covalo/cli` and exposes the `covalo` binary.
 
 ---
 
@@ -312,7 +312,7 @@ Near-term focus:
 
 Issues and pull requests are welcome. Start with [CONTRIBUTING.md](./CONTRIBUTING.md), then check open issues and roadmap items.
 
-LoopRig is especially interested in contributions around:
+Covalo is especially interested in contributions around:
 
 - local model presets
 - weak-model workflow reliability

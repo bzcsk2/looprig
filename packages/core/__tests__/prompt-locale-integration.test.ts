@@ -53,7 +53,7 @@ describe("ReasonixEngine submit system prompt locale", () => {
     // The first message should be the system prompt
     const zhSystemMsg = messages.find((m) => m.role === "system");
     expect(zhSystemMsg).toBeDefined();
-    expect(zhSystemMsg!.content).toContain("你是 LoopRig");
+    expect(zhSystemMsg!.content).toContain("你是 Covalo");
     expect(zhSystemMsg!.content).toContain("## 循环模式 —— Worker");
 
     // Clear and switch to English
@@ -69,9 +69,9 @@ describe("ReasonixEngine submit system prompt locale", () => {
 
     const enSystemMsg = messages.find((m) => m.role === "system");
     expect(enSystemMsg).toBeDefined();
-    expect(enSystemMsg!.content).toContain("You are LoopRig");
+    expect(enSystemMsg!.content).toContain("You are Covalo");
     expect(enSystemMsg!.content).toContain("## Loop Mode — Worker");
-    expect(enSystemMsg!.content).not.toContain("你是 LoopRig");
+    expect(enSystemMsg!.content).not.toContain("你是 Covalo");
 
     engine.shutdown().catch(() => {});
   });

@@ -1,5 +1,5 @@
-# @deepreef/cli
+# @covalo/cli
 
-Reserved package for the DeepReef CLI.
+Reserved package for the Covalo CLI.
 
-Project: https://github.com/bzcsk2/DeepReef
+Project: https://github.com/bzcsk2/Covalo

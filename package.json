@@ -1,11 +1,11 @@
 {
-  "name": "@deepreef/cli",
+  "name": "covalo",
   "version": "0.1.1",
-  "description": "Terminal-native AI loop agent runtime for supervised local, free, and low-cost coding models.",
+  "description": "A dual-role agent harness for traceable loop engineering, evals, weak-model supervision, and self-improving agent workflows.",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "looprig": "./dist/index.js"
+    "covalo": "./dist/index.js"
   },
   "files": [
     "dist",
@@ -23,11 +23,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bzcsk2/looprig.git"
+    "url": "git+https://github.com/bzcsk2/covalo.git"
   },
-  "homepage": "https://github.com/bzcsk2/looprig#readme",
+  "homepage": "https://github.com/bzcsk2/covalo#readme",
   "bugs": {
-    "url": "https://github.com/bzcsk2/looprig/issues"
+    "url": "https://github.com/bzcsk2/covalo/issues"
   },
   "keywords": [
     "ai-agent",

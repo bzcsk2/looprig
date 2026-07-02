@@ -10,7 +10,7 @@
  * @param onComplete - 用户按 Tab 自动补全时的回调，传入完整命令名
  * @param onClose - 用户按 Esc 关闭弹窗时的回调
  */
-import { Box, Text, useInput } from '@deepreef/ink';
+import { Box, Text, useInput } from '@covalo/ink';
 import React, { useState, useMemo } from 'react';
 import { filterCommands, type SlashCommand } from './CommandRegistry.js';
 import { TONE, FG } from './reasonix/tokens.js';

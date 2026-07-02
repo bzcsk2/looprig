@@ -168,7 +168,7 @@ export async function runEval(
   const { switchModel, restoreModel, executeWorker, executeSupervisor, checkApiKey, abortSignal } = executors
 
   const evalRunId = `eval-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.random().toString(36).slice(2, 8)}`
-  const reportDir = `.deepreef/evals/${evalRunId}`
+  const reportDir = `.covalo/evals/${evalRunId}`
 
   const allRuns: AgentBenchmarkRunScore[] = []
   const skippedModels: string[] = []

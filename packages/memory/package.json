@@ -1,7 +1,7 @@
 {
-  "name": "@deepreef/memory",
+  "name": "@covalo/memory",
   "version": "0.1.0",
-  "description": "AgentMemory integrated as Deepreef native memory — persistent memory for AI coding agents",
+  "description": "AgentMemory integrated as Covalo native memory — persistent memory for AI coding agents",
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
@@ -20,10 +20,10 @@
     "test": "node ../../node_modules/vitest/vitest.mjs run --config vitest.config.ts",
     "test:bun": "bun test"
   },
-  "keywords": ["deepreef", "memory", "agent", "persistent"],
+  "keywords": ["Covalo", "memory", "agent", "persistent"],
   "license": "Apache-2.0",
   "dependencies": {
-    "@deepreef/core": "workspace:*",
+    "@covalo/core": "workspace:*",
     "zod": "4.4.3"
   },
   "devDependencies": {

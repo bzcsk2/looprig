@@ -4,8 +4,8 @@ import { homedir } from "node:os"
 import { spawnSync } from "node:child_process"
 import { stringify } from "smol-toml"
 import { parse } from "smol-toml"
-import { ConfigManager, getConfigPath, DEFAULT_CONFIG, CONFIG_TEMPLATES } from "@deepreef/core"
-import type { DeepReefConfig } from "@deepreef/core"
+import { ConfigManager, getConfigPath, DEFAULT_CONFIG, CONFIG_TEMPLATES } from "@covalo/core"
+import type { CovaloConfig } from "@covalo/core"
 
 interface ConfigCommandOptions {
   json?: boolean
@@ -42,15 +42,15 @@ export async function configCommand(subcommand: string, args: string[]): Promise
 }
 
 function printConfigHelp(): void {
-  console.log(`deepreef config - Configuration management
+  console.log(`covalo config - Configuration management
 
 Usage:
-  deepreef config path              Show config file paths
-  deepreef config print [options]   Print effective config
-  deepreef config validate          Validate config files
-  deepreef config init [options]    Initialize config file
-  deepreef config edit [options]    Open config in editor
-  deepreef config doctor            Check config health
+  covalo config path              Show config file paths
+  covalo config print [options]   Print effective config
+  covalo config validate          Validate config files
+  covalo config init [options]    Initialize config file
+  covalo config edit [options]    Open config in editor
+  covalo config doctor            Check config health
 
 Options:
   --json              Output as JSON (for print)
@@ -175,7 +175,7 @@ async function configInit(args: string[]): Promise<void> {
   }
   
   // Merge with defaults to get complete config
-  const config = { ...DEFAULT_CONFIG, ...template } as DeepReefConfig
+  const config = { ...DEFAULT_CONFIG, ...template } as CovaloConfig
   
   // Create directory if needed
   const dir = dirname(targetPath)
@@ -219,7 +219,7 @@ async function configEdit(args: string[]): Promise<void> {
   try {
     spawnSync(editorCmd, editorArgs, { stdio: "inherit" })
     console.log(`Config file edited: ${targetPath}`)
-    console.log(`Run 'deepreef config validate' to check your changes.`)
+    console.log(`Run 'covalo config validate' to check your changes.`)
   } catch (error) {
     console.error(`Failed to open editor: ${error instanceof Error ? error.message : String(error)}`)
     process.exit(1)
@@ -352,7 +352,7 @@ function parseEditOptions(args: string[]): ConfigCommandOptions {
   return options
 }
 
-function redactSecrets(config: DeepReefConfig): DeepReefConfig {
+function redactSecrets(config: CovaloConfig): CovaloConfig {
   const redacted = { ...config }
   
   // Redact provider API keys

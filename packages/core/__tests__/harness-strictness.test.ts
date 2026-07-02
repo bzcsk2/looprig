@@ -148,9 +148,9 @@ describe("readProjectHarnessConfig / writeProjectHarnessConfig", () => {
   })
 
   it("returns null for corrupt JSON", () => {
-    const deepreefDir = resolve(TEST_DIR, ".deepreef")
-    mkdirSync(deepreefDir, { recursive: true })
-    writeFileSync(resolve(deepreefDir, "harness.json"), "not-json", "utf-8")
+    const covaloDir = resolve(TEST_DIR, ".covalo")
+    mkdirSync(covaloDir, { recursive: true })
+    writeFileSync(resolve(covaloDir, "harness.json"), "not-json", "utf-8")
     expect(readProjectHarnessConfig(TEST_DIR)).toBeNull()
   })
 })

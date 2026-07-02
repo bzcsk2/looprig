@@ -1,4 +1,4 @@
-import type { AgentTool, ToolResult } from "@deepreef/core"
+import type { AgentTool, ToolResult } from "@covalo/core"
 import type { MemoryService } from "./memory-service.js"
 
 function ok(content: unknown): ToolResult {

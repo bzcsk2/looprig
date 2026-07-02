@@ -93,7 +93,7 @@ confirm_dangerous_tool_policy = true
 
 [logging]
 level = "info"
-path = ".deepreef/logs"
+path = ".covalo/logs"
 events_jsonl = true
 mailbox_jsonl = true
 workflow_jsonl = true

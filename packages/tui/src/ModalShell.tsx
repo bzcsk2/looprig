@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Dialog, useTerminalSize } from '@deepreef/ink';
+import { Box, Dialog, useTerminalSize } from '@covalo/ink';
 import { TONE, SURFACE } from './reasonix/tokens.js';
 
 /**

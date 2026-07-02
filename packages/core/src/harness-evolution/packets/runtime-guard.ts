@@ -1,6 +1,6 @@
 import type { PacketBase, EvidenceRef } from "./types";
 
-export const RUNTIME_GUARD_SCHEMA_VERSION = "looprig.runtime-guard.v1";
+export const RUNTIME_GUARD_SCHEMA_VERSION = "covalo.runtime-guard.v1";
 
 export type RuntimeGuardDisposition = "allow" | "review" | "block";
 

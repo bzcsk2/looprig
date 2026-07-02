@@ -1,4 +1,4 @@
 import React from "react"
-import { wrappedRender as render } from "@deepreef/ink"
-import { App } from "@deepreef/tui"
+import { wrappedRender as render } from "@covalo/ink"
+import { App } from "@covalo/tui"
 console.log('imports done')

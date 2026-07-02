@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process"
 import { resolve } from "node:path"
-import type { AgentTool, ToolProgressUpdate } from "@deepreef/core"
+import type { AgentTool, ToolProgressUpdate } from "@covalo/core"
 import { safeStringify, hasBinaryEncoding } from "./safe-stringify.js"
 import { normalizePlatform } from "./platform/capabilities.js"
 import { terminateProcessTree } from "./platform/process-tree.js"

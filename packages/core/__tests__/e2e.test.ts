@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import { ReasonixEngine } from "../src/engine.js"
 import type { LoopEvent } from "../src/interface.js"
-import { createWriteFileTool, createReadFileTool, createEditTool, createBashTool } from "@deepreef/tools"
+import { createWriteFileTool, createReadFileTool, createEditTool, createBashTool } from "@covalo/tools"
 import { mkdtempSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs"
 import { join, resolve } from "node:path"
 
@@ -78,7 +78,7 @@ function genTool(name: string, args: Record<string, unknown>) {
 describe("TT2: E2E tool chains through engine", () => {
   let tmpDir: string
 
-  beforeEach(() => { tmpDir = mkdtempSync(join(process.cwd(), ".deepreef-test-e2e-")) })
+  beforeEach(() => { tmpDir = mkdtempSync(join(process.cwd(), ".covalo-test-e2e-")) })
   afterEach(() => { rmSync(tmpDir, { recursive: true, force: true }) })
 
   it("write_file → read_file chain", async () => {
@@ -105,7 +105,7 @@ describe("TT2: E2E tool chains through engine", () => {
     const filePath = join(tmpDir, "edit-me.txt")
     mockClient.setGenerators([
       genWrite(filePath, "hello world"),
-      genEdit(filePath, "world", "deepreef"),
+      genEdit(filePath, "world", "covalo"),
       genRead(filePath),
       genText("done"),
     ])
@@ -115,13 +115,13 @@ describe("TT2: E2E tool chains through engine", () => {
     engine.registerTool(createReadFileTool())
     const events: LoopEvent[] = []
     for await (const e of engine.submit("write edit read")) events.push(e)
-    expect(readFileSync(filePath, "utf-8")).toBe("hello deepreef")
+    expect(readFileSync(filePath, "utf-8")).toBe("hello covalo")
     const tools = events.filter((e) => e.role === "tool")
     expect(tools).toHaveLength(3)
     expect(tools[0].toolName).toBe("write_file")
     expect(tools[1].toolName).toBe("edit")
     expect(tools[2].toolName).toBe("read_file")
-    expect(tools[2].content).toContain("hello deepreef")
+    expect(tools[2].content).toContain("hello covalo")
   })
 
   it("bash execution through engine", async () => {

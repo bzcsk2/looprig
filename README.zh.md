@@ -1,4 +1,4 @@
-# 🌊 LoopRig
+# 🌊 Covalo
 
 <p align="center">
   <a href="./README.md">English</a> |
@@ -14,17 +14,17 @@
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License" />
 </p>
 
-**LoopRig 是一个终端原生 AI Loop Agent，目标是让便宜、免费、本地模型也能稳定交付工程任务。**
+**Covalo 是一个终端原生 AI Loop Agent，目标是让便宜、免费、本地模型也能稳定交付工程任务。**
 
-大部分 AI 编程工具默认依赖昂贵的头部模型来保证质量。LoopRig 的设计哲学不同：让更强的模型负责规划、监督、审查和纠偏，让便宜/免费/本地模型负责大量施工，再通过明确的执行闭环、证据汇报、失败恢复和权限边界把任务做完。
+大部分 AI 编程工具默认依赖昂贵的头部模型来保证质量。Covalo 的设计哲学不同：让更强的模型负责规划、监督、审查和纠偏，让便宜/免费/本地模型负责大量施工，再通过明确的执行闭环、证据汇报、失败恢复和权限边界把任务做完。
 
-> LoopRig 不是要否定强模型，而是把强模型用在最有价值的位置，让弱模型也能持续工作。
+> Covalo 不是要否定强模型，而是把强模型用在最有价值的位置，让弱模型也能持续工作。
 
 ---
 
-## LoopRig 经济学
+## Covalo 经济学
 
-LoopRig 关注的是 AI 编程进入长期工作流之后的真实成本：
+Covalo 关注的是 AI 编程进入长期工作流之后的真实成本：
 
 - 强模型负责关键判断，而不是每一步都亲自施工。
 - Worker 可以使用免费模型、低价 API 模型或本地 OpenAI-compatible 模型。
@@ -37,7 +37,7 @@ LoopRig 关注的是 AI 编程进入长期工作流之后的真实成本：
 
 ## ⚔️ 双 Agent Workflow
 
-LoopRig 摒弃容易自我迷失的单体无限 Loop，采用固定双角色 Workflow：
+Covalo 摒弃容易自我迷失的单体无限 Loop，采用固定双角色 Workflow：
 
 ```text
 Supervisor 分析
@@ -64,23 +64,23 @@ Supervisor 使用更强的模型，负责规划、审查、失败识别、恢复
 ### 全局安装
 
 ```bash
-npm install -g @deepreef/cli
+npm install -g @covalo/cli
 ```
 
 也可以使用 Bun：
 
 ```bash
-bun install -g @deepreef/cli
+bun install -g @covalo/cli
 ```
 
 ### 在项目中启动
 
 ```bash
 cd your-project
-looprig
+covalo
 ```
 
-进入 LoopRig 后，优先使用：
+进入 Covalo 后，优先使用：
 
 ```text
 /help
@@ -93,8 +93,8 @@ looprig
 ### 从源码运行
 
 ```bash
-git clone https://github.com/bzcsk2/looprig.git
-cd looprig
+git clone https://github.com/bzcsk2/covalo.git
+cd covalo
 bun install
 bun run dev
 ```
@@ -152,7 +152,7 @@ bun run dev
 
 ## 🏗️ 软件架构
 
-LoopRig 采用核壳分离设计：
+Covalo 采用核壳分离设计：
 
 ```text
 packages/core      -> 推理循环、API 适配、上下文管理、缓存、工具修复、workflow 基础
@@ -170,7 +170,7 @@ packages/cli       -> 命令行入口
 
 ## 📡 模型与 Provider
 
-LoopRig 不绑定单一模型供应商。运行时真正关心的是：
+Covalo 不绑定单一模型供应商。运行时真正关心的是：
 
 ```ts
 {
@@ -196,7 +196,7 @@ LoopRig 不绑定单一模型供应商。运行时真正关心的是：
 
 ## 🛡️ 安全边界
 
-LoopRig 可以读取文件、编辑文件、运行命令和调用工具。它是强大的本地工程助手，不是完全隔离的安全沙箱。
+Covalo 可以读取文件、编辑文件、运行命令和调用工具。它是强大的本地工程助手，不是完全隔离的安全沙箱。
 
 当前安全策略包括：
 
@@ -209,13 +209,13 @@ LoopRig 可以读取文件、编辑文件、运行命令和调用工具。它是
 - 子 Agent 权限隔离。
 - API Key 文件默认被 Git 忽略。
 
-不要在你不愿意审查 agent 修改结果的仓库中运行 LoopRig。
+不要在你不愿意审查 agent 修改结果的仓库中运行 Covalo。
 
 ---
 
 ## 🗺️ 项目状态
 
-LoopRig 当前处于 **pre-1.0** 阶段。
+Covalo 当前处于 **pre-1.0** 阶段。
 
 | 模块 | 状态 |
 | --- | --- |
@@ -241,7 +241,7 @@ bun run build
 npm pack --dry-run
 ```
 
-发布包名是 `@deepreef/cli`，命令行入口是 `looprig`。
+发布包名是 `@covalo/cli`，命令行入口是 `covalo`。
 
 ---
 

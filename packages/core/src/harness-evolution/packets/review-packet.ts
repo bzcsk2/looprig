@@ -1,6 +1,6 @@
 import type { PacketBase, EvidenceRef, ReviewVerdict } from "./types";
 
-export const REVIEW_PACKET_SCHEMA_VERSION = "looprig.review-packet.v1";
+export const REVIEW_PACKET_SCHEMA_VERSION = "covalo.review-packet.v1";
 
 export const REVIEW_FINDING_CATEGORIES = [
   "correctness",

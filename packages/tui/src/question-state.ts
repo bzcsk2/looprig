@@ -7,7 +7,7 @@
  * Multi-question flows use tabs and a final confirmation step.
  */
 
-import type { QuestionInfo, QuestionRequest } from "@deepreef/core"
+import type { QuestionInfo, QuestionRequest } from "@covalo/core"
 
 export interface QuestionBodyState {
   requestId: string

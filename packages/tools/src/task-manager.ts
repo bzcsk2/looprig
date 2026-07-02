@@ -21,7 +21,7 @@ export class TaskManager {
 
   constructor(baseDir?: string) {
     const dir = baseDir ?? process.cwd()
-    this.filePath = resolve(dir, ".deepreef", "tasks.json")
+    this.filePath = resolve(dir, ".covalo", "tasks.json")
     this.load()
   }
 

@@ -55,16 +55,16 @@ describe("buildSystemPrompt locale", () => {
     setPromptLocale("zh-CN");
   });
 
-  test("zh-CN contains '你是 LoopRig'", () => {
+  test("zh-CN contains '你是 Covalo'", () => {
     const prompt = buildSystemPrompt(".", { locale: "zh-CN" });
-    expect(prompt).toContain("你是 LoopRig");
-    expect(prompt).not.toContain("deepreef");
+    expect(prompt).toContain("你是 Covalo");
+    expect(prompt).not.toContain("covalo");
   });
 
-  test("en contains 'You are LoopRig'", () => {
+  test("en contains 'You are Covalo'", () => {
     const prompt = buildSystemPrompt(".", { locale: "en" });
-    expect(prompt).toContain("You are LoopRig");
-    expect(prompt).not.toContain("deepreef");
+    expect(prompt).toContain("You are Covalo");
+    expect(prompt).not.toContain("covalo");
   });
 
   test("zh-CN includes environment info", () => {
@@ -84,7 +84,7 @@ describe("buildSystemPrompt locale", () => {
   test("defaults to getPromptLocale() when locale not passed", () => {
     setPromptLocale("en");
     const prompt = buildSystemPrompt(".");
-    expect(prompt).toContain("You are LoopRig");
+    expect(prompt).toContain("You are Covalo");
     expect(prompt).not.toContain("你是");
   });
 });

@@ -36,7 +36,7 @@ describe("runEval", () => {
     const result = await runEval(options, createMockExecutors())
 
     expect(result.evalRunId).toBeTruthy()
-    expect(result.reportDir).toContain(".deepreef/evals/")
+    expect(result.reportDir).toContain(".covalo/evals/")
     expect(result.runs.length).toBe(4) // 2 models x 2 cases
     expect(result.leaderboard.length).toBe(2)
 
@@ -104,7 +104,7 @@ describe("runEval", () => {
   })
 
   it("persists eval report to disk", async () => {
-    const tmpDir = mkdtempSync(join(tmpdir(), "deepreef-eval-"))
+    const tmpDir = mkdtempSync(join(tmpdir(), "covalo-eval-"))
     const originalCwd = process.cwd
     // Override cwd to use temp dir
     process.cwd = () => tmpDir
@@ -118,7 +118,7 @@ describe("runEval", () => {
 
       const result = await runEval(options, createMockExecutors())
 
-      const reportDir = join(tmpDir, ".deepreef", "evals", result.evalRunId)
+      const reportDir = join(tmpDir, ".covalo", "evals", result.evalRunId)
       expect(existsSync(reportDir)).toBe(true)
       expect(existsSync(join(reportDir, "meta.json"))).toBe(true)
       expect(existsSync(join(reportDir, "summary.json"))).toBe(true)
@@ -135,7 +135,7 @@ describe("runEval", () => {
       expect(scores.length).toBe(1)
 
       // Verify EvalReportStore can read it back
-      const store = new EvalReportStore(join(tmpDir, ".deepreef", "evals"))
+      const store = new EvalReportStore(join(tmpDir, ".covalo", "evals"))
       const loadedMeta = store.loadMeta(result.evalRunId)
       expect(loadedMeta).not.toBeNull()
       expect(loadedMeta!.evalRunId).toBe(result.evalRunId)

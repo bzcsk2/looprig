@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from 'bun:test';
 import { OrchestrationStore } from '../src/store/orchestration-store.js';
-import type { OrchestrationEventPayload, WorkerSnapshot, SupervisorSnapshot, LoopTransition, RuntimeSignal } from '@deepreef/core';
+import type { OrchestrationEventPayload, WorkerSnapshot, SupervisorSnapshot, LoopTransition, RuntimeSignal } from '@covalo/core';
 
 function makeWorkerUpsert(overrides: Partial<WorkerSnapshot> & { id: string }): OrchestrationEventPayload {
   return {

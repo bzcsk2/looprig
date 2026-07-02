@@ -1,5 +1,5 @@
 {
-  "name": "@deepreef/core",
+  "name": "@covalo/core",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -20,8 +20,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@deepreef/security": "workspace:*",
-    "@deepreef/tools": "workspace:*",
+    "@covalo/security": "workspace:*",
+    "@covalo/tools": "workspace:*",
     "zod": "4.4.3",
     "smol-toml": "^1.7.0"
   }

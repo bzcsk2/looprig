@@ -3,7 +3,7 @@ import { PatchProposer, determinePatchRisk, generatePatchId } from "../src/harne
 import { SurfaceStore } from "../src/harness-evolution/surfaces/surface-store";
 import type { Weakness } from "../src/harness-evolution/experience/weakness-miner";
 
-const TEST_BASE = "/tmp/looprig-test-proposer-" + Math.random().toString(36).slice(2, 8);
+const TEST_BASE = "/tmp/covalo-test-proposer-" + Math.random().toString(36).slice(2, 8);
 
 function makeWeakness(overrides: Partial<Weakness> = {}): Weakness {
   return {
@@ -31,7 +31,7 @@ describe("PatchProposer", () => {
     const weakness = makeWeakness();
     const patch = await proposer.proposeFromWeakness(weakness);
 
-    expect(patch.schemaVersion).toBe("looprig.harness-patch.v1");
+    expect(patch.schemaVersion).toBe("covalo.harness-patch.v1");
     expect(patch.surface).toBe("worker-system-prompt");
     expect(patch.weaknessIds).toEqual(["weak:test_sig"]);
     expect(patch.patchId).toMatch(/^p:/);

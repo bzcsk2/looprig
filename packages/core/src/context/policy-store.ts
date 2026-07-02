@@ -4,7 +4,7 @@ import type { ContextPolicy } from "./policy.js"
 import { DEFAULT_CONTEXT_POLICY, validateContextPolicy } from "./policy.js"
 
 const CONTEXT_FILE_NAME = "context.json"
-const CONTEXT_DIR = ".deepreef"
+const CONTEXT_DIR = ".covalo"
 
 export class ContextPolicyStore {
   private filePath: string

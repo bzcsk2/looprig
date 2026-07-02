@@ -1,6 +1,6 @@
 import type { PacketBase, EvidenceRef } from "./types";
 
-export const TASK_DIGEST_SCHEMA_VERSION = "looprig.task-digest.v1";
+export const TASK_DIGEST_SCHEMA_VERSION = "covalo.task-digest.v1";
 
 export interface ContextFileEntry {
   path: string;

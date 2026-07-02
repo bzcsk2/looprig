@@ -134,7 +134,7 @@ describe("matchSkills", () => {
 describe("loadSkillsDirs", () => {
   let tmpDir: string
   beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "deepreef-skills-"))
+    tmpDir = mkdtempSync(join(tmpdir(), "covalo-skills-"))
   })
   afterEach(() => {
     try { rmSync(tmpDir, { recursive: true, force: true }) } catch {}

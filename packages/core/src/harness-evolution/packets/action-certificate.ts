@@ -1,6 +1,6 @@
 import type { PacketBase } from "./types";
 
-export const ACTION_CERTIFICATE_SCHEMA_VERSION = "looprig.action-certificate.v1";
+export const ACTION_CERTIFICATE_SCHEMA_VERSION = "covalo.action-certificate.v1";
 
 export type RiskLevel = "low" | "medium" | "high";
 

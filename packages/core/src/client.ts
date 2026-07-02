@@ -354,7 +354,7 @@ export class DeepSeekClient implements ChatClient {
           try {
             json = JSON.parse(payload) as SSEChunk
           } catch {
-            if (process.env.DEEPREEF_DEBUG) {
+            if (process.env.COVALO_DEBUG) {
               console.debug("[SSE] JSON parse failed:", payload.slice(0, 200))
             }
             if (diagnosticsEnabled) requestLogger.debug("api.sse.parse_error", { payloadLength: payload.length })

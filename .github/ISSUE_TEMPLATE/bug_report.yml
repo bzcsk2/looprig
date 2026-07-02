@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible DeepReef bug
+description: Report a reproducible Covalo bug
 title: "bug: "
 labels: [bug]
 body:
@@ -16,7 +16,7 @@ body:
       label: Reproduction steps
       description: Provide the smallest sequence of commands or interactions that reproduces the issue.
       placeholder: |
-        1. Run `deepreef`
+        1. Run `covalo`
         2. Select ...
         3. Execute ...
         4. Observe ...
@@ -37,7 +37,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: DeepReef version or commit
+      label: Covalo version or commit
       placeholder: "0.1.1 or commit SHA"
     validations:
       required: true

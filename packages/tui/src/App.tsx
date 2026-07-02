@@ -1,14 +1,14 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Box, AlternateScreen, instances, SHOW_CURSOR, EXIT_ALT_SCREEN, useInput } from '@deepreef/ink';
-import type { ScrollBoxHandle } from '@deepreef/ink';
+import { Box, AlternateScreen, instances, SHOW_CURSOR, EXIT_ALT_SCREEN, useInput } from '@covalo/ink';
+import type { ScrollBoxHandle } from '@covalo/ink';
 import { writeSync } from 'node:fs';
-import type { ReasonixEngine, LoopEvent } from '@deepreef/core';
-import type { ChatMessage, DeepreefConfig } from '@deepreef/core';
-import { PROVIDERS, AGENTS, defaultAgentRegistry, getModelContextWindow, saveLastConfig, saveRoleConfig, loadAgentProfiles, saveAgentProfiles, updateAgentProfile, selectBenchmarkCases, FREE_MODEL_TARGETS, resolveApiKey, loadRoleConfig, getCategory, getSuite, runFixedEval, saveEvalReport } from '@deepreef/core';
-import { resolveHarnessStrictness, readProjectHarnessConfig, writeProjectHarnessConfig } from '@deepreef/core';
+import type { ReasonixEngine, LoopEvent } from '@covalo/core';
+import type { ChatMessage, DeepreefConfig } from '@covalo/core';
+import { PROVIDERS, AGENTS, defaultAgentRegistry, getModelContextWindow, saveLastConfig, saveRoleConfig, loadAgentProfiles, saveAgentProfiles, updateAgentProfile, selectBenchmarkCases, FREE_MODEL_TARGETS, resolveApiKey, loadRoleConfig, getCategory, getSuite, runFixedEval, saveEvalReport } from '@covalo/core';
+import { resolveHarnessStrictness, readProjectHarnessConfig, writeProjectHarnessConfig } from '@covalo/core';
 import { createBridge, timelineFromMessages, type BridgeState } from './bridge.js';
-import type { DualAgentRuntime } from '@deepreef/core/dual-agent-runtime/dual-runtime.js';
-import type { WorkflowCoordinator } from '@deepreef/core/workflow-coordinator/coordinator.js';
+import type { DualAgentRuntime } from '@covalo/core/dual-agent-runtime/dual-runtime.js';
+import type { WorkflowCoordinator } from '@covalo/core/workflow-coordinator/coordinator.js';
 import { TranscriptProvider } from './store/TranscriptContext.js';
 import { BridgeRuntimeProvider } from './store/BridgeRuntimeContext.js';
 import { isBridgeRuntimeSplitEnabled, isTranscriptStoreEnabled } from './store/feature.js';
@@ -32,11 +32,11 @@ import { ContextModal } from './ContextModal.js';
 import { formatStatus } from './status/format.js';
 import { t, setLocale, getLocale, dicts } from './i18n/index.js';
 import { loadLang } from './i18n/persist.js';
-import { setPromptLocale, savePromptLocaleToDisk } from '@deepreef/core';
+import { setPromptLocale, savePromptLocaleToDisk } from '@covalo/core';
 import type { Locale } from './i18n/strings.js';
 import { LocaleProvider } from './i18n/context.js';
 import { loadTuiSettings, saveTuiSettings, type WorkflowMode } from './settings.js';
-import { GoalStore, GoalRuntime } from '@deepreef/core/goal/index.js';
+import { GoalStore, GoalRuntime } from '@covalo/core/goal/index.js';
 import {
   buildHelpText,
   parseSlashCommand,
@@ -201,7 +201,7 @@ function parseSkillDetail(content: string): SkillRecord {
  */
 async function loadTaggedSkills(names: string[]): Promise<SkillRecord[]> {
   if (names.length === 0) return [];
-  const { createSkillTool } = await import('@deepreef/tools');
+  const { createSkillTool } = await import('@covalo/tools');
   const tool = createSkillTool();
   const loaded: SkillRecord[] = [];
   for (const name of names) {
@@ -418,7 +418,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
   const [showWorkflowMenu, setShowWorkflowMenu] = useState(false);
   const [showEvalWizard, setShowEvalWizard] = useState(false);
   // Eval state for live EvalRunPanel display
-  const [evalState, setEvalState] = useState<{ running: boolean; categoryId: string; suiteId: string; environmentId: string; latestEvent: import('@deepreef/core').EvalProgressEvent | null }>({
+  const [evalState, setEvalState] = useState<{ running: boolean; categoryId: string; suiteId: string; environmentId: string; latestEvent: import('@covalo/core').EvalProgressEvent | null }>({
     running: false, categoryId: '', suiteId: '', environmentId: '', latestEvent: null,
   });
   // ADV-HAR-01: Harness 三档严格度状态
@@ -506,7 +506,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
   // Fixed eval: 跟踪 evalAbortRef 供 /eval-cancel 使用
   const evalAbortRef = useRef<AbortController | null>(null);
   const startFixedEval = useCallback(async (categoryId: string, suiteId: string, environmentId?: string) => {
-    const { resolveEvalEnvironment } = await import('@deepreef/core/sandbox/types.js');
+    const { resolveEvalEnvironment } = await import('@covalo/core/sandbox/types.js');
     const env = resolveEvalEnvironment(environmentId ?? '');
     const category = getCategory(categoryId as any);
     const suite = getSuite(categoryId as any, suiteId as any, env as any);
@@ -765,7 +765,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
       if (['doctor', 'mine', 'propose', 'validate', 'promote', 'history', 'rollback'].includes(command.subcommand ?? '')) {
         appendMessage({
           role: 'assistant' as const,
-          content: '这个命令在 CLI 下更合适。请在终端中运行:\n  looprig harness ' + command.subcommand + (command.arg ? ' ' + command.arg : ''),
+          content: '这个命令在 CLI 下更合适。请在终端中运行:\n  covalo harness ' + command.subcommand + (command.arg ? ' ' + command.arg : ''),
         });
         return;
       }
@@ -849,7 +849,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
       const caseTags = command.cases ?? ['smoke', 'easy']
       const limit = command.limit ?? 3
       const dryRun = command.dryRun ?? false
-      const selectedCases: import('@deepreef/core').AgentBenchmarkCase[] = selectBenchmarkCases(caseTags)
+      const selectedCases: import('@covalo/core').AgentBenchmarkCase[] = selectBenchmarkCases(caseTags)
       const effectiveLimit = dryRun ? (limit > 0 ? limit : selectedCases.length) : (limit > 0 ? limit : selectedCases.length)
       const finalCases = selectedCases.slice(0, effectiveLimit)
       const totalRuns = models.length * finalCases.length
@@ -965,7 +965,7 @@ export function App({ engine, config, pluginCount = 0, contentPackCount = 0, ass
     // /config 命令 — 配置管理
     if (command?.name === 'config') {
       void (async () => {
-        const { ConfigManager } = await import('@deepreef/core');
+        const { ConfigManager } = await import('@covalo/core');
         const configManager = await ConfigManager.create({ cwd: process.cwd() });
         const configPath = configManager.getProjectConfigPath();
 

@@ -19,7 +19,7 @@ export interface TuiSettings {
   workflowMode?: WorkflowMode;
 }
 
-const SETTINGS_DIR = '.deepreef';
+const SETTINGS_DIR = '.covalo';
 const SETTINGS_FILE = 'ui-settings.json';
 
 function settingsPath(): string {

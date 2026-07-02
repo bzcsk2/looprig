@@ -9,7 +9,7 @@ import { InMemoryKV } from "../src/mcp/in-memory-kv.js"
 import { parseJsonlText } from "../src/replay/jsonl-parser.js"
 
 function tempDir(): string {
-  return mkdtempSync(join(tmpdir(), "deepreef-mem-test-"))
+  return mkdtempSync(join(tmpdir(), "covalo-mem-test-"))
 }
 
 describe("F1: MemoryStore path traversal protection", () => {
@@ -181,9 +181,9 @@ describe("F4: InMemoryKV auto-persist and atomic write", () => {
     kv.set("scope", "key", "val")
     const files = readFileSync(persistPath, "utf-8")
     expect(files).toBeTruthy()
-    // No .deepreef_tmp_ files should remain
+    // No .covalo_tmp_ files should remain
     const dirFiles = readdirSync(dir)
-    expect(dirFiles.filter((f: string) => f.includes("deepreef_tmp")).length).toBe(0)
+    expect(dirFiles.filter((f: string) => f.includes("covalo_tmp")).length).toBe(0)
   })
 })
 

@@ -7,7 +7,7 @@
  * Adapted from gemini-cli for Deepreef.
  */
 
-import type { PermissionRequest, QuestionRequest } from '@deepreef/core';
+import type { PermissionRequest, QuestionRequest } from '@covalo/core';
 
 export type ActiveDialogKind = 'permission' | 'question' | null;
 

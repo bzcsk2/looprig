@@ -6,9 +6,9 @@
  * 修复：自定义输入的 backspace 和字符追加逻辑（原代码误用 useInput 的 input 参数）。
  */
 
-import { Box, Text, useInput } from '@deepreef/ink';
+import { Box, Text, useInput } from '@covalo/ink';
 import React, { useState, useCallback, useMemo } from 'react';
-import type { QuestionRequest } from '@deepreef/core';
+import type { QuestionRequest } from '@covalo/core';
 import {
   createQuestionBodyState,
   questionSingle,

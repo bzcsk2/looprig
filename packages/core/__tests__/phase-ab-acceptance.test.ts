@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto"
 import { GoalStore } from "../src/goal/store.js"
 import { WorkflowCoordinator } from "../src/workflow-coordinator/coordinator.js"
 
-const TEST_DIR = resolve(process.cwd(), ".deepreef-test-accept")
+const TEST_DIR = resolve(process.cwd(), ".covalo-test-accept")
 
 describe("/goal 用户命令验收", () => {
   let store: GoalStore

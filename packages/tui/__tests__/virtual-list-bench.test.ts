@@ -5,7 +5,7 @@
 
 import { describe, it } from 'bun:test';
 import type { TimelineItem, TurnView } from '../src/bridge.js';
-import type { ChatMessage } from '@deepreef/core';
+import type { ChatMessage } from '@covalo/core';
 
 function makeTurn(id: string, textLen: number, toolCount: number): TimelineItem {
   const tools = Array.from({ length: toolCount }, (_, i) => ({

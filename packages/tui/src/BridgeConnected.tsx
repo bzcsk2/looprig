@@ -1,6 +1,6 @@
 import React from 'react';
-import { Box, Text } from '@deepreef/ink';
-import type { PermissionRequest, QuestionRequest } from '@deepreef/core';
+import { Box, Text } from '@covalo/ink';
+import type { PermissionRequest, QuestionRequest } from '@covalo/core';
 import { DeepiPromptInput, type DeepiPromptInputHandle } from './DeepiPromptInput.js';
 import { StatusBar } from './StatusBar.js';
 import { PermissionPrompt } from './PermissionPrompt.js';

@@ -3,8 +3,8 @@ import { readPluginConfig, type PluginConfigError } from "./config.js"
 import { loadPlugins, type PluginLoaded, type PluginLoadError } from "./loader.js"
 import { extractToolsFromPlugins, pluginToolsToToolSpecs, type PluginTool, type PluginToolError } from "./tool-adapter.js"
 import { PluginHookRegistry } from "./hook-adapter.js"
-import type { HookManager, ToolCallHooks } from "@deepreef/security"
-import type { AgentDefinition, ToolSpec } from "@deepreef/core"
+import type { HookManager, ToolCallHooks } from "@covalo/security"
+import type { AgentDefinition, ToolSpec } from "@covalo/core"
 import { resolve, dirname, basename } from "node:path"
 import { resolveContentPack } from "./content-pack/resolver.js"
 import { isDirectory } from "./content-pack/discovery.js"
@@ -64,7 +64,7 @@ export class PluginRuntime {
     if (this.initialized) return
 
     const workspaceRoot = this.options.workspaceRoot ?? process.cwd()
-    const configPath = this.options.configPath ?? resolve(workspaceRoot, ".deepreef", "plugins.json")
+    const configPath = this.options.configPath ?? resolve(workspaceRoot, ".covalo", "plugins.json")
 
     const configResult = readPluginConfig(configPath)
     if (configResult.errors.length > 0) {

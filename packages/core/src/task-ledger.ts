@@ -76,8 +76,8 @@ const PLAN_HINTS = [
  */
 export function shouldCreateLedger(userMessage: string): boolean {
   if (typeof userMessage !== "string" || userMessage.length === 0) return false
-  if (process.env.DEEPREEF_TASK_LEDGER === "false") return false
-  if (process.env.DEEPREEF_TASK_LEDGER === "true") return true
+  if (process.env.COVALO_TASK_LEDGER === "false") return false
+  if (process.env.COVALO_TASK_LEDGER === "true") return true
 
   if (userMessage.length > 300) return true
   if (PLAN_HINTS.some(p => p.test(userMessage))) return true

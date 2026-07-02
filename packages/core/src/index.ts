@@ -330,7 +330,7 @@ export {
 export type { ConfigChangeListener } from "./config/manager.js"
 
 export {
-  DeepReefConfigSchema,
+  CovaloConfigSchema,
   ProviderConfigSchema,
   AgentConfigSchema,
   AgentsConfigSchema,
@@ -358,7 +358,7 @@ export type {
   ConfigSource,
   ConfigWarning,
   ConfigLoadOptions,
-  DeepReefConfig,
+  CovaloConfig,
 } from "./config/schema.js"
 
 export {
@@ -517,7 +517,7 @@ export {
   SupervisorBudgetTracker,
   scoreSupervisorCandidate,
   selectSupervisorCandidate,
-  DEEPREEF_SUPERVISOR_SMOKE_ENV,
+  COVALO_SUPERVISOR_SMOKE_ENV,
   isSupervisorSmokeEnabled,
   runSupervisorSmokeTest,
   runSupervisorPoolSmokeTests,

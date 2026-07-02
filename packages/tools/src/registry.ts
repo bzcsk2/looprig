@@ -1,5 +1,5 @@
-import type { AgentTool } from "@deepreef/core"
-import type { ToolSpec } from "@deepreef/core"
+import type { AgentTool } from "@covalo/core"
+import type { ToolSpec } from "@covalo/core"
 
 export class ToolRegistry {
   private tools = new Map<string, AgentTool>()

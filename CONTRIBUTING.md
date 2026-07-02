@@ -1,6 +1,6 @@
-# Contributing to DeepReef
+# Contributing to Covalo
 
-Thanks for considering a contribution. DeepReef is a pre-1.0 project, so the most valuable contributions are those that improve reliability, installation quality, documentation, safety, and weak/local model behavior.
+Thanks for considering a contribution. Covalo is a pre-1.0 project, so the most valuable contributions are those that improve reliability, installation quality, documentation, safety, and weak/local model behavior.
 
 ## Good Contribution Areas
 
@@ -18,8 +18,8 @@ Thanks for considering a contribution. DeepReef is a pre-1.0 project, so the mos
 ## Development Setup
 
 ```bash
-git clone https://github.com/bzcsk2/DeepReef.git
-cd DeepReef
+git clone https://github.com/bzcsk2/Covalo.git
+cd Covalo
 bun install
 bun run typecheck
 bun test
@@ -37,7 +37,7 @@ Before opening a pull request:
 4. Run the relevant test command.
 5. Run `bun run build` for CLI or package changes.
 6. Update documentation when changing commands, config, provider behavior, workflow behavior, or public-facing UX.
-7. Avoid committing local secrets, generated sessions, `.env`, `api-key`, `.deepreef/`, `dist/`, or logs.
+7. Avoid committing local secrets, generated sessions, `.env`, `api-key`, `.covalo/`, `dist/`, or logs.
 
 ## Commit Style
 
@@ -55,7 +55,7 @@ Use concise conventional-style commit prefixes when practical:
 
 When filing a bug, include:
 
-- DeepReef version or commit
+- Covalo version or commit
 - OS and terminal
 - Node and Bun versions
 - command used

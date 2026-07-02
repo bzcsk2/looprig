@@ -1,4 +1,4 @@
-import type { QuestionRequest, PermissionRequest } from '@deepreef/core';
+import type { QuestionRequest, PermissionRequest } from '@covalo/core';
 import { SubscribeStore } from './subscribe-store.js';
 
 export interface TokenUsage {

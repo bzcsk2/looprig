@@ -1,0 +1,6 @@
+{"ts":1781249714319,"type":"messages","payload":[{"role":"system","content":"You are a full-stack engineering agent with access to a complete toolset.\nYou can read, write, edit files, run bash commands, search code, and manage tasks.\nAlways verify your changes — re-read files after editing when needed."},{"role":"user","content":"hi"}]}
+{"ts":1781249714319,"type":"stats","payload":{"promptTokens":1,"completionTokens":1,"cacheHitTokens":0,"cacheMissTokens":0,"apiCalls":0,"toolCalls":0,"totalCost":0.0000024999999999999998}}
+{"ts":1781249714319,"type":"event","payload":{"role":"assistant_delta","content":"final"}}
+{"ts":1781249714319,"type":"stats","payload":{"promptTokens":2,"completionTokens":2,"cacheHitTokens":0,"cacheMissTokens":0,"apiCalls":1,"toolCalls":0,"totalCost":0.0000049999999999999996}}
+{"ts":1781249714319,"type":"messages","payload":[{"role":"system","content":"You are a full-stack engineering agent with access to a complete toolset.\nYou can read, write, edit files, run bash commands, search code, and manage tasks.\nAlways verify your changes — re-read files after editing when needed."},{"role":"user","content":"hi"},{"role":"assistant","content":"final"}]}
+{"ts":1781249714319,"type":"event","payload":{"role":"done","metadata":{"reason":"stop"}}}

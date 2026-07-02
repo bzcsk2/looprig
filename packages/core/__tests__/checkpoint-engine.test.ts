@@ -13,7 +13,7 @@ import {
 import type { SessionCheckpointEnvelope } from "../src/checkpoint/checkpoint-envelope.js"
 
 async function makeTempDir(): Promise<string> {
-  return fs.mkdtemp(path.join(os.tmpdir(), "deepreef-ce-"))
+  return fs.mkdtemp(path.join(os.tmpdir(), "covalo-ce-"))
 }
 
 function buildV1Envelope(): SessionCheckpointEnvelope {

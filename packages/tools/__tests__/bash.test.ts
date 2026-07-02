@@ -123,7 +123,7 @@ describe("bash tool", () => {
 
   it("should resolve cwd relative to ctx.cwd", async () => {
     const { createBashTool } = await import("../src/shell-exec.js")
-    const tmpDir = mkdtempSync(join(tmpdir(), "deepreef-bash-cwd-"))
+    const tmpDir = mkdtempSync(join(tmpdir(), "covalo-bash-cwd-"))
     writeFileSync(join(tmpDir, "test.txt"), "cwd test")
     const tool = createBashTool()
     const r = await tool.execute({ command: "cat test.txt", cwd: tmpDir }, { cwd: "/tmp", signal: new AbortController().signal } as any)
@@ -172,7 +172,7 @@ describe("CL-21: Bash bounded output", () => {
   let dir: string
 
   beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "deepreef-cl21-"))
+    dir = mkdtempSync(join(tmpdir(), "covalo-cl21-"))
   })
 
   afterEach(() => {

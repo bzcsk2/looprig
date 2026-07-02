@@ -68,19 +68,19 @@ describe("terminal-bench-assets", () => {
     expect(existsSync(join(ws, "task.yaml"))).toBe(false);
   });
 
-  test("taskPath resolves from LOOPRIG_EVAL_ASSETS_DIR", async () => {
-    process.env.LOOPRIG_EVAL_ASSETS_DIR = TEST_DIR;
+  test("taskPath resolves from COVALO_EVAL_ASSETS_DIR", async () => {
+    process.env.COVALO_EVAL_ASSETS_DIR = TEST_DIR;
     try {
       const { getEvalAssetPath } = await import("../../assets/resolve-assets-root");
       const taskYaml = getEvalAssetPath("terminal-bench/tasks/hello-world/task.yaml");
       expect(existsSync(taskYaml)).toBe(true);
     } finally {
-      delete process.env.LOOPRIG_EVAL_ASSETS_DIR;
+      delete process.env.COVALO_EVAL_ASSETS_DIR;
     }
   });
 
   test("loadTerminalBenchManifests works with env override", async () => {
-    process.env.LOOPRIG_EVAL_ASSETS_DIR = TEST_DIR;
+    process.env.COVALO_EVAL_ASSETS_DIR = TEST_DIR;
     try {
       const { loadTerminalBenchManifests } = await import("../../sources/terminal-bench");
       const manifests = loadTerminalBenchManifests();
@@ -89,12 +89,12 @@ describe("terminal-bench-assets", () => {
       expect(ids).toContain("tb-fix-permissions");
       expect(ids).not.toContain("tb-nonexistent-task");
     } finally {
-      delete process.env.LOOPRIG_EVAL_ASSETS_DIR;
+      delete process.env.COVALO_EVAL_ASSETS_DIR;
     }
   });
 
   test("manifests load from npm-like package root without curated fallback", async () => {
-    process.env.LOOPRIG_EVAL_ASSETS_DIR = join(NPM_PKG_DIR, "resources", "eval-assets");
+    process.env.COVALO_EVAL_ASSETS_DIR = join(NPM_PKG_DIR, "resources", "eval-assets");
     try {
       const { loadTerminalBenchManifests } = await import("../../sources/terminal-bench");
       const manifests = loadTerminalBenchManifests();
@@ -106,13 +106,13 @@ describe("terminal-bench-assets", () => {
       const taskYaml = join(NPM_PKG_DIR, "resources", "eval-assets", "terminal-bench", "tasks", "hello-world", "task.yaml");
       expect(existsSync(taskYaml)).toBe(true);
     } finally {
-      delete process.env.LOOPRIG_EVAL_ASSETS_DIR;
+      delete process.env.COVALO_EVAL_ASSETS_DIR;
     }
   });
 
   test("terminalBenchMaterializer copies from npm-like package root (not curated)", async () => {
     const npmAssetsDir = join(NPM_PKG_DIR, "resources", "eval-assets");
-    process.env.LOOPRIG_EVAL_ASSETS_DIR = npmAssetsDir;
+    process.env.COVALO_EVAL_ASSETS_DIR = npmAssetsDir;
 
     try {
       const { terminalBenchMaterializer } = await import("../terminal-bench");
@@ -156,7 +156,7 @@ describe("terminal-bench-assets", () => {
       // Verify runner was created
       expect(existsSync(join(ws, "__tb_runner.py"))).toBe(true);
     } finally {
-      delete process.env.LOOPRIG_EVAL_ASSETS_DIR;
+      delete process.env.COVALO_EVAL_ASSETS_DIR;
     }
   });
 });

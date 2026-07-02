@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
-import { Box, Text, useInput } from '@deepreef/ink';
-import type { PermissionRequest, PermissionReply } from '@deepreef/core';
+import { Box, Text, useInput } from '@covalo/ink';
+import type { PermissionRequest, PermissionReply } from '@covalo/core';
 import { t } from './i18n/index.js';
 
 interface PermissionPromptProps {

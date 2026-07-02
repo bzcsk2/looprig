@@ -1,7 +1,7 @@
 import React from 'react';
-import { Box, Text } from '@deepreef/ink';
-import type { EvalCategoryId, EvalSuiteId, EvalProgressEvent, EvalEnvironmentId } from '@deepreef/core';
-import { resolveEvalEnvironment } from '@deepreef/core/sandbox/types.js';
+import { Box, Text } from '@covalo/ink';
+import type { EvalCategoryId, EvalSuiteId, EvalProgressEvent, EvalEnvironmentId } from '@covalo/core';
+import { resolveEvalEnvironment } from '@covalo/core/sandbox/types.js';
 import { ModalShell } from '../ModalShell.js';
 import { FG, TONE } from '../reasonix/tokens.js';
 import { Spinner } from '../Spinner.js';

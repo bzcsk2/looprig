@@ -4,7 +4,7 @@ import type { AgentProfilesConfig, AgentRoleProfile } from "./types.js"
 import { DEFAULT_AGENT_PROFILES } from "./types.js"
 import { validateAgentProfiles } from "./schema.js"
 
-const AGENTS_CONFIG_FILE = ".deepreef/agents.json"
+const AGENTS_CONFIG_FILE = ".covalo/agents.json"
 
 interface LegacyConfig {
   agent?: string
@@ -17,7 +17,7 @@ interface LegacyConfig {
 
 function loadLegacyConfig(): LegacyConfig | null {
   try {
-    const raw = readFileSync(resolve(process.cwd(), ".deepreef/ui-settings.json"), "utf8")
+    const raw = readFileSync(resolve(process.cwd(), ".covalo/ui-settings.json"), "utf8")
     return JSON.parse(raw) as LegacyConfig
   } catch {
     return null
@@ -97,7 +97,7 @@ function migrateLegacyFromOldFormat(parsed: Record<string, unknown>): AgentProfi
 
 export function saveAgentProfiles(config: AgentProfilesConfig): void {
   try {
-    const dir = join(process.cwd(), ".deepreef")
+    const dir = join(process.cwd(), ".covalo")
     if (!existsSync(dir)) {
       mkdirSync(dir, { recursive: true })
     }

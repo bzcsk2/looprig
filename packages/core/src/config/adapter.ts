@@ -1,4 +1,4 @@
-import type { DeepReefConfig } from "./schema.js"
+import type { CovaloConfig } from "./schema.js"
 import type { WorkflowConfig as LegacyWorkflowConfig } from "../workflow-coordinator/types.js"
 import type { GoalRuntimeConfig } from "../goal/runtime.js"
 
@@ -9,7 +9,7 @@ import type { GoalRuntimeConfig } from "../goal/runtime.js"
 /**
  * 将新的WorkflowConfig转换为WorkflowCoordinator使用的格式
  */
-export function toWorkflowCoordinatorConfig(config: DeepReefConfig): Partial<LegacyWorkflowConfig> {
+export function toWorkflowCoordinatorConfig(config: CovaloConfig): Partial<LegacyWorkflowConfig> {
   return {
     maxRounds: config.workflow.maxRounds,
     requireSupervisorPlan: config.workflow.structuredProtocol,
@@ -20,7 +20,7 @@ export function toWorkflowCoordinatorConfig(config: DeepReefConfig): Partial<Leg
 /**
  * 将新的GoalConfig转换为GoalRuntime使用的格式
  */
-export function toGoalRuntimeConfig(config: DeepReefConfig): Partial<GoalRuntimeConfig> {
+export function toGoalRuntimeConfig(config: CovaloConfig): Partial<GoalRuntimeConfig> {
   return {
     maxAutoContinuations: config.goal.maxAutoContinuations,
     maxConsecutiveTurnErrors: config.goal.maxConsecutiveTurnErrors,
@@ -30,14 +30,14 @@ export function toGoalRuntimeConfig(config: DeepReefConfig): Partial<GoalRuntime
 /**
  * 获取Supervisor的工具策略
  */
-export function getSupervisorToolPolicy(config: DeepReefConfig, mode: "loop" | "subagent") {
+export function getSupervisorToolPolicy(config: CovaloConfig, mode: "loop" | "subagent") {
   return config.tools.supervisor[mode]
 }
 
 /**
  * 获取Worker的工具策略
  */
-export function getWorkerToolPolicy(config: DeepReefConfig, mode: "loop" | "subagent") {
+export function getWorkerToolPolicy(config: CovaloConfig, mode: "loop" | "subagent") {
   return config.tools.worker[mode]
 }
 
@@ -45,7 +45,7 @@ export function getWorkerToolPolicy(config: DeepReefConfig, mode: "loop" | "suba
  * 检查工具是否被允许
  */
 export function isToolAllowed(
-  config: DeepReefConfig,
+  config: CovaloConfig,
   role: "supervisor" | "worker",
   mode: "loop" | "subagent",
   toolName: string
@@ -85,7 +85,7 @@ export function isHardDeniedForWorkerLoop(toolName: string): boolean {
 /**
  * 获取Mailbox配置
  */
-export function getMailboxConfig(config: DeepReefConfig) {
+export function getMailboxConfig(config: CovaloConfig) {
   return {
     enabled: config.mailbox.enabled,
     storage: config.mailbox.storage,
@@ -98,7 +98,7 @@ export function getMailboxConfig(config: DeepReefConfig) {
 /**
  * 获取Context配置
  */
-export function getContextConfig(config: DeepReefConfig) {
+export function getContextConfig(config: CovaloConfig) {
   return {
     strategy: config.context.strategy,
     maxInputTokens: config.context.maxInputTokens,

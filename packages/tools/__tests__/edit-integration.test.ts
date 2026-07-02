@@ -11,7 +11,7 @@ describe("edit tool integration", () => {
   let tmpDir: string
 
   beforeEach(() => {
-    tmpDir = join(tmpdir(), `deepreef-edit-int-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tmpDir = join(tmpdir(), `covalo-edit-int-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(tmpDir, { recursive: true })
     writeFileSync(join(tmpDir, "test.txt"), "original content\nsecond line\nthird line", "utf-8")
   })

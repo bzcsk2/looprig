@@ -95,7 +95,7 @@ export interface EffectiveHarnessPolicy {
   supervisorPolicy: "on-failure" | "critical-only" | "off"
 }
 
-/** 项目级 harness 配置（.deepreef/harness.json） */
+/** 项目级 harness 配置（.covalo/harness.json） */
 export interface ProjectHarnessConfig {
   strictness?: HarnessStrictness
   modelOverrides?: Record<string, HarnessStrictness>

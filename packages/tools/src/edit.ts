@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 import { readFile, writeFile, stat } from "node:fs/promises"
-import type { AgentTool } from "@deepreef/core"
+import type { AgentTool } from "@covalo/core"
 import { fuzzyReplaceOnce } from "./fuzzy-edit.js"
 import { resolvePath, PathContainmentError } from "./resolve-path.js"
 import { checkStale } from "./stale-read.js"

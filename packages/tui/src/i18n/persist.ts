@@ -1,15 +1,15 @@
-/** Language preference persistence — reads/writes .deepreef/lang.json */
+/** Language preference persistence — reads/writes .covalo/lang.json */
 
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadPromptLocaleFromDisk, savePromptLocaleToDisk } from '@deepreef/core';
+import { loadPromptLocaleFromDisk, savePromptLocaleToDisk } from '@covalo/core';
 import type { Locale } from './strings.js';
 import { LangConfigSchema } from '../settings-schema.js';
 
-const LANG_FILE = '.deepreef/lang.json';
+const LANG_FILE = '.covalo/lang.json';
 
 function getConfigDir(): string {
-  return join(process.cwd(), '.deepreef');
+  return join(process.cwd(), '.covalo');
 }
 
 export function loadLang(): Locale | null {

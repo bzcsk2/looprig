@@ -4,7 +4,7 @@ import { existsSync } from "node:fs";
 import type { HarnessSurface } from "./patch-schema";
 import type { HarnessValidationResult } from "./promotion-gate";
 
-export const LINEAGE_SCHEMA_VERSION = "looprig.harness-lineage.v1";
+export const LINEAGE_SCHEMA_VERSION = "covalo.harness-lineage.v1";
 
 export type LineageDecision = "accepted" | "rejected" | "blocked" | "manual_required";
 export type PromotedBy = "self-harness" | "human";
@@ -28,7 +28,7 @@ export class LineageStore {
   private patchesDir: string;
 
   constructor(baseDir: string) {
-    const harnessDir = join(baseDir, ".looprig", "harness");
+    const harnessDir = join(baseDir, ".covalo", "harness");
     this.lineagePath = join(harnessDir, "lineage.jsonl");
     this.patchesDir = join(harnessDir, "patches");
   }

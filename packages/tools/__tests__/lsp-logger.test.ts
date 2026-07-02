@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest"
 import { LspLogger, createLspLogger } from "../src/lsp/logger.js"
-import { RuntimeLogger } from "@deepreef/core"
+import { RuntimeLogger } from "@covalo/core"
 import { readFileSync, writeFileSync, unlinkSync, existsSync, mkdirSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"

@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto"
 import { GoalStore } from "../src/goal/store.js"
 
 import { setPromptLocale } from "../src/prompt-locale";
-const TEST_DIR = resolve(process.cwd(), ".deepreef-test-goal")
+const TEST_DIR = resolve(process.cwd(), ".covalo-test-goal")
 
 function makeStore(): GoalStore {
   return new GoalStore(TEST_DIR)

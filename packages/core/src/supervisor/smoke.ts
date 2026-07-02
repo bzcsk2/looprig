@@ -1,7 +1,7 @@
 /**
  * Supervisor smoke test 辅助 — 验证候选 target 可用性。
  *
- * DRF-51：仅在 DEEPREEF_SUPERVISOR_SMOKE=1 时执行；StepFun 等未验证候选
+ * DRF-51：仅在 COVALO_SUPERVISOR_SMOKE=1 时执行；StepFun 等未验证候选
  * 需 smoke test 通过后再启用。
  */
 
@@ -10,7 +10,7 @@ import type { DeepreefConfig } from "../config.js"
 import type { SupervisorCandidate } from "./pool.js"
 
 /** smoke test 环境变量名 */
-export const DEEPREEF_SUPERVISOR_SMOKE_ENV = "DEEPREEF_SUPERVISOR_SMOKE"
+export const COVALO_SUPERVISOR_SMOKE_ENV = "COVALO_SUPERVISOR_SMOKE"
 
 /** smoke test 最小输出长度 */
 const MIN_SMOKE_OUTPUT_LENGTH = 4
@@ -32,10 +32,10 @@ export interface SupervisorSmokeResult {
 
 /**
  * 判断 Supervisor smoke test 是否启用。
- * 仅当环境变量 DEEPREEF_SUPERVISOR_SMOKE=1 时返回 true。
+ * 仅当环境变量 COVALO_SUPERVISOR_SMOKE=1 时返回 true。
  */
 export function isSupervisorSmokeEnabled(): boolean {
-  return process.env[DEEPREEF_SUPERVISOR_SMOKE_ENV] === "1"
+  return process.env[COVALO_SUPERVISOR_SMOKE_ENV] === "1"
 }
 
 /**
@@ -55,7 +55,7 @@ export async function runSupervisorSmokeTest(
     return {
       passed: false,
       latencyMs: 0,
-      error: "smoke test 未启用（需设置 DEEPREEF_SUPERVISOR_SMOKE=1）",
+      error: "smoke test 未启用（需设置 COVALO_SUPERVISOR_SMOKE=1）",
     }
   }
 
@@ -130,7 +130,7 @@ export async function runSupervisorSmokeTest(
 }
 
 /**
- * 对池中全部启用候选批量执行 smoke test（需 DEEPREEF_SUPERVISOR_SMOKE=1）。
+ * 对池中全部启用候选批量执行 smoke test（需 COVALO_SUPERVISOR_SMOKE=1）。
  *
  * @param candidates - 候选列表
  * @param resolveAndTest - 解析 target 并执行 smoke 的回调

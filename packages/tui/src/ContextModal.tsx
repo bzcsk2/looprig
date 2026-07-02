@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Box, Text, useInput } from '@deepreef/ink';
-import type { ContextPolicy, ContextPolicyStatus, ContextReductionResult } from '@deepreef/core';
+import { Box, Text, useInput } from '@covalo/ink';
+import type { ContextPolicy, ContextPolicyStatus, ContextReductionResult } from '@covalo/core';
 import { ModalShell } from './ModalShell.js';
 import { FG, TONE } from './reasonix/tokens.js';
 import { t } from './i18n/index.js';

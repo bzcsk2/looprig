@@ -9,12 +9,12 @@
  * Changes from Gemini:
  * - Replaced CliSpinner with inline braille animation frames
  * - Uses themeManager.getColors() instead of static Colors import
- * - Removed useIsScreenReaderEnabled (not available in @deepreef/ink)
+ * - Removed useIsScreenReaderEnabled (not available in @covalo/ink)
  */
 
 import type React from 'react';
 import { useState, useEffect, useMemo } from 'react';
-import { Text, type HexColor } from '@deepreef/ink';
+import { Text, type HexColor } from '@covalo/ink';
 import tinygradient from 'tinygradient';
 import { themeManager } from '../../theme/theme-manager.js';
 

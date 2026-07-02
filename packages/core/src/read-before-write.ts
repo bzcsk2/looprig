@@ -34,8 +34,8 @@ export class ReadTracker {
   private strict: boolean
 
   constructor(options?: { disabled?: boolean; strict?: boolean }) {
-    this.disabled = options?.disabled ?? process.env.DEEPREEF_WRITE_GUARD === "false"
-    this.strict = options?.strict ?? process.env.DEEPREEF_WRITE_GUARD_STRICT === "true"
+    this.disabled = options?.disabled ?? process.env.COVALO_WRITE_GUARD === "false"
+    this.strict = options?.strict ?? process.env.COVALO_WRITE_GUARD_STRICT === "true"
   }
 
   /** 规范化路径用于跟踪 */

@@ -12,7 +12,7 @@ import { StreamingToolExecutor } from "./streaming-executor.js"
 import { AsyncSessionWriter, SessionLoader } from "./session.js"
 import { runLoop } from "./loop.js"
 import type { LoopOptions } from "./loop.js"
-import { PermissionEngine, HookManager } from "@deepreef/security"
+import { PermissionEngine, HookManager } from "@covalo/security"
 import { getAgent, agentConfigFor, getMainMode } from "./agent.js"
 import type { WorkflowMode } from "./dual-agent-runtime/types.js"
 import { resolveEffectiveTools } from "./resolve-effective-tools.js"
@@ -358,7 +358,7 @@ export class ReasonixEngine implements CoreEngine {
   }
 
   private rebindSessionWriter(sessionId: string): void {
-    const sessionPath = resolve(process.cwd(), ".deepreef", "sessions", `${sessionId}.jsonl`)
+    const sessionPath = resolve(process.cwd(), ".covalo", "sessions", `${sessionId}.jsonl`)
     const writer = new AsyncSessionWriter(sessionPath)
     writer.init().catch(() => {})
     this.sessionWriter = writer
@@ -900,7 +900,7 @@ Do not change goal status.`
 
     // ADV-HAR-03: 根据 effectivePolicy.shellPolicy 重新注册 bash 工具
     if (this.effectivePolicy.shellPolicy === "dual-track" || this.effectivePolicy.shellPolicy === "dual-track-conservative") {
-      const { createBashTool } = await import("@deepreef/tools")
+      const { createBashTool } = await import("@covalo/tools")
       this.tools.set("bash", createBashTool({ dualTrack: true }))
     }
 

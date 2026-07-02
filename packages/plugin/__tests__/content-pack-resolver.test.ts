@@ -9,7 +9,7 @@ describe("Content Pack Resolver", () => {
     const result = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "developer",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
     })
     expect(result.id).toBeTruthy()
@@ -21,7 +21,7 @@ describe("Content Pack Resolver", () => {
     const result = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "developer",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
       rules: { enabled: true, mode: "system" },
     })
@@ -32,7 +32,7 @@ describe("Content Pack Resolver", () => {
   test("profile selection works with default developer", () => {
     const result = resolveContentPack(ECC_DIR, {
       type: "content-pack",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
     })
     // Even without explicit profile, should default to "developer"
@@ -43,7 +43,7 @@ describe("Content Pack Resolver", () => {
     const compatible = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "full",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
     })
 
@@ -62,7 +62,7 @@ describe("Content Pack Resolver", () => {
     const result = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "minimal",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
       include: ["baseline:rules"],
     })
@@ -73,7 +73,7 @@ describe("Content Pack Resolver", () => {
     const result = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "developer",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
       exclude: ["baseline:rules"],
     })
@@ -84,7 +84,7 @@ describe("Content Pack Resolver", () => {
     const result = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "unknown-profile-xyz",
-      target: "deepreef",
+      target: "covalo",
     })
     const warns = result.diagnostics.filter(d => d.type === "warn")
     expect(warns.length).toBeGreaterThan(0)
@@ -94,7 +94,7 @@ describe("Content Pack Resolver", () => {
     const result = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       modules: ["non-existent-module-12345"],
-      target: "deepreef",
+      target: "covalo",
     })
     const warns = result.diagnostics.filter(d => d.message.includes("not found"))
     expect(warns.length).toBeGreaterThan(0)

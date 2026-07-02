@@ -5,7 +5,7 @@ import { convertSchemaToJsonSpec, validateSchemaArgs, isStandardSchemaLike } fro
 
 describe("Zod Plugin Tool Integration", () => {
   describe("definePluginTool", () => {
-    it("creates a function with deepreefTool metadata", () => {
+    it("creates a function with covaloTool metadata", () => {
       const schema = z.object({ name: z.string() })
       const tool = definePluginTool({
         description: "Greet a user",
@@ -14,8 +14,8 @@ describe("Zod Plugin Tool Integration", () => {
       })
 
       expect(typeof tool).toBe("function")
-      expect(tool.deepreefTool.description).toBe("Greet a user")
-      expect(isStandardSchemaLike(tool.deepreefTool.inputSchema)).toBe(true)
+      expect(tool.covaloTool.description).toBe("Greet a user")
+      expect(isStandardSchemaLike(tool.covaloTool.inputSchema)).toBe(true)
       expect(isSchemaAwareTool(tool)).toBe(true)
     })
 

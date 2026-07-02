@@ -96,7 +96,7 @@ export function parseManifest(manifestPath: string, rootDir: string): ParseResul
       mcpServers.push(mcpJsonPath)
     }
 
-    const sourceKind = manifestPath.includes("deepreef") ? "deepreef"
+    const sourceKind = manifestPath.includes("covalo") ? "covalo"
       : manifestPath.includes("codex") ? "codex"
       : "claude"
 

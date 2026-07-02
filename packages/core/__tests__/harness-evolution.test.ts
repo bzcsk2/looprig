@@ -30,7 +30,7 @@ describe("TaskDigestPacket", () => {
       verificationPlan: ["Run tests"],
       omittedContext: [],
     });
-    expect(d.schemaVersion).toBe("looprig.task-digest.v1");
+    expect(d.schemaVersion).toBe("covalo.task-digest.v1");
     expect(d.goal).toBe("Fix bug");
     expect(d.repoFacts.packageManager).toBe("bun");
     expect(d.contextFiles).toHaveLength(1);
@@ -71,7 +71,7 @@ describe("ReviewPacket", () => {
       evidenceRefs: [],
       confidence: 0.9,
     });
-    expect(r.schemaVersion).toBe("looprig.review-packet.v1");
+    expect(r.schemaVersion).toBe("covalo.review-packet.v1");
     expect(r.verdict).toBe("ACCEPTED");
     expect(r.issues).toHaveLength(0);
   });
@@ -124,7 +124,7 @@ describe("IncidentPacket", () => {
         recommendedChecks: ["Check model prompt"],
       }],
     });
-    expect(p.schemaVersion).toBe("looprig.incident-packet.v1");
+    expect(p.schemaVersion).toBe("covalo.incident-packet.v1");
     expect(p.incidents).toHaveLength(1);
     expect(p.incidents[0].kind).toBe("missing_output");
     expect(p.issues).toHaveLength(0);
@@ -222,7 +222,7 @@ describe("RuntimeGuard", () => {
       mode: "eval",
       role: "system",
     });
-    expect(p.schemaVersion).toBe("looprig.runtime-guard.v1");
+    expect(p.schemaVersion).toBe("covalo.runtime-guard.v1");
     expect(p.disposition).toBe("block");
   });
 });
@@ -253,7 +253,7 @@ describe("ActionCertificate", () => {
       mode: "eval",
       role: "worker",
     });
-    expect(cert.schemaVersion).toBe("looprig.action-certificate.v1");
+    expect(cert.schemaVersion).toBe("covalo.action-certificate.v1");
     expect(cert.riskLevel).toBe("high");
 
     const completed = completeActionCertificate(cert, { status: "ok", exitCode: 0, durationMs: 100 });
@@ -263,17 +263,17 @@ describe("ActionCertificate", () => {
 
 describe("PacketStore", () => {
   test("init creates directories and run.json", async () => {
-    const tmpDir = "/tmp/looprig-test-packets-" + Math.random().toString(36).slice(2, 8);
+    const tmpDir = "/tmp/covalo-test-packets-" + Math.random().toString(36).slice(2, 8);
     const store = new PacketStore({ baseDir: tmpDir, runId: "store-test-1" });
     await store.init();
 
     const { existsSync } = await import("node:fs");
     const { join } = await import("node:path");
-    expect(existsSync(join(tmpDir, ".looprig", "runs", "store-test-1", "run.json"))).toBe(true);
+    expect(existsSync(join(tmpDir, ".covalo", "runs", "store-test-1", "run.json"))).toBe(true);
   });
 
   test("append and events write JSONL lines", async () => {
-    const tmpDir = "/tmp/looprig-test-packets-" + Math.random().toString(36).slice(2, 8);
+    const tmpDir = "/tmp/covalo-test-packets-" + Math.random().toString(36).slice(2, 8);
     const store = new PacketStore({ baseDir: tmpDir, runId: "store-test-2" });
     await store.init();
 
@@ -291,10 +291,10 @@ describe("PacketStore", () => {
 
     const { readFileSync } = await import("node:fs");
     const { join } = await import("node:path");
-    const packetsContent = readFileSync(join(tmpDir, ".looprig", "runs", "store-test-2", "packets.jsonl"), "utf-8");
+    const packetsContent = readFileSync(join(tmpDir, ".covalo", "runs", "store-test-2", "packets.jsonl"), "utf-8");
     expect(packetsContent.trim().split("\n")).toHaveLength(1);
 
-    const eventsContent = readFileSync(join(tmpDir, ".looprig", "runs", "store-test-2", "events.jsonl"), "utf-8");
+    const eventsContent = readFileSync(join(tmpDir, ".covalo", "runs", "store-test-2", "events.jsonl"), "utf-8");
     expect(eventsContent.trim().split("\n")).toHaveLength(2); // 1 from auto-emit + 1 explicit
     const eventLines = eventsContent.trim().split("\n");
     expect(eventLines[0]).toContain("harness.packet.created");

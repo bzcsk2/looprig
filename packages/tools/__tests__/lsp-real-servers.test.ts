@@ -6,7 +6,7 @@ import { execSync } from "node:child_process"
 import { LspClient } from "../src/lsp/lsp-client.js"
 import { pathToFileURL } from "node:url"
 
-const ENABLE_REAL_TESTS = process.env.DEEPREEF_LSP_REAL === "1"
+const ENABLE_REAL_TESTS = process.env.COVALO_LSP_REAL === "1"
 
 function isCommandAvailable(command: string): boolean {
   try {

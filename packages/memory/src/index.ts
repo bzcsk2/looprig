@@ -4,8 +4,8 @@
 
 export { MemoryService } from "./memory-service.js"
 export type { MemoryServiceConfig } from "./memory-service.js"
-export { DeepreefMemoryBridge } from "./bridge/deepreef-memory-bridge.js"
-export type { DeepreefMemoryBridgeConfig } from "./bridge/deepreef-memory-bridge.js"
+export { DeepreefMemoryBridge } from "./bridge/covalo-memory-bridge.js"
+export type { DeepreefMemoryBridgeConfig } from "./bridge/covalo-memory-bridge.js"
 export { MemoryRuntimeSdk } from "./runtime/memory-runtime-sdk.js"
 export { MemoryStore } from "./runtime/memory-store.js"
 export type { ISdk } from "./runtime/types.js"

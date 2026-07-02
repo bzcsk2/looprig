@@ -7,7 +7,7 @@ export class Mailbox {
   private basePath: string
 
   constructor(basePath?: string) {
-    this.basePath = basePath ?? resolve(process.cwd(), ".deepreef", "sessions")
+    this.basePath = basePath ?? resolve(process.cwd(), ".covalo", "sessions")
   }
 
   private mailboxPath(threadId: string): string {

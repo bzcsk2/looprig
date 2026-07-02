@@ -54,11 +54,11 @@ describe("runner-smoke", () => {
   beforeAll(() => {
     clearManifests();
     registerBuiltinManifests(WEAK_MODEL_MANIFESTS);
-    process.env.DEEPRREF_ROOT = TEST_DIR;
+    process.env.COVALO_ROOT = TEST_DIR;
   });
 
   afterAll(() => {
-    delete process.env.DEEPRREF_ROOT;
+    delete process.env.COVALO_ROOT;
     import("node:fs").then((fs) => fs.rmSync(TEST_DIR, { recursive: true, force: true }));
   });
 

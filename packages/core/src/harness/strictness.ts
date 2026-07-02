@@ -16,7 +16,7 @@ import type {
   ModelProfile,
 } from "../model-profile/types.js"
 
-const PROJECT_CONFIG_DIR = ".deepreef"
+const PROJECT_CONFIG_DIR = ".covalo"
 const PROJECT_CONFIG_FILE = "harness.json"
 
 // ADV-HAR-P0: Zod schema for harness config validation
@@ -28,7 +28,7 @@ const ProjectHarnessConfigSchema = z.object({
 }).strict()
 
 /**
- * 读取项目级 harness 配置（.deepreef/harness.json）
+ * 读取项目级 harness 配置（.covalo/harness.json）
  * ADV-HAR-P0: 使用 Zod 校验，非法配置安全回退到 null
  */
 export function readProjectHarnessConfig(cwd?: string): ProjectHarnessConfig | null {

@@ -19,7 +19,7 @@ export class MemoryStore {
   private baseDir: string
 
   constructor(baseDir?: string) {
-    this.baseDir = baseDir ?? resolve(homedir(), ".deepreef", "memory")
+    this.baseDir = baseDir ?? resolve(homedir(), ".covalo", "memory")
     if (!existsSync(this.baseDir)) {
       mkdirSync(this.baseDir, { recursive: true })
     }

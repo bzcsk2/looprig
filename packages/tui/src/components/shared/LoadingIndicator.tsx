@@ -9,7 +9,7 @@
  * Changes from Gemini:
  * - Removed @google/gemini-cli-core import (ThoughtSummary type inlined)
  * - Replaced useStreamingContext/StreamingState with `streamingState` prop
- * - Uses useTerminalSize from @deepreef/ink
+ * - Uses useTerminalSize from @covalo/ink
  * - Uses getSemanticColors() for theme colors
  * - Uses local formatDuration helper
  * - Removed INTERACTIVE_SHELL_WAITING_PHRASE constant (not applicable)
@@ -17,7 +17,7 @@
  */
 
 import type React from 'react';
-import { Box, Text, useTerminalSize, type HexColor } from '@deepreef/ink';
+import { Box, Text, useTerminalSize, type HexColor } from '@covalo/ink';
 import { getSemanticColors } from '../../theme/semantic-colors.js';
 import { RespondingSpinner, type SpinnerState } from './RespondingSpinner.js';
 

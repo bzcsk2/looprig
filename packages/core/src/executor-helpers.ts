@@ -1,6 +1,6 @@
 import type { AgentTool, ToolResult, ToolProgressUpdate } from "./interface.js"
 import type { ToolCall } from "./types.js"
-import type { PermissionEngine, HookManager, PermissionDecision } from "@deepreef/security"
+import type { PermissionEngine, HookManager, PermissionDecision } from "@covalo/security"
 import type { PermissionService, PermissionRule } from "./permission/index.js"
 import { evaluateRules, fromConfig, createSessionRule } from "./permission/index.js"
 import { maybePersistResult, type ResultPersistenceConfig } from "./result-persistence.js"

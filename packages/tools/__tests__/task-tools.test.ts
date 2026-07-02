@@ -12,7 +12,7 @@ const ctx = (cwd: string) => ({ cwd, signal: new AbortController().signal }) as 
 
 describe("TaskCreate", () => {
   let tmpDir: string
-  beforeEach(() => { tmpDir = join(tmpdir(), `tc-${Date.now()}`); mkdirSync(join(tmpDir, ".deepreef"), { recursive: true }) })
+  beforeEach(() => { tmpDir = join(tmpdir(), `tc-${Date.now()}`); mkdirSync(join(tmpDir, ".covalo"), { recursive: true }) })
   afterEach(() => { try { rmSync(tmpDir, { recursive: true, force: true }) } catch {} })
 
   it("should create a task", async () => {
@@ -42,7 +42,7 @@ describe("TaskUpdate", () => {
   let tmpDir: string
   let taskId: string
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `tu-${Date.now()}`); mkdirSync(join(tmpDir, ".deepreef"), { recursive: true })
+    tmpDir = join(tmpdir(), `tu-${Date.now()}`); mkdirSync(join(tmpDir, ".covalo"), { recursive: true })
     const create = createTaskCreateTool()
     const r = await create.execute({ content: "to update" }, ctx(tmpDir))
     taskId = JSON.parse(r.content as string).id
@@ -67,7 +67,7 @@ describe("TaskUpdate", () => {
 describe("TaskList", () => {
   let tmpDir: string
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `tl-${Date.now()}`); mkdirSync(join(tmpDir, ".deepreef"), { recursive: true })
+    tmpDir = join(tmpdir(), `tl-${Date.now()}`); mkdirSync(join(tmpDir, ".covalo"), { recursive: true })
     const create = createTaskCreateTool()
     await create.execute({ content: "high-pri", priority: "high" }, ctx(tmpDir))
     await create.execute({ content: "low-pri", priority: "low" }, ctx(tmpDir))
@@ -108,7 +108,7 @@ describe("TaskList", () => {
 
 describe("TaskList empty", () => {
   let tmpDir: string
-  beforeEach(() => { tmpDir = join(tmpdir(), `tle-${Date.now()}`); mkdirSync(join(tmpDir, ".deepreef"), { recursive: true }) })
+  beforeEach(() => { tmpDir = join(tmpdir(), `tle-${Date.now()}`); mkdirSync(join(tmpDir, ".covalo"), { recursive: true }) })
   afterEach(() => { try { rmSync(tmpDir, { recursive: true, force: true }) } catch {} })
 
   it("should return empty list when no tasks exist", async () => {
@@ -124,7 +124,7 @@ describe("TaskGet", () => {
   let tmpDir: string
   let taskId: string
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `tg-${Date.now()}`); mkdirSync(join(tmpDir, ".deepreef"), { recursive: true })
+    tmpDir = join(tmpdir(), `tg-${Date.now()}`); mkdirSync(join(tmpDir, ".covalo"), { recursive: true })
     const create = createTaskCreateTool()
     const r = await create.execute({ content: "get me" }, ctx(tmpDir))
     taskId = JSON.parse(r.content as string).id
@@ -149,7 +149,7 @@ describe("TaskStop", () => {
   let tmpDir: string
   let taskId: string
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `ts-${Date.now()}`); mkdirSync(join(tmpDir, ".deepreef"), { recursive: true })
+    tmpDir = join(tmpdir(), `ts-${Date.now()}`); mkdirSync(join(tmpDir, ".covalo"), { recursive: true })
     const create = createTaskCreateTool()
     const r = await create.execute({ content: "stop me" }, ctx(tmpDir))
     taskId = JSON.parse(r.content as string).id
@@ -173,8 +173,8 @@ describe("TaskStop", () => {
 describe("M16: Task full flow via tools", () => {
   let tmpDir: string
   beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "deepreef-task-full-"))
-    mkdirSync(join(tmpDir, ".deepreef"), { recursive: true })
+    tmpDir = mkdtempSync(join(tmpdir(), "covalo-task-full-"))
+    mkdirSync(join(tmpDir, ".covalo"), { recursive: true })
   })
   afterEach(() => {
     try { rmSync(tmpDir, { recursive: true, force: true }) } catch {}

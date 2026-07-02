@@ -1,6 +1,6 @@
-import type { DeepReefConfig } from "./schema.js"
+import type { CovaloConfig } from "./schema.js"
 
-export const DEFAULT_CONFIG: DeepReefConfig = {
+export const DEFAULT_CONFIG: CovaloConfig = {
   version: 1,
   providers: {},
   agents: {
@@ -102,7 +102,7 @@ export const DEFAULT_CONFIG: DeepReefConfig = {
   },
   logging: {
     level: "info",
-    path: ".deepreef/logs",
+    path: ".covalo/logs",
     eventsJsonl: true,
     mailboxJsonl: true,
     workflowJsonl: true,
@@ -118,7 +118,7 @@ export const DEFAULT_CONFIG: DeepReefConfig = {
 }
 
 // 预定义的配置模板
-export const LOCAL_FIRST_CONFIG: Partial<DeepReefConfig> = {
+export const LOCAL_FIRST_CONFIG: Partial<CovaloConfig> = {
   providers: {
     default: {
       type: "openai-compatible",
@@ -172,7 +172,7 @@ export const LOCAL_FIRST_CONFIG: Partial<DeepReefConfig> = {
   },
 }
 
-export const SAFE_READONLY_CONFIG: Partial<DeepReefConfig> = {
+export const SAFE_READONLY_CONFIG: Partial<CovaloConfig> = {
   tools: {
     approvalPolicy: "always",
     sandbox: "read-only",
@@ -200,7 +200,7 @@ export const SAFE_READONLY_CONFIG: Partial<DeepReefConfig> = {
   },
 }
 
-export const AUTONOMOUS_CODING_CONFIG: Partial<DeepReefConfig> = {
+export const AUTONOMOUS_CODING_CONFIG: Partial<CovaloConfig> = {
   goal: {
     enabled: true,
     autoContinue: true,
@@ -241,7 +241,7 @@ export const AUTONOMOUS_CODING_CONFIG: Partial<DeepReefConfig> = {
   },
 }
 
-export const CONFIG_TEMPLATES: Record<string, Partial<DeepReefConfig>> = {
+export const CONFIG_TEMPLATES: Record<string, Partial<CovaloConfig>> = {
   "default": DEFAULT_CONFIG,
   "local-first": LOCAL_FIRST_CONFIG,
   "safe-readonly": SAFE_READONLY_CONFIG,

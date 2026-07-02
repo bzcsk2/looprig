@@ -1,7 +1,7 @@
 import type { PacketBase } from "./types";
 import type { IncidentRecord } from "./incident-packet";
 
-export const RECOVERY_PACKET_SCHEMA_VERSION = "looprig.recovery-packet.v1";
+export const RECOVERY_PACKET_SCHEMA_VERSION = "covalo.recovery-packet.v1";
 
 export type RecoveryDisposition = "ready" | "blocked";
 

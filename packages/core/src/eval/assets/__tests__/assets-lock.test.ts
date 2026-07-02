@@ -36,11 +36,11 @@ beforeAll(() => {
   mkdirSync(join(ASSETS_DIR, "swe-bench", "snapshots", "psf_requests"), { recursive: true });
   writeFileSync(join(ASSETS_DIR, "assets.lock.json"), JSON.stringify(FAKE_LOCK, null, 2));
   writeFileSync(join(ASSETS_DIR, "swe-bench", "snapshots", "psf_requests", "deadbeef.tar.gz"), "");
-  process.env.LOOPRIG_EVAL_ASSETS_DIR = ASSETS_DIR;
+  process.env.COVALO_EVAL_ASSETS_DIR = ASSETS_DIR;
 });
 
 afterAll(() => {
-  delete process.env.LOOPRIG_EVAL_ASSETS_DIR;
+  delete process.env.COVALO_EVAL_ASSETS_DIR;
   import("node:fs").then((fs) => fs.rmSync(TEST_DIR, { recursive: true, force: true }));
 });
 

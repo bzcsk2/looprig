@@ -1,7 +1,7 @@
 {
-  "name": "@deepreef/tui",
+  "name": "@covalo/tui",
   "version": "0.0.1",
-  "description": "Reserved package for the DeepReef terminal UI.",
+  "description": "Reserved package for the Covalo terminal UI.",
   "type": "module",
   "main": "./index.js",
   "exports": "./index.js",
@@ -12,7 +12,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bzcsk2/DeepReef.git",
+    "url": "git+https://github.com/bzcsk2/Covalo.git",
     "directory": "packages/tui"
   },
   "license": "MIT",

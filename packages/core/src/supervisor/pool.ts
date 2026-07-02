@@ -45,7 +45,7 @@ export interface SupervisorPoolConfig {
 }
 
 /** 配置文件路径 */
-export const SUPERVISOR_POOL_FILE = ".deepreef/supervisor-pool.json"
+export const SUPERVISOR_POOL_FILE = ".covalo/supervisor-pool.json"
 
 const capabilitiesSchema = z.object({
   structuredJson: z.boolean(),
@@ -68,7 +68,7 @@ const poolConfigSchema = z.object({
 
 /**
  * 默认 Supervisor 候选池。
- * ADV-HAR-04: 所有候选默认禁用，用户必须显式配置 .deepreef/supervisor-pool.json 才能启用。
+ * ADV-HAR-04: 所有候选默认禁用，用户必须显式配置 .covalo/supervisor-pool.json 才能启用。
  * 未配置时不发起任何 Supervisor 网络请求。
  */
 export const DEFAULT_SUPERVISOR_POOL: SupervisorPoolConfig = {
@@ -150,7 +150,7 @@ export function mergeSupervisorPool(
 }
 
 /**
- * 从 `.deepreef/supervisor-pool.json` 加载 Supervisor 池。
+ * 从 `.covalo/supervisor-pool.json` 加载 Supervisor 池。
  * ADV-HAR-04: 文件不存在时返回空池（无候选），用户必须显式配置才能启用 Supervisor。
  *
  * @param cwd - 工作目录，默认 process.cwd()

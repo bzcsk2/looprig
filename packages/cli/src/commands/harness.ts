@@ -8,20 +8,20 @@ import {
   mineFromIncidents,
   mineFromReview,
   formatWeaknesses,
-} from "@deepreef/core";
-import type { Weakness } from "@deepreef/core";
+} from "@covalo/core";
+import type { Weakness } from "@covalo/core";
 
 function printHarnessHelp(): void {
-  console.log(`looprig harness - Harness evolution management
+  console.log(`covalo harness - Harness evolution management
 
 Usage:
-  looprig harness doctor                Check harness health
-  looprig harness mine --from-eval <id>  Mine weaknesses from eval run
-  looprig harness propose --weakness <id> Propose patches from weakness
-  looprig harness validate --patch <id>  Validate a patch
-  looprig harness promote --patch <id>   Promote a patch
-  looprig harness history                Show harness evolution history
-  looprig harness rollback <id>          Rollback a patch
+  covalo harness doctor                Check harness health
+  covalo harness mine --from-eval <id>  Mine weaknesses from eval run
+  covalo harness propose --weakness <id> Propose patches from weakness
+  covalo harness validate --patch <id>  Validate a patch
+  covalo harness promote --patch <id>   Promote a patch
+  covalo harness history                Show harness evolution history
+  covalo harness rollback <id>          Rollback a patch
 `);
 }
 
@@ -46,7 +46,7 @@ export async function harnessDoctor(args: string[]): Promise<void> {
     return;
   }
 
-  console.log("LoopRig Harness Doctor\n");
+  console.log("Covalo Harness Doctor\n");
 
   // Check surfaces
   const surfaces = surfaceStore.list();
@@ -74,7 +74,7 @@ export async function harnessDoctor(args: string[]): Promise<void> {
   console.log();
 
   if (lineage.length === 0) {
-    console.log("No harness evolution history yet. Run 'looprig harness mine' to start.");
+    console.log("No harness evolution history yet. Run 'covalo harness mine' to start.");
   } else {
     const lastAccepted = lineage.filter(e => e.decision === "accepted").pop();
     if (lastAccepted) {
@@ -88,16 +88,16 @@ export async function harnessMine(args: string[]): Promise<void> {
   const evalRunId = fromEvalIdx >= 0 ? args[fromEvalIdx + 1] : undefined;
 
   if (!evalRunId) {
-    console.error("Usage: looprig harness mine --from-eval <evalRunId>");
+    console.error("Usage: covalo harness mine --from-eval <evalRunId>");
     console.error("Mine weaknesses from a specific eval run.");
     process.exit(1);
   }
 
   const baseDir = getBaseDir();
-  const deepreefDir = join(baseDir, ".deepreef", "evals", evalRunId);
+  const covaloDir = join(baseDir, ".covalo", "evals", evalRunId);
 
-  if (!existsSync(deepreefDir)) {
-    console.error(`Eval run directory not found: ${deepreefDir}`);
+  if (!existsSync(covaloDir)) {
+    console.error(`Eval run directory not found: ${covaloDir}`);
     process.exit(1);
   }
 
@@ -106,7 +106,7 @@ export async function harnessMine(args: string[]): Promise<void> {
 
   // Collect incident packets and review packets from the eval run
   const { readFileSync, readdirSync } = await import("node:fs");
-  const casesDir = join(deepreefDir, "cases");
+  const casesDir = join(covaloDir, "cases");
   const incidents: any[] = [];
   const reviews: any[] = [];
 
@@ -119,10 +119,10 @@ export async function harnessMine(args: string[]): Promise<void> {
         for (const line of content.trim().split("\n").filter(Boolean)) {
           try {
             const packet = JSON.parse(line);
-            if (packet.schemaVersion === "looprig.incident-packet.v1") {
+            if (packet.schemaVersion === "covalo.incident-packet.v1") {
               incidents.push(packet);
             }
-            if (packet.schemaVersion === "looprig.review-packet.v1") {
+            if (packet.schemaVersion === "covalo.review-packet.v1") {
               reviews.push(packet);
             }
           } catch {}
@@ -170,13 +170,13 @@ export async function harnessPropose(args: string[]): Promise<void> {
   const weaknessId = weaknessIdx >= 0 ? args[weaknessIdx + 1] : undefined;
 
   if (!weaknessId) {
-    console.error("Usage: looprig harness propose --weakness <weaknessId>");
+    console.error("Usage: covalo harness propose --weakness <weaknessId>");
     process.exit(1);
   }
 
   const baseDir = getBaseDir();
   const surfaceStore = new SurfaceStore(baseDir);
-  const { PatchProposer } = await import("@deepreef/core");
+  const { PatchProposer } = await import("@covalo/core");
   const proposer = new PatchProposer(surfaceStore);
 
   // Create a synthetic weakness for proposing
@@ -207,7 +207,7 @@ export async function harnessPropose(args: string[]): Promise<void> {
   // Save patches to disk for subsequent validate/promote
   const { mkdirSync, writeFileSync } = await import("node:fs");
   const { join } = await import("node:path");
-  const patchesDir = join(baseDir, ".looprig", "harness", "patches");
+  const patchesDir = join(baseDir, ".covalo", "harness", "patches");
   mkdirSync(patchesDir, { recursive: true });
 
   for (const patch of patches) {
@@ -218,7 +218,7 @@ export async function harnessPropose(args: string[]): Promise<void> {
 
   console.log(JSON.stringify(patches, null, 2));
   console.log(`\nProposed ${patches.length} patch(es).`);
-  console.log("Run 'looprig harness validate --patch <patchId>' to validate.");
+  console.log("Run 'covalo harness validate --patch <patchId>' to validate.");
 }
 
 export async function harnessValidate(args: string[]): Promise<void> {
@@ -226,23 +226,23 @@ export async function harnessValidate(args: string[]): Promise<void> {
   const patchId = patchIdx >= 0 ? args[patchIdx + 1] : undefined;
 
   if (!patchId) {
-    console.error("Usage: looprig harness validate --patch <patchId>");
+    console.error("Usage: covalo harness validate --patch <patchId>");
     process.exit(1);
   }
 
   const baseDir = getBaseDir();
   const surfaceStore = new SurfaceStore(baseDir);
-  const { PatchValidator } = await import("@deepreef/core");
+  const { PatchValidator } = await import("@covalo/core");
   const validator = new PatchValidator(surfaceStore);
 
   // Load the patch from saved patch file
   const { join } = await import("node:path");
   const { existsSync, readFileSync } = await import("node:fs");
-  const patchPath = join(baseDir, ".looprig", "harness", "patches", `${patchId}.json`);
+  const patchPath = join(baseDir, ".covalo", "harness", "patches", `${patchId}.json`);
 
   if (!existsSync(patchPath)) {
     console.error(`Patch file not found: ${patchPath}`);
-    console.error("Run 'looprig harness propose --weakness <weaknessId>' first.");
+    console.error("Run 'covalo harness propose --weakness <weaknessId>' first.");
     process.exit(1);
   }
 
@@ -269,8 +269,8 @@ export async function harnessValidate(args: string[]): Promise<void> {
   console.log();
 
   console.log("⚠ This is a PATCH INTEGRITY CHECK only. Full held-in/held-out validation");
-  console.log("  requires running 'looprig eval' before and after applying the patch,");
-  console.log("  then comparing pass rate deltas. Use 'looprig harness promote' only");
+  console.log("  requires running 'covalo eval' before and after applying the patch,");
+  console.log("  then comparing pass rate deltas. Use 'covalo harness promote' only");
   console.log("  after real eval validation, or use --force for manual override.");
 }
 
@@ -279,7 +279,7 @@ export async function harnessPromote(args: string[]): Promise<void> {
   const patchId = patchIdx >= 0 ? args[patchIdx + 1] : undefined;
 
   if (!patchId) {
-    console.error("Usage: looprig harness promote --patch <patchId>");
+    console.error("Usage: covalo harness promote --patch <patchId>");
     process.exit(1);
   }
 
@@ -288,17 +288,17 @@ export async function harnessPromote(args: string[]): Promise<void> {
   const lineageStore = new LineageStore(baseDir);
 
   const forcePromote = args.includes("--force");
-  const { promotePatch, PatchValidator } = await import("@deepreef/core");
+  const { promotePatch, PatchValidator } = await import("@covalo/core");
 
   // Load the patch from saved patch file
   const { join } = await import("node:path");
   const { existsSync, readFileSync } = await import("node:fs");
-  const patchPath = join(baseDir, ".looprig", "harness", "patches", `${patchId}.json`);
+  const patchPath = join(baseDir, ".covalo", "harness", "patches", `${patchId}.json`);
 
   if (!existsSync(patchPath)) {
     console.error(`Patch file not found: ${patchPath}`);
-    console.error("Run 'looprig harness propose --weakness <weaknessId>' first.");
-    console.error("Or use 'looprig harness promote --force --patch <patchId>' to force promote from lineage.");
+    console.error("Run 'covalo harness propose --weakness <weaknessId>' first.");
+    console.error("Or use 'covalo harness promote --force --patch <patchId>' to force promote from lineage.");
     process.exit(1);
   }
 
@@ -351,7 +351,7 @@ export async function harnessPromote(args: string[]): Promise<void> {
 
   // Save a backup of the current surface content before promoting
   const { writeFileSync, mkdirSync } = await import("node:fs");
-  const rollbackDir = join(baseDir, ".looprig", "harness", "rollbacks");
+  const rollbackDir = join(baseDir, ".covalo", "harness", "rollbacks");
   mkdirSync(rollbackDir, { recursive: true });
 
   const currentSurfaceContent = await surfaceStore.get(patch.surface);
@@ -375,7 +375,7 @@ export async function harnessPromote(args: string[]): Promise<void> {
     console.log(`✓ Patch ${patchId} promoted successfully.`);
     console.log(`  New surface "${patch.surface}" content has been applied.`);
     console.log("  Changes will apply to future runs.");
-    console.log("  Use 'looprig harness rollback <patchId>' to revert if needed.");
+    console.log("  Use 'covalo harness rollback <patchId>' to revert if needed.");
   } else {
     console.log(`Patch ${patchId} was not promoted.`);
     console.log(`  Decision: ${newEntry.decision}`);
@@ -390,7 +390,7 @@ export async function harnessHistory(args: string[]): Promise<void> {
 
   if (lineage.length === 0) {
     console.log("No harness evolution history found.");
-    console.log("Run 'looprig harness mine --from-eval <evalRunId>' to get started.");
+    console.log("Run 'covalo harness mine --from-eval <evalRunId>' to get started.");
     return;
   }
 
@@ -419,7 +419,7 @@ export async function harnessRollback(args: string[]): Promise<void> {
   const rollbackId = args[0];
 
   if (!rollbackId) {
-    console.error("Usage: looprig harness rollback <rollbackId>");
+    console.error("Usage: covalo harness rollback <rollbackId>");
     process.exit(1);
   }
 
@@ -456,7 +456,7 @@ export async function harnessRollback(args: string[]): Promise<void> {
   // Restore surface content from backup
   const { join } = await import("node:path");
   const { existsSync, readFileSync } = await import("node:fs");
-  const backupPath = join(baseDir, ".looprig", "harness", "rollbacks", `${rollbackId}-before.json`);
+  const backupPath = join(baseDir, ".covalo", "harness", "rollbacks", `${rollbackId}-before.json`);
 
   if (!existsSync(backupPath)) {
     console.error(`Backup file not found: ${backupPath}`);
@@ -470,7 +470,7 @@ export async function harnessRollback(args: string[]): Promise<void> {
   }
 
   // Record rollback in lineage
-  const { recordLineageForPatch } = await import("@deepreef/core");
+  const { recordLineageForPatch } = await import("@covalo/core");
   await recordLineageForPatch({
     baseDir,
     patchId: `rollback:${rollbackId}`,

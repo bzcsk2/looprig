@@ -692,7 +692,7 @@ describe("LIFE-01: Engine shutdown", () => {
     const { mkdir } = await import("node:fs/promises")
     const { join } = await import("node:path")
     const { tmpdir } = await import("node:os")
-    const tmpDir = join(tmpdir(), `deepreef-shutdown-log-${Date.now()}`)
+    const tmpDir = join(tmpdir(), `covalo-shutdown-log-${Date.now()}`)
     await mkdir(tmpDir, { recursive: true })
 
     const logPath = join(tmpDir, "engine-shutdown.jsonl")

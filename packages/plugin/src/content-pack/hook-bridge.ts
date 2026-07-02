@@ -52,8 +52,8 @@ export function parseEccHooks(filePath: string): { hooks: BridgedHook[]; warning
     }
     const bridged: BridgedHook[] = []
     for (const [eccPhase, entries] of Object.entries(manifest.hooks)) {
-      const deepreefPhase = PHASE_MAP[eccPhase]
-      if (!deepreefPhase) {
+      const covaloPhase = PHASE_MAP[eccPhase]
+      if (!covaloPhase) {
         warnings.push(`Unknown ECC hook phase "${eccPhase}", skipping`)
         continue
       }
@@ -76,7 +76,7 @@ export function parseEccHooks(filePath: string): { hooks: BridgedHook[]; warning
               : `ecc:${matcher}:${hook.command.slice(0, 40)}`
           bridged.push({
             id: hookId,
-            phase: deepreefPhase,
+            phase: covaloPhase,
             toolMatcher: matcher,
             command: hook.command,
             timeout: hook.timeout ?? 30,

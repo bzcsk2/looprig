@@ -2,8 +2,8 @@ import { execSync } from "node:child_process"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { homedir } from "node:os"
-import { initDefaultProviders, diagnoseEnvironment } from "@deepreef/core"
-import { resolveEvalEnvironment } from "@deepreef/core/sandbox/types.js"
+import { initDefaultProviders, diagnoseEnvironment } from "@covalo/core"
+import { resolveEvalEnvironment } from "@covalo/core/sandbox/types.js"
 import {
   ensureTool,
   isToolInstalled,
@@ -12,7 +12,7 @@ import {
   getToolManifest,
   cleanToolchain,
   getBenchmarkToolchainStatus,
-} from "@deepreef/core/eval/profile/index.js"
+} from "@covalo/core/eval/profile/index.js"
 
 interface ToolCheck {
   name: string
@@ -39,7 +39,7 @@ async function checkTool(name: string, expected?: string): Promise<ToolCheck> {
 }
 
 function checkBwrap(): ToolCheck {
-  const paths = ["/usr/bin/bwrap", "/usr/local/bin/bwrap", join(homedir(), ".looprig", "bin", "bwrap")]
+  const paths = ["/usr/bin/bwrap", "/usr/local/bin/bwrap", join(homedir(), ".covalo", "bin", "bwrap")]
   for (const p of paths) {
     if (existsSync(p)) {
       try {
@@ -130,7 +130,7 @@ export async function evalDoctor(args: string[]): Promise<void> {
     return
   }
 
-  console.log("LoopRig Eval Doctor\n")
+  console.log("Covalo Eval Doctor\n")
 
   console.log("sandbox.benchmark:")
   console.log(`  provider:        ${benchmarkDiag.available ? benchmarkDiag.providerId : "unavailable"} ${benchmarkDiag.official ? "(official)" : "(diagnostic)"}`)
@@ -164,7 +164,7 @@ export async function evalDoctor(args: string[]): Promise<void> {
 export async function evalPrepare(args: string[]): Promise<void> {
   const target = args[0]
   if (!target || (target !== "sandbox.benchmark" && target !== "sandbox.local")) {
-    console.error("Usage: looprig eval prepare <sandbox.benchmark|sandbox.local>")
+    console.error("Usage: covalo eval prepare <sandbox.benchmark|sandbox.local>")
     process.exit(1)
   }
 
@@ -183,7 +183,7 @@ export async function evalPrepare(args: string[]): Promise<void> {
     const missingManaged = getToolManifest.filter((t) => !isToolInstalled(t.name))
 
     if (missingManaged.length === 0) {
-      console.log("✓ Managed toolchain already installed at ~/.looprig/toolchains/benchmark-node/")
+      console.log("✓ Managed toolchain already installed at ~/.covalo/toolchains/benchmark-node/")
       return
     }
 
@@ -201,7 +201,7 @@ export async function evalPrepare(args: string[]): Promise<void> {
 
     const stillMissing = getToolManifest.filter((t) => !isToolInstalled(t.name))
     if (stillMissing.length === 0) {
-      console.log("\n✓ Benchmark toolchain ready at ~/.looprig/toolchains/benchmark-node/")
+      console.log("\n✓ Benchmark toolchain ready at ~/.covalo/toolchains/benchmark-node/")
     } else {
       console.log(`\n⚠ ${stillMissing.length} tool(s) still missing: ${stillMissing.map((t) => t.name).join(", ")}`)
     }
@@ -233,7 +233,7 @@ export async function evalPrepare(args: string[]): Promise<void> {
 export async function evalCleanToolchains(args: string[]): Promise<void> {
   const force = args.includes("--force")
   if (!force) {
-    console.log("This will remove all managed toolchains at ~/.looprig/toolchains/")
+    console.log("This will remove all managed toolchains at ~/.covalo/toolchains/")
     console.log("Run with --force to confirm.")
     return
   }
@@ -254,9 +254,9 @@ export async function evalCommand(subcommand: string, args: string[]): Promise<v
       break
     default:
       console.log(`Usage:
-  looprig eval doctor [--json]           Check eval environment health
-  looprig eval prepare <env>             Prepare an eval environment
-  looprig eval clean-toolchains [--force] Remove managed toolchains
+  covalo eval doctor [--json]           Check eval environment health
+  covalo eval prepare <env>             Prepare an eval environment
+  covalo eval clean-toolchains [--force] Remove managed toolchains
 `)
   }
 }

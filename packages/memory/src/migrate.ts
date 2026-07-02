@@ -3,7 +3,7 @@ import { homedir } from "node:os"
 import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync } from "node:fs"
 
 /**
- * Migrate data from ~/.agentmemory to ~/.deepreef/memory.
+ * Migrate data from ~/.agentmemory to ~/.covalo/memory.
  * Copies all state/*.json files preserving scope/key structure.
  */
 export interface MigrationResult {
@@ -16,7 +16,7 @@ export interface MigrationResult {
 
 export async function migrateFromAgentMemory(targetDir?: string): Promise<MigrationResult> {
   const sourceDir = join(homedir(), ".agentmemory", "state")
-  const destDir = targetDir ?? join(homedir(), ".deepreef", "memory")
+  const destDir = targetDir ?? join(homedir(), ".covalo", "memory")
 
   const result: MigrationResult = {
     migrated: 0,
@@ -59,7 +59,7 @@ export async function migrateFromAgentMemory(targetDir?: string): Promise<Migrat
 export function createMemoryMigrateTool() {
   return {
     name: "memory_migrate",
-    description: "Migrate memory data from ~/.agentmemory to ~/.deepreef/memory",
+    description: "Migrate memory data from ~/.agentmemory to ~/.covalo/memory",
     parameters: { type: "object" as const, properties: {} },
     concurrency: "exclusive" as const,
     approval: "write" as const,

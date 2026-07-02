@@ -1,6 +1,6 @@
 /**
  * Minimal diagnostic logger interface for Tools module.
- * Does not depend on @deepreef/core to avoid circular dependencies.
+ * Does not depend on @covalo/core to avoid circular dependencies.
  */
 
 export type LogLevel = "debug" | "info" | "warn" | "error"

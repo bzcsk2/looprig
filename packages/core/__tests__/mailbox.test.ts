@@ -6,7 +6,7 @@ import { Mailbox } from "../src/agent-comm/mailbox.js"
 import { AgentCommController } from "../src/agent-comm/controller.js"
 import type { AgentMessage } from "../src/agent-comm/types.js"
 
-const TEST_DIR = resolve(process.cwd(), ".deepreef-test-mailbox")
+const TEST_DIR = resolve(process.cwd(), ".covalo-test-mailbox")
 
 function makeMailbox(): Mailbox {
   return new Mailbox(TEST_DIR)

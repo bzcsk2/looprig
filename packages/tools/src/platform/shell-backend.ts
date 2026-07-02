@@ -32,8 +32,8 @@ export function defaultShellCandidates(platform: SupportedPlatform): ShellBacken
 }
 
 export async function resolveShellBackend(platform: SupportedPlatform): Promise<ShellBackend> {
-  const override = process.env.DEEPREEF_SHELL
-  const overrideArgs = process.env.DEEPREEF_SHELL_ARGS
+  const override = process.env.COVALO_SHELL
+  const overrideArgs = process.env.COVALO_SHELL_ARGS
   const cacheKey = `${platform}\0${override ?? ""}\0${overrideArgs ?? ""}`
   let pending = cache.get(cacheKey)
   if (!pending) {
@@ -47,7 +47,7 @@ async function detectShellBackend(platform: SupportedPlatform, override?: string
   if (override) {
     const args = overrideArgs ? JSON.parse(overrideArgs) as unknown : defaultArgs(platform, override)
     if (!Array.isArray(args) || !args.every(value => typeof value === "string")) {
-      throw new Error("DEEPREEF_SHELL_ARGS must be a JSON string array")
+      throw new Error("COVALO_SHELL_ARGS must be a JSON string array")
     }
     if (!await executableExists(override, platform)) {
       throw new Error(`Configured shell executable is not available: ${override}`)

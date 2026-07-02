@@ -9,7 +9,7 @@
  * Bridge 将 Core 的 orchestration 事件转发至此 Store，组件通过 useSyncExternalStore 消费。
  */
 
-import type { OrchestrationEventPayload, WorkerSnapshot, SupervisorSnapshot, LoopTransition, RuntimeSignal, AgentTreeNode, CheckpointSnapshot } from '@deepreef/core';
+import type { OrchestrationEventPayload, WorkerSnapshot, SupervisorSnapshot, LoopTransition, RuntimeSignal, AgentTreeNode, CheckpointSnapshot } from '@covalo/core';
 import { SubscribeStore } from './subscribe-store.js';
 
 /** Loop phase — 与 Core LoopPhase 对齐 */

@@ -9,7 +9,7 @@ describe("list_dir", () => {
   const ctx = (cwd: string) => ({ cwd, signal: new AbortController().signal } as any)
 
   beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "deepreef-listdir-"))
+    tmpDir = mkdtempSync(join(tmpdir(), "covalo-listdir-"))
     writeFileSync(join(tmpDir, "file.txt"), "hello", "utf-8")
     mkdirSync(join(tmpDir, "subdir"))
     writeFileSync(join(tmpDir, "subdir", "nested.txt"), "nested", "utf-8")

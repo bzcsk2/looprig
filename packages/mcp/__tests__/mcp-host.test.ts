@@ -39,7 +39,7 @@ describe("McpHost", () => {
   })
 
   it("should return load summary when some configured servers fail", { timeout: process.platform === "win32" ? 15000 : 5000 }, async () => {
-    const dir = mkdtempSync(join(tmpdir(), "deepreef-mcp-config-"))
+    const dir = mkdtempSync(join(tmpdir(), "covalo-mcp-config-"))
     const configPath = join(dir, "mcp.json")
     writeFileSync(configPath, JSON.stringify({
       mcpServers: {
@@ -206,7 +206,7 @@ describe("Built-in MCP server integration", () => {
   }
 
   it("auto-loads a built-in server when its command is on PATH", { timeout: process.platform === "win32" ? 15000 : 5000 }, async () => {
-    const dir = mkdtempSync(join(tmpdir(), "deepreef-mcp-builtin-auto-"))
+    const dir = mkdtempSync(join(tmpdir(), "covalo-mcp-builtin-auto-"))
     const configPath = writeConfig(dir, {}) // empty user config
 
     const host = new McpHost(undefined, {
@@ -229,7 +229,7 @@ describe("Built-in MCP server integration", () => {
   })
 
   it("skips built-in when user config has the same name", { timeout: process.platform === "win32" ? 15000 : 5000 }, async () => {
-    const dir = mkdtempSync(join(tmpdir(), "deepreef-mcp-builtin-override-"))
+    const dir = mkdtempSync(join(tmpdir(), "covalo-mcp-builtin-override-"))
     const configPath = writeConfig(dir, {
       myserver: { command: process.execPath, args: [fixture] },
     })
@@ -254,7 +254,7 @@ describe("Built-in MCP server integration", () => {
   })
 
   it("silently skips built-in when command is not on PATH", { timeout: process.platform === "win32" ? 15000 : 5000 }, async () => {
-    const dir = mkdtempSync(join(tmpdir(), "deepreef-mcp-builtin-skip-"))
+    const dir = mkdtempSync(join(tmpdir(), "covalo-mcp-builtin-skip-"))
     const configPath = writeConfig(dir, {})
 
     const host = new McpHost(undefined, {
@@ -276,7 +276,7 @@ describe("Built-in MCP server integration", () => {
   })
 
   it("does not load built-ins when loadBuiltins is false", { timeout: process.platform === "win32" ? 15000 : 5000 }, async () => {
-    const dir = mkdtempSync(join(tmpdir(), "deepreef-mcp-custom-path-"))
+    const dir = mkdtempSync(join(tmpdir(), "covalo-mcp-custom-path-"))
     const configPath = writeConfig(dir, {})
 
     let checkCommandCalled = false
@@ -299,7 +299,7 @@ describe("Built-in MCP server integration", () => {
   })
 
   it("built-in server connection failure is silent and excluded from statistics", { timeout: process.platform === "win32" ? 15000 : 5000 }, async () => {
-    const dir = mkdtempSync(join(tmpdir(), "deepreef-mcp-builtin-fail-"))
+    const dir = mkdtempSync(join(tmpdir(), "covalo-mcp-builtin-fail-"))
     const configPath = writeConfig(dir, {})
 
     const host = new McpHost(undefined, {
@@ -320,7 +320,7 @@ describe("Built-in MCP server integration", () => {
   })
 
   it("mixed user + built-in: only user failures appear in failed", { timeout: process.platform === "win32" ? 15000 : 5000 }, async () => {
-    const dir = mkdtempSync(join(tmpdir(), "deepreef-mcp-mixed-"))
+    const dir = mkdtempSync(join(tmpdir(), "covalo-mcp-mixed-"))
     const configPath = writeConfig(dir, {
       good_user: { command: process.execPath, args: [fixture] },
       bad_user: { command: process.execPath, args: ["-e", "process.exit(1)"] },

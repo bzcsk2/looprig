@@ -1,5 +1,5 @@
 /**
- * Base system prompt — bilingual LoopRig identity, tool guide, coding conventions.
+ * Base system prompt — bilingual Covalo identity, tool guide, coding conventions.
  *
  * @module
  */

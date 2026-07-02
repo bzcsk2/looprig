@@ -15,7 +15,7 @@
  *   - meta 元素之间用中间点(·)分隔
  *   - right 内容紧跟在 meta 之后，由调用方传入
  */
-import { Box, Text } from '@deepreef/ink';
+import { Box, Text } from '@covalo/ink';
 import React from 'react';
 import { FG } from './tokens.js';
 

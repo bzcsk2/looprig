@@ -281,7 +281,7 @@ export async function recordLineageForPatch(params: {
   await store.init();
 
   const entry: HarnessLineageEntry = {
-    schemaVersion: "looprig.harness-lineage.v1",
+    schemaVersion: "covalo.harness-lineage.v1",
     patchId: params.patchId,
     surface: params.surface,
     decision: params.decision,

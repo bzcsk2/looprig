@@ -768,7 +768,7 @@ describe("WorkflowCoordinator", () => {
       const { Mailbox } = await import("../src/agent-comm/mailbox.js")
       const { rmSync, mkdirSync, existsSync } = await import("node:fs")
       const { resolve } = await import("node:path")
-      const testDir = resolve(process.cwd(), ".deepreef-test-coord-mailbox")
+      const testDir = resolve(process.cwd(), ".covalo-test-coord-mailbox")
       if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true })
       mkdirSync(testDir, { recursive: true })
 
@@ -811,7 +811,7 @@ describe("WorkflowCoordinator", () => {
       const { Mailbox } = await import("../src/agent-comm/mailbox.js")
       const { rmSync, mkdirSync, existsSync } = await import("node:fs")
       const { resolve } = await import("node:path")
-      const testDir = resolve(process.cwd(), ".deepreef-test-coord-mailbox2")
+      const testDir = resolve(process.cwd(), ".covalo-test-coord-mailbox2")
       if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true })
       mkdirSync(testDir, { recursive: true })
 
@@ -869,7 +869,7 @@ describe("WorkflowCoordinator", () => {
       const { rmSync, mkdirSync, existsSync } = await import("node:fs")
       const { resolve } = await import("node:path")
       const { randomUUID } = await import("node:crypto")
-      const testDir = resolve(process.cwd(), ".deepreef-test-coord-goal")
+      const testDir = resolve(process.cwd(), ".covalo-test-coord-goal")
       if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true })
       mkdirSync(testDir, { recursive: true })
 
@@ -1098,7 +1098,7 @@ describe("WorkflowCoordinator", () => {
       const { GoalStore } = await import("../src/goal/store.js")
       const { randomUUID } = await import("node:crypto")
 
-      const testDir = resolve(process.cwd(), ".deepreef-test-regression-wfid")
+      const testDir = resolve(process.cwd(), ".covalo-test-regression-wfid")
       if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true })
       mkdirSync(testDir, { recursive: true })
 
@@ -1125,7 +1125,7 @@ describe("WorkflowCoordinator", () => {
       const { rmSync, mkdirSync, existsSync } = await import("node:fs")
       const { resolve } = await import("node:path")
 
-      const testDir = resolve(process.cwd(), ".deepreef-test-regression-mailbox")
+      const testDir = resolve(process.cwd(), ".covalo-test-regression-mailbox")
       if (existsSync(testDir)) rmSync(testDir, { recursive: true, force: true })
       mkdirSync(testDir, { recursive: true })
 

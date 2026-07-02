@@ -10,7 +10,7 @@ import { createWebSearchTool } from "../src/web-search.js"
 import { createWebFetchTool } from "../src/web-fetch.js"
 
 const ctx = {
-  cwd: mkdtempSync(join(tmpdir(), "deepreef-tools-")),
+  cwd: mkdtempSync(join(tmpdir(), "covalo-tools-")),
   sessionId: "test-session",
   signal: new AbortController().signal,
   invokeTool: async (name: string, args: Record<string, unknown>) => ({ content: JSON.stringify({ name, args }), isError: false }),
@@ -188,9 +188,9 @@ describe("LSP", () => {
 
   it("should execute a configured LSP hover request", async () => {
     const tool = createLspTool()
-    mkdirSync(join(ctx.cwd, ".deepreef"), { recursive: true })
+    mkdirSync(join(ctx.cwd, ".covalo"), { recursive: true })
     writeFileSync(join(ctx.cwd, "test.ts"), "const answer = 42\n")
-    writeFileSync(join(ctx.cwd, ".deepreef", "lsp.json"), JSON.stringify({
+    writeFileSync(join(ctx.cwd, ".covalo", "lsp.json"), JSON.stringify({
       languages: { typescript: { command: process.execPath, args: [join(import.meta.dir, "fixtures", "fake-lsp.mjs")] } },
     }))
     const r = await tool.execute({ action: "hover", file_path: "test.ts" }, ctx)

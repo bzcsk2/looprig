@@ -11,7 +11,7 @@ import { validateAssetPath } from "./path-security.js"
 
 const DEFAULT_OPTIONS: ContentPackPluginOptions = {
   type: "auto",
-  target: "deepreef",
+  target: "covalo",
   targetMode: "compatible",
   skills: { enabled: true },
   agents: { enabled: true },
@@ -185,7 +185,7 @@ function selectModules(
 
   // Filter by target
   const targetMode = options.targetMode ?? "compatible"
-  const target = options.target ?? "deepreef"
+  const target = options.target ?? "covalo"
   if (modules && Array.isArray(modules.modules)) {
     for (const mId of [...selected]) {
       const mod = modules.modules.find((m: any) => m.id === mId)

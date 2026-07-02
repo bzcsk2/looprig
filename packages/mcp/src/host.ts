@@ -17,12 +17,12 @@ interface McpConfig {
 }
 
 /**
- * Built-in MCP servers that ship with deepreef.
- * User config in `.deepreef/mcp.json` takes precedence — if the user has
+ * Built-in MCP servers that ship with covalo.
+ * User config in `.covalo/mcp.json` takes precedence — if the user has
  * already configured a server with the same name, the built-in is skipped.
  *
  * Built-in server connection failures are silent: if the command is not
- * installed (e.g. `codegraph` not on PATH), deepreef simply skips it.
+ * installed (e.g. `codegraph` not on PATH), covalo simply skips it.
  */
 const BUILTIN_MCP_SERVERS: Record<string, McpServerConfig> = {
   codegraph: {
@@ -112,7 +112,7 @@ export class McpHost {
    * Load MCP server configuration and connect to all servers.
    *
    * @param configPath  Path to a JSON config file.  When omitted the default
-   *                    `.deepreef/mcp.json` in `cwd` is used.
+   *                    `.covalo/mcp.json` in `cwd` is used.
    * @param options.loadBuiltins  When `true`, built-in servers are merged
    *        regardless of whether `configPath` was provided.  When `false`,
    *        built-in loading is skipped entirely.  When omitted, the original
@@ -124,7 +124,7 @@ export class McpHost {
     options?: { loadBuiltins?: boolean },
   ): Promise<McpLoadSummary> {
     const paths = configPath ? [configPath] : [
-      resolve(process.cwd(), ".deepreef/mcp.json"),
+      resolve(process.cwd(), ".covalo/mcp.json"),
     ]
 
     let config: McpConfig = {}
@@ -262,7 +262,7 @@ export class McpHost {
     const auth = await readAuthStore()
     const failed: McpLoadSummary["failed"] = []
     await Promise.all(sources.map(({ name, command, args, env }) =>
-      this.connect(name, { command, args, env: { ...env, ...(auth[name]?.apiKey ? { MCP_API_KEY: auth[name].apiKey, DEEPREEF_MCP_API_KEY: auth[name].apiKey } : {}) } }).catch((error) => {
+      this.connect(name, { command, args, env: { ...env, ...(auth[name]?.apiKey ? { MCP_API_KEY: auth[name].apiKey, COVALO_MCP_API_KEY: auth[name].apiKey } : {}) } }).catch((error) => {
         failed.push({ name, error: error instanceof Error ? error.message : String(error) })
       })
     ))
@@ -297,7 +297,7 @@ export class McpHost {
 
 async function readAuthStore(): Promise<Record<string, { apiKey: string }>> {
   try {
-    const raw = await readFile(resolve(process.cwd(), ".deepreef/mcp-auth.json"), "utf8")
+    const raw = await readFile(resolve(process.cwd(), ".covalo/mcp-auth.json"), "utf8")
     const parsed = JSON.parse(raw)
     const result = await McpAuthStoreSchema["~standard"].validate(parsed)
     if ("value" in result) {
@@ -315,7 +315,7 @@ function withCredential(config: McpServerConfig, apiKey?: string): McpServerConf
     ...config,
     env: {
       MCP_API_KEY: apiKey,
-      DEEPREEF_MCP_API_KEY: apiKey,
+      COVALO_MCP_API_KEY: apiKey,
       ...config.env,
     },
   }

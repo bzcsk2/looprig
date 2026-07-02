@@ -1,6 +1,6 @@
 import type { PacketBase, EvidenceRef } from "./types";
 
-export const INCIDENT_PACKET_SCHEMA_VERSION = "looprig.incident-packet.v1";
+export const INCIDENT_PACKET_SCHEMA_VERSION = "covalo.incident-packet.v1";
 
 export const INCIDENT_KINDS = [
   "review_needs_fix",

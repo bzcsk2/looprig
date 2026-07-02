@@ -1,12 +1,12 @@
-# LoopRig Eval NPM 自包含资产改造 Spec
+# Covalo Eval NPM 自包含资产改造 Spec
 
 ## 0. 一句话目标
 
-让用户通过 npm 安装 LoopRig 后，可以直接运行内置 eval 模式，不再因为缺少外部 benchmark 文件、SWE-bench git bundle、Terminal-Bench task 文件、PyTorch `.pt` 文件而失败。
+让用户通过 npm 安装 Covalo 后，可以直接运行内置 eval 模式，不再因为缺少外部 benchmark 文件、SWE-bench git bundle、Terminal-Bench task 文件、PyTorch `.pt` 文件而失败。
 
 ```text id="ou6lx1"
-npm install -g @deepreef/cli
-looprig
+npm install -g @covalo/cli
+covalo
   -> 在 TUI 中使用现有 eval 入口
 ```
 
@@ -23,7 +23,7 @@ looprig
 
 本 spec 只处理 **eval 数据资产自包含**。系统运行时依赖，例如 Node、Python、git、pytest、shell 工具、sandbox provider，仍由当前 preflight/setup 机制处理。
 
-注意：当前 CLI 的 `looprig eval` 只包含 `doctor / prepare / clean-toolchains` 子命令。除非本次实现明确新增 CLI list/run 子命令，否则验收不得使用 `looprig eval --list` 或 `looprig eval --category ...` 作为既有入口。
+注意：当前 CLI 的 `covalo eval` 只包含 `doctor / prepare / clean-toolchains` 子命令。除非本次实现明确新增 CLI list/run 子命令，否则验收不得使用 `covalo eval --list` 或 `covalo eval --category ...` 作为既有入口。
 
 ---
 
@@ -63,7 +63,7 @@ packages/core/src/eval/index.ts
 1. resolveSandboxProvider()
 2. setVerifierSandboxProvider()
 3. setEvalSandboxProvider()
-4. 创建 .deepreef/evals/<runId>
+4. 创建 .covalo/evals/<runId>
 5. getSuite(categoryId, suiteId, environmentId)
 6. preflight
 7. 遍历 caseRefs
@@ -266,7 +266,7 @@ export function assertSafeAssetRelativePath(relativePath: string): void;
 查找顺序：
 
 ```text id="m7g7cm"
-1. LOOPRIG_EVAL_ASSETS_DIR
+1. COVALO_EVAL_ASSETS_DIR
 2. npm package root/resources/eval-assets
 3. repo root/resources/eval-assets
 4. development fallback: packages/core/src/eval/curated
@@ -572,7 +572,7 @@ resources/eval-assets/assets.lock.json
 本地 build cache：
 
 ```text id="jkys4w"
-.deepreef/eval-build-cache/repos/<safeRepoName>
+.covalo/eval-build-cache/repos/<safeRepoName>
 ```
 
 输出路径：
@@ -994,14 +994,14 @@ npm pack --dry-run
 必须保证：
 
 ```text id="g4r4ip"
-looprig --help
-looprig eval doctor
+covalo --help
+covalo eval doctor
 现有 TUI eval 入口或新增的 CLI eval list/run 入口
 ```
 
 不会因为缺 benchmark 文件而崩溃。
 
-当前 CLI 不存在 `looprig eval --list` / `looprig eval --category ...`。如果实现者希望把这些命令作为验收项，必须把新增子命令写入本次改造范围；否则使用现有 TUI 入口和 core integration test 验收。
+当前 CLI 不存在 `covalo eval --list` / `covalo eval --category ...`。如果实现者希望把这些命令作为验收项，必须把新增子命令写入本次改造范围；否则使用现有 TUI 入口和 core integration test 验收。
 
 ### 16.2 默认 smoke suite 应尽量轻依赖
 
@@ -1074,7 +1074,7 @@ packages/core/src/eval/assets/__tests__/assets-lock.test.ts
 覆盖：
 
 ```text id="4kc29j"
-1. 能从 LOOPRIG_EVAL_ASSETS_DIR 读取
+1. 能从 COVALO_EVAL_ASSETS_DIR 读取
 2. 能从 repo root/resources/eval-assets 读取
 3. 能拒绝 ../evil
 4. 能拒绝 /absolute/path
@@ -1144,7 +1144,7 @@ runFixedEval({
 ```text id="4q936c"
 1. createCaseWorkspace 成功
 2. runSingleCase 成功进入 verifier
-3. report 写入 .deepreef/evals/<runId>
+3. report 写入 .covalo/evals/<runId>
 4. 不访问外部 benchmark 文件
 ```
 
@@ -1167,11 +1167,11 @@ npm pack --dry-run
 
 ```bash id="m3mpfb"
 npm pack
-mkdir -p /tmp/looprig-npm-test
-cd /tmp/looprig-npm-test
-npm install /path/to/deepreef-cli-*.tgz
-node node_modules/@deepreef/cli/dist/index.js --help
-node node_modules/@deepreef/cli/dist/index.js eval doctor
+mkdir -p /tmp/covalo-npm-test
+cd /tmp/covalo-npm-test
+npm install /path/to/covalo-cli-*.tgz
+node node_modules/@covalo/cli/dist/index.js --help
+node node_modules/@covalo/cli/dist/index.js eval doctor
 ```
 
 如果本次同时新增 CLI eval list/run 子命令，再追加对应命令验收；不要把当前不存在的 CLI 参数作为资产改造的必过项。
@@ -1245,12 +1245,12 @@ docs/DEVELOPMENT.md
 在不 clone 源码仓库的干净目录中：
 
 ```bash id="90wchy"
-npm install -g @deepreef/cli
-looprig --help
-looprig eval doctor
+npm install -g @covalo/cli
+covalo --help
+covalo eval doctor
 ```
 
-必须成功。内置 eval case 的列出与运行通过现有 TUI 入口或 core integration test 验收；只有实现了 CLI list/run 子命令时，才增加 `looprig eval --list` / `looprig eval --category weak-model --suite smoke` 验收。
+必须成功。内置 eval case 的列出与运行通过现有 TUI 入口或 core integration test 验收；只有实现了 CLI list/run 子命令时，才增加 `covalo eval --list` / `covalo eval --category weak-model --suite smoke` 验收。
 
 ### 23.2 资产验收
 
@@ -1323,10 +1323,10 @@ MissingEvalAssetError: missing SWE-bench snapshot for pytest-dev/pytest#<baseCom
 
 ## 24. 最终状态
 
-完成后，LoopRig eval 资产模型应变成：
+完成后，Covalo eval 资产模型应变成：
 
 ```text id="au5so8"
-@deepreef/cli npm package
+@covalo/cli npm package
   ├─ dist/
   ├─ resources/
   │   └─ eval-assets/
@@ -1372,5 +1372,5 @@ curated/swebench-repos/*.bundle
 核心验收口径：
 
 ```text id="2lwdc0"
-npm 安装后的 LoopRig eval 模式，必须依靠包内 resources/eval-assets 完成内置 case 的 manifest 加载、workspace 物化和必要数据文件准备。
+npm 安装后的 Covalo eval 模式，必须依靠包内 resources/eval-assets 完成内置 case 的 manifest 加载、workspace 物化和必要数据文件准备。
 ```

@@ -15,7 +15,7 @@ export interface ToolEntry {
   archiveBinaryPath: string
 }
 
-const TOOLCHAIN_ROOT = join(homedir(), ".looprig", "toolchains")
+const TOOLCHAIN_ROOT = join(homedir(), ".covalo", "toolchains")
 const PROFILE_DIR = "benchmark-node"
 
 function formatUrl(template: string, version: string): string {
@@ -70,7 +70,7 @@ function toolDir(name: string): string {
 }
 
 async function downloadFile(url: string, dest: string): Promise<void> {
-  const resp = await fetch(url, { headers: { "User-Agent": "looprig-toolchain/1.0" } })
+  const resp = await fetch(url, { headers: { "User-Agent": "covalo-toolchain/1.0" } })
   if (!resp.ok) {
     throw new Error(`HTTP ${resp.status} for ${url.slice(0, 80)}`)
   }

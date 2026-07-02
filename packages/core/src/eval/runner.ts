@@ -68,12 +68,12 @@ export function getCurrentEvalLogger(): import("../runtime-logger").RuntimeLogge
   return _currentEvalLogger;
 }
 
-function getDeepReefRoot(): string {
-  return process.env.DEEPRREF_ROOT ?? ".deepreef";
+function getCovaloRoot(): string {
+  return process.env.COVALO_ROOT ?? ".covalo";
 }
 
 function getEvalsDir(): string {
-  return join(getDeepReefRoot(), "evals");
+  return join(getCovaloRoot(), "evals");
 }
 
 function countVerifierCommands(manifest: import("./types").EvalCaseManifest): number {
@@ -879,9 +879,9 @@ async function runSingleCase(
         "review-packet.json", "incident-packet.json", "recovery-packet.json",
       ];
       const PACKET_SCHEMAS = new Set([
-        "looprig.task-digest.v1", "looprig.runtime-guard.v1", "looprig.action-certificate.v1",
-        "looprig.review-packet.v1", "looprig.incident-packet.v1", "looprig.recovery-packet.v1",
-        "looprig.harness-patch.v1",
+        "covalo.task-digest.v1", "covalo.runtime-guard.v1", "covalo.action-certificate.v1",
+        "covalo.review-packet.v1", "covalo.incident-packet.v1", "covalo.recovery-packet.v1",
+        "covalo.harness-patch.v1",
       ]);
       for (const fileName of packetFiles) {
         const { join } = await import("node:path");

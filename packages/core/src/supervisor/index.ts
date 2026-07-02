@@ -47,7 +47,7 @@ export type {
 } from "./router.js"
 
 export {
-  DEEPREEF_SUPERVISOR_SMOKE_ENV,
+  COVALO_SUPERVISOR_SMOKE_ENV,
   isSupervisorSmokeEnabled,
   runSupervisorSmokeTest,
   runSupervisorPoolSmokeTests,

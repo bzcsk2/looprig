@@ -120,7 +120,7 @@ export type AgentBenchmarkSource =
   | "agentprobe"
   | "issuebenchkit"
   | "live-repo-fixture"
-  | "deepreef-regression"
+  | "covalo-regression"
 
 export type AgentBenchmarkEvaluationSignal =
   | "test-pass-rate"

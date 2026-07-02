@@ -7,22 +7,22 @@ import { RuntimeLogger, createRuntimeLoggerFromEnv, parseDebugArgs, registerClea
 describe("RuntimeLogger", () => {
   let tmpDir: string
   let logPath: string
-  const originalLevel = process.env.DEEPREEF_LOG_LEVEL
-  const originalFile = process.env.DEEPREEF_LOG_FILE
+  const originalLevel = process.env.COVALO_LOG_LEVEL
+  const originalFile = process.env.COVALO_LOG_FILE
 
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `deepreef-runtime-log-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tmpDir = join(tmpdir(), `covalo-runtime-log-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     logPath = join(tmpDir, "runtime.jsonl")
     await mkdir(tmpDir, { recursive: true })
-    delete process.env.DEEPREEF_LOG_LEVEL
-    delete process.env.DEEPREEF_LOG_FILE
+    delete process.env.COVALO_LOG_LEVEL
+    delete process.env.COVALO_LOG_FILE
   })
 
   afterEach(async () => {
-    if (originalLevel === undefined) delete process.env.DEEPREEF_LOG_LEVEL
-    else process.env.DEEPREEF_LOG_LEVEL = originalLevel
-    if (originalFile === undefined) delete process.env.DEEPREEF_LOG_FILE
-    else process.env.DEEPREEF_LOG_FILE = originalFile
+    if (originalLevel === undefined) delete process.env.COVALO_LOG_LEVEL
+    else process.env.COVALO_LOG_LEVEL = originalLevel
+    if (originalFile === undefined) delete process.env.COVALO_LOG_FILE
+    else process.env.COVALO_LOG_FILE = originalFile
     await rm(tmpDir, { recursive: true, force: true })
   })
 
@@ -31,7 +31,7 @@ describe("RuntimeLogger", () => {
     expect(logger.isEnabled()).toBe(false)
     logger.info("ignored", { value: 1 })
     await logger.flush()
-    await expect(access(join(tmpDir, ".deepreef", "logs"))).rejects.toThrow()
+    await expect(access(join(tmpDir, ".covalo", "logs"))).rejects.toThrow()
   })
 
   it("writes JSONL records with child bindings", async () => {

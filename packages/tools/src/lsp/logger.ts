@@ -1,4 +1,4 @@
-import type { RuntimeLogger } from "@deepreef/core"
+import type { RuntimeLogger } from "@covalo/core"
 
 export interface LspLogContext {
   sessionId?: string

@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       publish_to_npm:
-        description: "Publish @deepreef/cli to npm"
+        description: "Publish covalo to npm"
         required: true
         default: false
         type: boolean

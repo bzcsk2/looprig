@@ -1,5 +1,5 @@
 import React, { type ReactNode } from 'react';
-import { Box, ScrollBox, type ScrollBoxHandle } from '@deepreef/ink';
+import { Box, ScrollBox, type ScrollBoxHandle } from '@covalo/ink';
 import { isFullscreenEnvEnabled } from './fullscreen.js';
 
 type Props = {

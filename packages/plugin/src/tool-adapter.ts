@@ -1,5 +1,5 @@
 import type { PluginLoaded } from "./loader.js"
-import type { ToolSpec } from "@deepreef/core"
+import type { ToolSpec } from "@covalo/core"
 import { isSchemaAwareTool } from "./define-tool.js"
 import { convertSchemaToJsonSpec, validateSchemaArgs } from "./schema-adapter.js"
 import type { StandardSchemaLike } from "./schema-adapter.js"
@@ -41,7 +41,7 @@ async function extractPluginTools(plugin: PluginLoaded): Promise<PluginToolResul
     const toolName = `${plugin.mod.id}.${key}`
 
     if (isSchemaAwareTool(value)) {
-      const meta = value.deepreefTool
+      const meta = value.covaloTool
       let parameters: Record<string, unknown>
       try {
         parameters = await convertSchemaToJsonSpec(meta.inputSchema)

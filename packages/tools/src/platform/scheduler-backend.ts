@@ -4,8 +4,8 @@ import type { SupportedPlatform } from "./shell-backend.js"
 
 export type SchedulerBackend = { id: "crontab" | "schtasks" | "unsupported" }
 
-const JOB_MARKER = "# deepreef-job:"
-const DEEPREEF_TASK_PREFIX = "Deepreef-"
+const JOB_MARKER = "# covalo-job:"
+const COVALO_TASK_PREFIX = "Deepreef-"
 
 export interface SchedulerJob {
   name: string
@@ -295,8 +295,8 @@ async function listSchTasksJobs(signal?: AbortSignal): Promise<SchedulerResult> 
         const match = line.match(/"([^"]+)"/)
         if (!match) continue
         const taskName = match[1]
-        if (!taskName.startsWith(DEEPREEF_TASK_PREFIX)) continue
-        const name = taskName.slice(DEEPREEF_TASK_PREFIX.length)
+        if (!taskName.startsWith(COVALO_TASK_PREFIX)) continue
+        const name = taskName.slice(COVALO_TASK_PREFIX.length)
         jobs.push({ name, schedule: "", command: "" })
       }
       resolve({ jobs, backend: "schtasks" })
@@ -320,7 +320,7 @@ async function createSchTaskJob(
 
   const sanitizedCommand = command.replace(/[\n\r]/g, " ")
   const sanitizedName = name.replace(/[\n\r]/g, "_")
-  const taskName = `${DEEPREEF_TASK_PREFIX}${sanitizedName}`
+  const taskName = `${COVALO_TASK_PREFIX}${sanitizedName}`
 
   const args: string[] = ["/Create", "/TN", taskName, "/TR", sanitizedCommand, "/SC", schSchedule.sc, "/F"]
   if (schSchedule.mo) args.push("/MO", schSchedule.mo)
@@ -348,7 +348,7 @@ async function createSchTaskJob(
 
 async function deleteSchTaskJob(name: string, signal?: AbortSignal): Promise<{ error?: string; backend: string }> {
   const sanitizedName = name.replace(/[\n\r]/g, "_")
-  const taskName = `${DEEPREEF_TASK_PREFIX}${sanitizedName}`
+  const taskName = `${COVALO_TASK_PREFIX}${sanitizedName}`
 
   return new Promise((resolve) => {
     const proc = spawn("schtasks.exe", ["/Delete", "/TN", taskName, "/F"], { timeout: 10_000, signal })

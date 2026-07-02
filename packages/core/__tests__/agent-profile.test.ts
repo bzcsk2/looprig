@@ -10,7 +10,7 @@ describe("agent-profile", () => {
   let tmpDir: string
 
   beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "deepreef-agent-profile-"))
+    tmpDir = mkdtempSync(join(tmpdir(), "covalo-agent-profile-"))
     vi.spyOn(process, "cwd").mockReturnValue(tmpDir)
   })
 
@@ -127,7 +127,7 @@ describe("agent-profile", () => {
         },
       }
 
-      const dir = join(tmpDir, ".deepreef")
+      const dir = join(tmpDir, ".covalo")
       mkdirSync(dir, { recursive: true })
       writeFileSync(join(dir, "agents.json"), JSON.stringify(legacyConfig), "utf8")
 
@@ -145,7 +145,7 @@ describe("agent-profile", () => {
         harness: { strictness: "strict" },
       }
 
-      const dir = join(tmpDir, ".deepreef")
+      const dir = join(tmpDir, ".covalo")
       mkdirSync(dir, { recursive: true })
       writeFileSync(join(dir, "ui-settings.json"), JSON.stringify(uiSettings), "utf8")
 
@@ -180,7 +180,7 @@ describe("agent-profile", () => {
     })
 
     it("should handle corrupted config file gracefully", () => {
-      const dir = join(tmpDir, ".deepreef")
+      const dir = join(tmpDir, ".covalo")
       mkdirSync(dir, { recursive: true })
       writeFileSync(join(dir, "agents.json"), "{invalid json!!!}", "utf8")
 
@@ -189,7 +189,7 @@ describe("agent-profile", () => {
     })
 
     it("should handle invalid config file gracefully", () => {
-      const dir = join(tmpDir, ".deepreef")
+      const dir = join(tmpDir, ".covalo")
       mkdirSync(dir, { recursive: true })
       writeFileSync(
         join(dir, "agents.json"),

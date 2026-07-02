@@ -39,13 +39,13 @@ describe("native sandbox fixture verifier contract", () => {
   let tmpDir: string;
 
   beforeAll(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "deepreef-verifier-contract-"));
-    process.env.DEEPRREF_ROOT = tmpDir;
+    tmpDir = mkdtempSync(join(tmpdir(), "covalo-verifier-contract-"));
+    process.env.COVALO_ROOT = tmpDir;
   });
 
   afterAll(() => {
     rmSync(tmpDir, { recursive: true, force: true });
-    delete process.env.DEEPRREF_ROOT;
+    delete process.env.COVALO_ROOT;
   });
 
   it("all sandbox fixtures are registered", () => {

@@ -1,0 +1,2 @@
+{"ts":1781249714320,"type":"messages","payload":[{"role":"system","content":"You are a full-stack engineering agent with access to a complete toolset.\nYou can read, write, edit files, run bash commands, search code, and manage tasks.\nAlways verify your changes — re-read files after editing when needed."},{"role":"user","content":"interrupt-me"}]}
+{"ts":1781249714320,"type":"event","payload":{"role":"assistant_delta","content":"partial "}}

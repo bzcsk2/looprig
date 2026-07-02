@@ -1,5 +1,5 @@
 import React, { type ReactNode } from 'react';
-import { Box, ScrollBox, Text, type ScrollBoxHandle } from '@deepreef/ink';
+import { Box, ScrollBox, Text, type ScrollBoxHandle } from '@covalo/ink';
 import { isFullscreenEnvEnabled } from './fullscreen.js';
 import { FG } from './reasonix/tokens.js';
 

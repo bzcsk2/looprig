@@ -14,14 +14,14 @@ describe("CLI memory integration (Deepreef native)", () => {
     rmSync(tempDir, { recursive: true, force: true })
   })
 
-  it("@deepreef/memory exports MemoryService class", async () => {
-    const mod = await import("@deepreef/memory")
+  it("@covalo/memory exports MemoryService class", async () => {
+    const mod = await import("@covalo/memory")
     expect(mod).toBeDefined()
     expect(typeof mod.MemoryService).toBe("function")
   })
 
-  it("@deepreef/memory exports all agent tool creators", async () => {
-    const mod = await import("@deepreef/memory")
+  it("@covalo/memory exports all agent tool creators", async () => {
+    const mod = await import("@covalo/memory")
     expect(typeof mod.createMemoryRecallTool).toBe("function")
     expect(typeof mod.createMemorySaveTool).toBe("function")
     expect(typeof mod.createMemorySmartSearchTool).toBe("function")
@@ -30,19 +30,19 @@ describe("CLI memory integration (Deepreef native)", () => {
     expect(typeof mod.createMemoryStatusTool).toBe("function")
   })
 
-  it("@deepreef/memory exports migration tools", async () => {
-    const mod = await import("@deepreef/memory")
+  it("@covalo/memory exports migration tools", async () => {
+    const mod = await import("@covalo/memory")
     expect(typeof mod.createMemoryMigrateTool).toBe("function")
     expect(typeof mod.migrateFromAgentMemory).toBe("function")
   })
 
-  it("@deepreef/memory exports bridge class", async () => {
-    const mod = await import("@deepreef/memory")
+  it("@covalo/memory exports bridge class", async () => {
+    const mod = await import("@covalo/memory")
     expect(typeof mod.DeepreefMemoryBridge).toBe("function")
   })
 
   it("MemoryService can be created and started", async () => {
-    const { MemoryService } = await import("@deepreef/memory")
+    const { MemoryService } = await import("@covalo/memory")
     const svc = new MemoryService({ dataDir: tempDir })
     await svc.start()
     // MemoryService exposes .config after construction

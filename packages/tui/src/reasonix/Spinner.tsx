@@ -1,4 +1,4 @@
-import { Box, Text, useAnimationFrame } from '@deepreef/ink';
+import { Box, Text, useAnimationFrame } from '@covalo/ink';
 import React from 'react';
 
 // 动画帧序列定义

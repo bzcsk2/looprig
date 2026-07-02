@@ -13,8 +13,8 @@ describe("LspManager", () => {
 
   beforeEach(() => {
     cwd = mkdtempSync(join(tmpdir(), "lsp-manager-test-"))
-    mkdirSync(join(cwd, ".deepreef"), { recursive: true })
-    writeFileSync(join(cwd, ".deepreef", "lsp.json"), JSON.stringify({
+    mkdirSync(join(cwd, ".covalo"), { recursive: true })
+    writeFileSync(join(cwd, ".covalo", "lsp.json"), JSON.stringify({
       languages: {
         typescript: { command: process.execPath, args: [fakeLspPath] },
       },
@@ -236,14 +236,14 @@ describe("LspManager", () => {
   })
 
   it("should handle missing server config gracefully", async () => {
-    mkdirSync(join(cwd, ".deepreef2"), { recursive: true })
-    writeFileSync(join(cwd, ".deepreef2", "lsp.json"), JSON.stringify({
+    mkdirSync(join(cwd, ".covalo2"), { recursive: true })
+    writeFileSync(join(cwd, ".covalo2", "lsp.json"), JSON.stringify({
       languages: {},
     }))
 
-    manager = new LspManager(join(cwd, ".deepreef2"))
+    manager = new LspManager(join(cwd, ".covalo2"))
 
-    const testFile = join(cwd, ".deepreef2", "test.ts")
+    const testFile = join(cwd, ".covalo2", "test.ts")
     writeFileSync(testFile, "const x = 42")
 
     await expect(

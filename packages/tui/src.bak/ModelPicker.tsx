@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { Box, Text, useInput } from '@deepreef/ink';
-import { PROVIDERS, getApiKeyEnvVar } from '@deepreef/core';
+import { Box, Text, useInput } from '@covalo/ink';
+import { PROVIDERS, getApiKeyEnvVar } from '@covalo/core';
 import { execFile } from 'child_process';
 
 interface ModelPickerProps {

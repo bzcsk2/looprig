@@ -1,11 +1,11 @@
-import type { ChatMessage, ReasonixEngine, QuestionRequest, PermissionRequest, PermissionReply, LoopEvent } from '@deepreef/core';
-import type { AgentRole } from '@deepreef/core/agent-profile/types.js';
-import type { WorkflowMode } from '@deepreef/core/dual-agent-runtime/types.js';
-import type { DualAgentRuntime } from '@deepreef/core/dual-agent-runtime/dual-runtime.js';
-import type { WorkflowCoordinator } from '@deepreef/core/workflow-coordinator/coordinator.js';
-import type { WorkflowEvent } from '@deepreef/core/workflow-coordinator/types.js';
-import type { EvalRunOptions, EvalRunProgress, EvalRunResult } from '@deepreef/core';
-import { PROVIDERS, resolveApiKey, getApiKeyEnvVar, resolveModelTarget, loadConfig, runEval as runCoreEval } from '@deepreef/core';
+import type { ChatMessage, ReasonixEngine, QuestionRequest, PermissionRequest, PermissionReply, LoopEvent } from '@covalo/core';
+import type { AgentRole } from '@covalo/core/agent-profile/types.js';
+import type { WorkflowMode } from '@covalo/core/dual-agent-runtime/types.js';
+import type { DualAgentRuntime } from '@covalo/core/dual-agent-runtime/dual-runtime.js';
+import type { WorkflowCoordinator } from '@covalo/core/workflow-coordinator/coordinator.js';
+import type { WorkflowEvent } from '@covalo/core/workflow-coordinator/types.js';
+import type { EvalRunOptions, EvalRunProgress, EvalRunResult } from '@covalo/core';
+import { PROVIDERS, resolveApiKey, getApiKeyEnvVar, resolveModelTarget, loadConfig, runEval as runCoreEval } from '@covalo/core';
 import { setTUIState } from './App.js';
 import { DeltaBatcher, resolveDeltaFlushMs } from './delta-batcher.js';
 import { t } from './i18n/index.js';
@@ -1482,7 +1482,7 @@ export function createBridge(
     }
 
     const checkApiKey = (modelTarget: string): string | null => {
-      // Try alias resolution first (includes .deepreef/model-targets.json custom aliases)
+      // Try alias resolution first (includes .covalo/model-targets.json custom aliases)
       const cfg = loadConfig()
       const resolved = resolveModelTarget(modelTarget, cfg, cfg.modelTargets)
       if (resolved) {
@@ -1503,7 +1503,7 @@ export function createBridge(
     }
 
     const switchModel = async (modelTarget: string): Promise<void> => {
-      // Try alias resolution first (includes .deepreef/model-targets.json custom aliases)
+      // Try alias resolution first (includes .covalo/model-targets.json custom aliases)
       const cfg = loadConfig()
       const resolved = resolveModelTarget(modelTarget, cfg, cfg.modelTargets)
       if (resolved) {

@@ -1,4 +1,4 @@
-import type { AgentTool } from "@deepreef/core"
+import type { AgentTool } from "@covalo/core"
 import { safeStringify } from "./safe-stringify.js"
 
 interface TodoItem {

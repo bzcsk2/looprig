@@ -11,7 +11,7 @@ export class AgentScoreStore {
   private basePath: string
 
   constructor(options: AgentScoreStoreOptions = {}) {
-    this.basePath = options.basePath ?? resolve(process.cwd(), ".deepreef", "scores")
+    this.basePath = options.basePath ?? resolve(process.cwd(), ".covalo", "scores")
   }
 
   private pathForWorkflow(workflowId: string): string {
@@ -53,7 +53,7 @@ export class EvalReportStore {
   private basePath: string
 
   constructor(basePath?: string) {
-    this.basePath = basePath ?? resolve(process.cwd(), ".deepreef", "evals")
+    this.basePath = basePath ?? resolve(process.cwd(), ".covalo", "evals")
   }
 
   private evalDir(evalRunId: string): string {

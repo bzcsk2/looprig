@@ -26,11 +26,11 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 8000
 const DEFAULT_IDLE_TIMEOUT_MS = 300000
 
 export async function readLspConfig(cwd: string, configPath?: string): Promise<LspConfigResult> {
-  const envConfigPath = process.env.DEEPREEF_LSP_CONFIG
+  const envConfigPath = process.env.COVALO_LSP_CONFIG
   const paths = [
     configPath,
     envConfigPath,
-    resolve(cwd, ".deepreef", "lsp.json"),
+    resolve(cwd, ".covalo", "lsp.json"),
   ].filter((p): p is string => typeof p === "string")
 
   for (const path of paths) {

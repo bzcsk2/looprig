@@ -19,7 +19,7 @@ import { createHash } from "node:crypto";
 
 const REPO_ROOT = resolve(import.meta.dirname, "..", "..");
 const ASSETS_DIR = join(REPO_ROOT, "resources", "eval-assets");
-const CACHE_DIR = join(REPO_ROOT, ".deepreef", "eval-build-cache", "repos");
+const CACHE_DIR = join(REPO_ROOT, ".covalo", "eval-build-cache", "repos");
 const SWE_LOCK_PATH = join(ASSETS_DIR, "swe-bench", "lock.json");
 const ASSETS_LOCK_PATH = join(ASSETS_DIR, "assets.lock.json");
 

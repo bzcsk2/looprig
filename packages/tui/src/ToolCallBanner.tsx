@@ -11,7 +11,7 @@
  *   - 已完成且非空的输出会截取前 80 字符预览
  */
 import React from 'react';
-import { Box, Text } from '@deepreef/ink';
+import { Box, Text } from '@covalo/ink';
 import type { ToolStatus } from './bridge.js';
 
 interface ToolCallBannerProps {

@@ -1,5 +1,5 @@
 /**
- * Checkpoint v1 信封 — 与 `.deepreef/sessions/*.checkpoint.json` 兼容的最小壳。
+ * Checkpoint v1 信封 — 与 `.covalo/sessions/*.checkpoint.json` 兼容的最小壳。
  */
 
 import type { StopReason } from "./runtime-checkpoint.js"

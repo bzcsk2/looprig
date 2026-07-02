@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Box, Text, useInput } from '@deepreef/ink';
-import type { ChatMessage } from '@deepreef/core';
+import { Box, Text, useInput } from '@covalo/ink';
+import type { ChatMessage } from '@covalo/core';
 import type { ToolStatus, ToolCallRecord } from './bridge.js';
 import { Markdown } from './MarkdownRenderer.js';
 

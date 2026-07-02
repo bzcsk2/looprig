@@ -9,7 +9,7 @@
  */
 
 import { highlight, supportsLanguage } from 'cli-highlight';
-import { Box, Text } from '@deepreef/ink';
+import { Box, Text } from '@covalo/ink';
 import { type Token, type Tokens, marked } from 'marked';
 import React from 'react';
 import stringWidth from 'string-width';

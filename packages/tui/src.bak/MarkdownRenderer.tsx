@@ -1,6 +1,6 @@
 import { marked, type Token, type Tokens } from 'marked';
 import React, { useMemo } from 'react';
-import { Box, Text, stringWidth } from '@deepreef/ink';
+import { Box, Text, stringWidth } from '@covalo/ink';
 import stripAnsi from 'strip-ansi';
 import { configureMarked, formatToken, padAligned } from './markdown.js';
 

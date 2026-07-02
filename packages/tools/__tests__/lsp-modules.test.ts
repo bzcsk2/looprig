@@ -26,9 +26,9 @@ describe("LSP Config", () => {
     expect(result.configPath).toBeNull()
   })
 
-  it("should read config from .deepreef/lsp.json", async () => {
-    mkdirSync(join(cwd, ".deepreef"), { recursive: true })
-    writeFileSync(join(cwd, ".deepreef", "lsp.json"), JSON.stringify({
+  it("should read config from .covalo/lsp.json", async () => {
+    mkdirSync(join(cwd, ".covalo"), { recursive: true })
+    writeFileSync(join(cwd, ".covalo", "lsp.json"), JSON.stringify({
       version: 1,
       languages: {
         typescript: { command: "typescript-language-server", args: ["--stdio"] },

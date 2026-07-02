@@ -64,7 +64,7 @@ export async function hashAnchoredReplaceOnce(
     // If file doesn't exist, we can't edit it anyway, but we'll let read stream fail
   }
 
-  const tmpPath = `${filePath}.deepreef_tmp_${randomUUID()}`
+  const tmpPath = `${filePath}.covalo_tmp_${randomUUID()}`
   let tmpCreated = false
 
   try {

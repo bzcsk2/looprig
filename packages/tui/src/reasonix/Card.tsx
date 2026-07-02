@@ -10,7 +10,7 @@
  *   - marginTop={1} — 卡片之间保持 1 个单位的上边距
  *   - width="100%" — 宽度撑满父容器
  */
-import { Box } from '@deepreef/ink';
+import { Box } from '@covalo/ink';
 import React from 'react';
 import { SURFACE } from './tokens.js';
 

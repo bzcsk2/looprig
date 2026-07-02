@@ -31,16 +31,16 @@ describe("resolve-assets-root", () => {
     expect(() => assertSafeAssetRelativePath("terminal-bench/tasks/hello-world/task.yaml")).not.toThrow();
   });
 
-  test("getEvalAssetsRoot reads from LOOPRIG_EVAL_ASSETS_DIR", async () => {
+  test("getEvalAssetsRoot reads from COVALO_EVAL_ASSETS_DIR", async () => {
     const tmpDir = join(tmpdir(), `eval-assets-test-${randomUUID()}`);
     mkdirSync(tmpDir, { recursive: true });
-    process.env.LOOPRIG_EVAL_ASSETS_DIR = tmpDir;
+    process.env.COVALO_EVAL_ASSETS_DIR = tmpDir;
     try {
       const { getEvalAssetsRoot } = await import("../resolve-assets-root");
       const root = getEvalAssetsRoot();
       expect(root).toBe(tmpDir);
     } finally {
-      delete process.env.LOOPRIG_EVAL_ASSETS_DIR;
+      delete process.env.COVALO_EVAL_ASSETS_DIR;
     }
   });
 
@@ -48,25 +48,25 @@ describe("resolve-assets-root", () => {
     const tmpDir = join(tmpdir(), `eval-assets-test-${randomUUID()}`);
     mkdirSync(join(tmpDir, "swe-bench"), { recursive: true });
     writeFileSync(join(tmpDir, "swe-bench", "lock.json"), "{}");
-    process.env.LOOPRIG_EVAL_ASSETS_DIR = tmpDir;
+    process.env.COVALO_EVAL_ASSETS_DIR = tmpDir;
     try {
       const { getEvalAssetPath } = await import("../resolve-assets-root");
       const p = getEvalAssetPath("swe-bench/lock.json");
       expect(p).toBe(join(tmpDir, "swe-bench", "lock.json"));
     } finally {
-      delete process.env.LOOPRIG_EVAL_ASSETS_DIR;
+      delete process.env.COVALO_EVAL_ASSETS_DIR;
     }
   });
 
   test("getEvalAssetPath throws on missing file", async () => {
     const tmpDir = join(tmpdir(), `eval-assets-test-${randomUUID()}`);
     mkdirSync(tmpDir, { recursive: true });
-    process.env.LOOPRIG_EVAL_ASSETS_DIR = tmpDir;
+    process.env.COVALO_EVAL_ASSETS_DIR = tmpDir;
     try {
       const { getEvalAssetPath } = await import("../resolve-assets-root");
       expect(() => getEvalAssetPath("nonexistent/file.txt")).toThrow();
     } finally {
-      delete process.env.LOOPRIG_EVAL_ASSETS_DIR;
+      delete process.env.COVALO_EVAL_ASSETS_DIR;
     }
   });
 });

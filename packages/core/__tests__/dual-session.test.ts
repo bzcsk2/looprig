@@ -195,7 +195,7 @@ describe("DualSessionStore", () => {
   let store: DualSessionStore
 
   beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "deepreef-dual-session-"))
+    tmpDir = mkdtempSync(join(tmpdir(), "covalo-dual-session-"))
     store = new DualSessionStore({ sessionDir: tmpDir })
   })
 

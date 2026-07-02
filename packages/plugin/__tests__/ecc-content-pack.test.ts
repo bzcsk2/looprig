@@ -9,7 +9,7 @@ describe("Real ECC Content Pack Resolution", () => {
     const result = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "developer",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
       hooks: { enabled: false },
       mcp: { enabled: false },
@@ -22,7 +22,7 @@ describe("Real ECC Content Pack Resolution", () => {
     const minimal = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "minimal",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
       hooks: { enabled: false },
       mcp: { enabled: false },
@@ -31,7 +31,7 @@ describe("Real ECC Content Pack Resolution", () => {
     const developer = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "developer",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
       hooks: { enabled: false },
       mcp: { enabled: false },
@@ -45,7 +45,7 @@ describe("Real ECC Content Pack Resolution", () => {
     const developer = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "developer",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
       hooks: { enabled: false },
       mcp: { enabled: false },
@@ -54,7 +54,7 @@ describe("Real ECC Content Pack Resolution", () => {
     const full = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "full",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
       hooks: { enabled: false },
       mcp: { enabled: false },
@@ -67,7 +67,7 @@ describe("Real ECC Content Pack Resolution", () => {
     const result = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "minimal",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
       hooks: { enabled: false },
       mcp: { enabled: false },
@@ -85,7 +85,7 @@ describe("Real ECC Content Pack Resolution", () => {
     const minimal = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "minimal",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
       hooks: { enabled: false },
       mcp: { enabled: false },
@@ -94,7 +94,7 @@ describe("Real ECC Content Pack Resolution", () => {
     const developer = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "developer",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
       hooks: { enabled: false },
       mcp: { enabled: false },
@@ -103,7 +103,7 @@ describe("Real ECC Content Pack Resolution", () => {
     const full = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "full",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
       hooks: { enabled: false },
       mcp: { enabled: false },
@@ -122,7 +122,7 @@ describe("Real ECC Content Pack Resolution", () => {
     const result = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "nonexistent-profile",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
     })
 
@@ -136,7 +136,7 @@ describe("Real ECC Content Pack Resolution", () => {
     const result = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "developer",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
     })
 
@@ -148,7 +148,7 @@ describe("Real ECC Content Pack Resolution", () => {
     const result = resolveContentPack(ECC_DIR, {
       type: "content-pack",
       profile: "developer",
-      target: "deepreef",
+      target: "covalo",
       targetMode: "compatible",
     })
 

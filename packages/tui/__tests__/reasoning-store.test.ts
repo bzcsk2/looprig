@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import type React from 'react';
-import type { LoopEvent } from '@deepreef/core';
-import type { ReasonixEngine } from '@deepreef/core';
+import type { LoopEvent } from '@covalo/core';
+import type { ReasonixEngine } from '@covalo/core';
 import { createBridge, type BridgeState, type TimelineItem } from '../src/bridge.js';
 
 beforeAll(() => {

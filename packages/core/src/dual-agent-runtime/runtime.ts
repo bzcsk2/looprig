@@ -39,7 +39,7 @@ export class AgentRuntime {
     if (options.engine) {
       this.engine = options.engine
     } else {
-      const deepreefConfig: DeepreefConfig = {
+      const covaloConfig: DeepreefConfig = {
         apiKey: options.config.apiKey,
         baseUrl: options.config.baseUrl,
         model: options.config.model,
@@ -49,7 +49,7 @@ export class AgentRuntime {
         maxContextRounds: options.maxContextRounds,
         provider: options.config.provider,
       }
-      this.engine = new ReasonixEngine(deepreefConfig)
+      this.engine = new ReasonixEngine(covaloConfig)
       this.engine.setSystemPrompt(options.systemPrompt)
     }
 

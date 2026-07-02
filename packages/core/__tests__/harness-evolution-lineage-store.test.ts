@@ -3,7 +3,7 @@ import { LineageStore } from "../src/harness-evolution/self-harness/lineage-stor
 import type { HarnessLineageEntry } from "../src/harness-evolution/self-harness/lineage-store";
 import { buildValidationResult } from "../src/harness-evolution/self-harness/promotion-gate";
 
-const BASE = "/tmp/looprig-test-lineage-" + Math.random().toString(36).slice(2, 8);
+const BASE = "/tmp/covalo-test-lineage-" + Math.random().toString(36).slice(2, 8);
 
 function makeLineage(overrides: Partial<HarnessLineageEntry> = {}): HarnessLineageEntry {
   const val = buildValidationResult({
@@ -19,7 +19,7 @@ function makeLineage(overrides: Partial<HarnessLineageEntry> = {}): HarnessLinea
     afterPolicyViolations: 0,
   });
   return {
-    schemaVersion: "looprig.harness-lineage.v1",
+    schemaVersion: "covalo.harness-lineage.v1",
     patchId: "p1",
     surface: "supervisor-system-prompt",
     decision: "accepted",

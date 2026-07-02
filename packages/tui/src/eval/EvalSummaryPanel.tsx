@@ -1,6 +1,6 @@
 import React from 'react';
-import { Box, Text } from '@deepreef/ink';
-import type { EvalRunReport } from '@deepreef/core';
+import { Box, Text } from '@covalo/ink';
+import type { EvalRunReport } from '@covalo/core';
 import { ModalShell } from '../ModalShell.js';
 import { FG, TONE } from '../reasonix/tokens.js';
 
@@ -54,7 +54,7 @@ export function EvalSummaryPanel({ report, onClose }: Props): React.ReactElement
 
         <Box marginTop={1}>
           <Text dimColor>
-            Report saved at: .deepreef/evals/{meta.runId}/
+            Report saved at: .covalo/evals/{meta.runId}/
           </Text>
         </Box>
 

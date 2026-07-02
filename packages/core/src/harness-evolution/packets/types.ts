@@ -1,4 +1,4 @@
-export const HARNESS_PACKET_SCHEMA_VERSION = "looprig.packet-base.v1";
+export const HARNESS_PACKET_SCHEMA_VERSION = "covalo.packet-base.v1";
 
 export type HarnessMode = "alone" | "subagent" | "loop" | "eval";
 export type HarnessRole = "worker" | "supervisor" | "system";

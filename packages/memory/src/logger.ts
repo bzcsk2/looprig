@@ -1,20 +1,20 @@
-// Thin logging shim for deepreef memory.
+// Thin logging shim for covalo memory.
 //
-// Output goes to stderr as `[deepreef:memory] <level> <msg> <json-fields>`.
-// The boot log uses `[deepreef:memory]` prefix instead of upstream agentmemory branding.
+// Output goes to stderr as `[covalo:memory] <level> <msg> <json-fields>`.
+// The boot log uses `[covalo:memory]` prefix instead of upstream agentmemory branding.
 
 type Fields = Record<string, unknown> | undefined;
 
 function fmt(level: string, msg: string, fields: Fields): string {
   if (!fields || Object.keys(fields).length === 0) {
-    return `[deepreef:memory] ${level} ${msg}`;
+    return `[covalo:memory] ${level} ${msg}`;
   }
   try {
-    return `[deepreef:memory] ${level} ${msg} ${JSON.stringify(fields)}`;
+    return `[covalo:memory] ${level} ${msg} ${JSON.stringify(fields)}`;
   } catch {
     // Fields contained a circular reference or a BigInt — fall back
     // to the plain message so a log line never throws.
-    return `[deepreef:memory] ${level} ${msg}`;
+    return `[covalo:memory] ${level} ${msg}`;
   }
 }
 
@@ -67,7 +67,7 @@ export function isBootVerbose(): boolean {
 export function bootLog(msg: string): void {
   if (bootVerbose) {
     try {
-      process.stderr.write(`[deepreef:memory] ${msg}\n`);
+      process.stderr.write(`[covalo:memory] ${msg}\n`);
     } catch {
       // stderr unavailable — drop.
     }
@@ -80,7 +80,7 @@ export function bootWarn(msg: string): void {
   // Warnings always surface; they're rare and the user needs to see
   // them even when the rest of the boot log is suppressed.
   try {
-    process.stderr.write(`[deepreef:memory] warn ${msg}\n`);
+    process.stderr.write(`[covalo:memory] warn ${msg}\n`);
   } catch {}
 }
 

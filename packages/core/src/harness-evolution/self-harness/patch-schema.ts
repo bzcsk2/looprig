@@ -1,6 +1,6 @@
 import type { PacketBase } from "../packets/types";
 
-export const HARNESS_PATCH_SCHEMA_VERSION = "looprig.harness-patch.v1";
+export const HARNESS_PATCH_SCHEMA_VERSION = "covalo.harness-patch.v1";
 
 export type HarnessSurface =
   | "supervisor-system-prompt"

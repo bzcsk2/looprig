@@ -10,8 +10,8 @@ describe("FileSnapshot", () => {
   let snap: FileSnapshot
 
   beforeEach(async () => {
-    workDir = join(tmpdir(), `deepreef-snap-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-    patchesDir = join(workDir, ".deepreef_patches")
+    workDir = join(tmpdir(), `covalo-snap-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    patchesDir = join(workDir, ".covalo_patches")
     await mkdir(workDir, { recursive: true })
     snap = new FileSnapshot(patchesDir)
   })

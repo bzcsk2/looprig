@@ -1,3 +1,0 @@
-{"ts":"2026-06-30T15:11:54.614Z","event":"harness.packet.created","runId":"8b5d64b4-81ea-44d0-8b79-a94658653528","packetId":"8b5d64b4-81ea-44d0-8b79-a94658653528:digest","packetType":"looprig.task-digest.v1","mode":"loop","role":"supervisor"}
-{"ts":"2026-06-30T15:11:54.614Z","event":"harness.packet.created","runId":"8b5d64b4-81ea-44d0-8b79-a94658653528","packetId":"8b5d64b4-81ea-44d0-8b79-a94658653528:guard","packetType":"looprig.runtime-guard.v1","mode":"loop","role":"supervisor"}
-{"ts":"2026-06-30T15:11:54.614Z","event":"harness.packet.created","runId":"8b5d64b4-81ea-44d0-8b79-a94658653528","packetId":"8b5d64b4-81ea-44d0-8b79-a94658653528:review","packetType":"looprig.review-packet.v1","mode":"loop","role":"supervisor"}

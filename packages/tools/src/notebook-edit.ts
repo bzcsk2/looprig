@@ -1,7 +1,7 @@
 import { readFile, writeFile, rename, stat, mkdir } from "node:fs/promises"
 import { randomUUID } from "node:crypto"
 import { dirname, resolve } from "node:path"
-import type { AgentTool } from "@deepreef/core"
+import type { AgentTool } from "@covalo/core"
 import { safeStringify } from "./safe-stringify.js"
 import { isSensitive } from "./sensitive.js"
 
@@ -107,7 +107,7 @@ async function atomicWrite(filePath: string, content: string): Promise<void> {
   await mkdir(dir, { recursive: true })
   let originalMode: number | undefined
   try { originalMode = (await stat(filePath)).mode } catch {}
-  const tmpPath = `${filePath}.deepreef_tmp_${randomUUID()}`
+  const tmpPath = `${filePath}.covalo_tmp_${randomUUID()}`
   try {
     await writeFile(tmpPath, content, "utf-8")
     if (originalMode !== undefined) {

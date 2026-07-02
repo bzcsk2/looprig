@@ -10,7 +10,7 @@ describe("ConfigManager", () => {
   let testDir: string
 
   beforeAll(() => {
-    testDir = join(tmpdir(), `deepreef-config-test-${Date.now()}`)
+    testDir = join(tmpdir(), `covalo-config-test-${Date.now()}`)
     mkdirSync(testDir, { recursive: true })
   })
 
@@ -32,7 +32,7 @@ describe("ConfigManager", () => {
   it("should load user config from file", async () => {
     // 创建临时用户目录
     const tempHome = join(testDir, "home")
-    const userConfigDir = join(tempHome, ".deepreef")
+    const userConfigDir = join(tempHome, ".covalo")
     mkdirSync(userConfigDir, { recursive: true })
     
     const configContent = `
@@ -58,7 +58,7 @@ auto_continue = false
   })
 
   it("should merge project config over user config", async () => {
-    const userConfigDir = join(testDir, ".deepreef")
+    const userConfigDir = join(testDir, ".covalo")
     mkdirSync(userConfigDir, { recursive: true })
     
     const userConfig = `
@@ -69,7 +69,7 @@ max_rounds = 10
 `
     writeFileSync(join(userConfigDir, "config.toml"), userConfig, "utf-8")
     
-    const projectConfigDir = join(testDir, ".deepreef")
+    const projectConfigDir = join(testDir, ".covalo")
     mkdirSync(projectConfigDir, { recursive: true })
     
     const projectConfig = `
@@ -134,7 +134,7 @@ describe("loadConfig", () => {
   let testDir: string
 
   beforeAll(() => {
-    testDir = join(tmpdir(), `deepreef-load-config-test-${Date.now()}`)
+    testDir = join(tmpdir(), `covalo-load-config-test-${Date.now()}`)
     mkdirSync(testDir, { recursive: true })
   })
 
@@ -152,7 +152,7 @@ describe("loadConfig", () => {
   })
 
   it("should throw error for invalid config", async () => {
-    const configDir = join(testDir, ".deepreef")
+    const configDir = join(testDir, ".covalo")
     mkdirSync(configDir, { recursive: true })
     
     const invalidConfig = `

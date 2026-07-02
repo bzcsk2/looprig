@@ -9,7 +9,7 @@ const SYSTEM_DIRS = ["/usr", "/bin", "/lib", "/lib64"];
 const ETC_FILES = ["/etc/passwd", "/etc/group", "/etc/nsswitch.conf", "/etc/resolv.conf", "/etc/hosts", "/etc/hostname"];
 
 const TOOL_NAMES = ["sh", "node", "bun", "python3", "pytest"];
-const PROFILE_MOUNT_ROOT = "/looprig/toolchains";
+const PROFILE_MOUNT_ROOT = "/covalo/toolchains";
 
 interface ProfilePathBind {
   source: string;
@@ -194,7 +194,7 @@ export class BwrapProvider implements SandboxProvider {
     }
 
     if (profileBinds.length > 0) {
-      args.push("--dir", "/looprig");
+      args.push("--dir", "/covalo");
       args.push("--dir", PROFILE_MOUNT_ROOT);
       for (const bind of profileBinds) {
         args.push("--ro-bind", bind.source, bind.dest);

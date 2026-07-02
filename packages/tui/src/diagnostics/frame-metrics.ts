@@ -1,4 +1,4 @@
-import type { FrameEvent } from '@deepreef/ink';
+import type { FrameEvent } from '@covalo/ink';
 
 const REPORT_INTERVAL_MS = 10_000;
 
@@ -35,7 +35,7 @@ export function createFrameMetricsHandler(): ((event: FrameEvent) => void) | und
       const p95Index = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95));
       const p95 = sorted[p95Index] ?? 0;
       process.stderr.write(
-        `[deepreef-tui-metrics] frames=${frameCount} p95=${p95.toFixed(1)}ms full_reset=${fullResetCount}\n`,
+        `[covalo-tui-metrics] frames=${frameCount} p95=${p95.toFixed(1)}ms full_reset=${fullResetCount}\n`,
       );
     }
 

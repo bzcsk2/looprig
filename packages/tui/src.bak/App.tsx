@@ -1,9 +1,9 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Box, Text, AlternateScreen, instances, SHOW_CURSOR, EXIT_ALT_SCREEN, useInput } from '@deepreef/ink';
+import { Box, Text, AlternateScreen, instances, SHOW_CURSOR, EXIT_ALT_SCREEN, useInput } from '@covalo/ink';
 import { writeSync } from 'node:fs';
-import type { ReasonixEngine } from '@deepreef/core';
-import type { DeepreefConfig } from '@deepreef/core';
-import { PROVIDERS, AGENTS, saveLastConfig } from '@deepreef/core';
+import type { ReasonixEngine } from '@covalo/core';
+import type { DeepreefConfig } from '@covalo/core';
+import { PROVIDERS, AGENTS, saveLastConfig } from '@covalo/core';
 import { createBridge, type BridgeState } from './bridge.js';
 import { DeepiMessages } from './DeepiMessages.js';
 import { DeepiPromptInput } from './DeepiPromptInput.js';

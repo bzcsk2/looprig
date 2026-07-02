@@ -242,7 +242,7 @@ export const noopRuntimeLogger = new RuntimeLogger({ enabled: false })
 
 function readLogFileLevel(cwd: string): string | undefined {
   try {
-    const configPath = resolve(cwd, ".deepreef", "config.json")
+    const configPath = resolve(cwd, ".covalo", "config.json")
     const raw = readFileSync(configPath, "utf-8")
     const parsed = JSON.parse(raw) as Record<string, unknown>
     if (typeof parsed.logLevel === "string") return parsed.logLevel.trim().toLowerCase()
@@ -256,18 +256,18 @@ export function createRuntimeLoggerFromEnv(
   bindings: Record<string, unknown> = {},
   cwd = process.cwd(),
 ): RuntimeLogger {
-  const envLevel = process.env.DEEPREEF_LOG_LEVEL?.trim().toLowerCase()
+  const envLevel = process.env.COVALO_LOG_LEVEL?.trim().toLowerCase()
   const fileLevel = readLogFileLevel(cwd)
   const configuredLevel = envLevel ?? fileLevel
   const enabled = configuredLevel !== undefined && configuredLevel !== "" && configuredLevel !== "off"
   const level = isRuntimeLogLevel(configuredLevel)
     ? configuredLevel
     : "info"
-  const filePath = process.env.DEEPREEF_LOG_FILE?.trim()
-    ? resolve(cwd, process.env.DEEPREEF_LOG_FILE.trim())
+  const filePath = process.env.COVALO_LOG_FILE?.trim()
+    ? resolve(cwd, process.env.COVALO_LOG_FILE.trim())
     : defaultLogPath(cwd)
-  const filter = process.env.DEEPREEF_LOG_FILTER?.trim() || undefined
-  const createSymlink = process.env.DEEPREEF_LOG_SYMLINK === "1"
+  const filter = process.env.COVALO_LOG_FILTER?.trim() || undefined
+  const createSymlink = process.env.COVALO_LOG_SYMLINK === "1"
   return new RuntimeLogger({ enabled, level, filePath, bindings, filter, createSymlink })
 }
 
@@ -333,7 +333,7 @@ export function registerShutdownFlush(logger: RuntimeLogger, timeoutMs = 200): v
 
 function defaultLogPath(cwd = process.cwd()): string {
   const day = new Date().toISOString().slice(0, 10)
-  return resolve(cwd, ".deepreef", "logs", `runtime-${day}.jsonl`)
+  return resolve(cwd, ".covalo", "logs", `runtime-${day}.jsonl`)
 }
 
 function isRuntimeLogLevel(value: string | undefined): value is RuntimeLogLevel {
@@ -389,12 +389,12 @@ function serializeError(error: unknown): Record<string, unknown> | undefined {
  * Runs in background, does not block TUI.
  */
 export async function cleanupOldLogs(logsDir?: string): Promise<void> {
-  const retentionDays = parseInt(process.env.DEEPREEF_LOG_RETENTION_DAYS ?? "7", 10)
-  const maxTotalMB = parseInt(process.env.DEEPREEF_LOG_MAX_TOTAL_MB ?? "100", 10)
+  const retentionDays = parseInt(process.env.COVALO_LOG_RETENTION_DAYS ?? "7", 10)
+  const maxTotalMB = parseInt(process.env.COVALO_LOG_MAX_TOTAL_MB ?? "100", 10)
 
   if (retentionDays <= 0 && maxTotalMB <= 0) return
 
-  const dir = logsDir ?? join(process.cwd(), ".deepreef", "logs")
+  const dir = logsDir ?? join(process.cwd(), ".covalo", "logs")
 
   try {
     await mkdir(dir, { recursive: true })
@@ -441,12 +441,12 @@ export async function cleanupOldLogs(logsDir?: string): Promise<void> {
 }
 
 /**
- * Check for deprecated DEEPREEF_DEBUG env var and warn
+ * Check for deprecated COVALO_DEBUG env var and warn
  */
 export function checkDeprecatedDebugEnv(): void {
-  if (process.env.DEEPREEF_DEBUG !== undefined) {
+  if (process.env.COVALO_DEBUG !== undefined) {
     console.error(
-      "[deprecated] DEEPREEF_DEBUG is deprecated. Use DEEPREEF_LOG_LEVEL=debug instead.",
+      "[deprecated] COVALO_DEBUG is deprecated. Use COVALO_LOG_LEVEL=debug instead.",
     )
   }
 }

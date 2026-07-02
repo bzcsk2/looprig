@@ -1,4 +1,4 @@
-import { Box, Text } from '@deepreef/ink';
+import { Box, Text } from '@covalo/ink';
 import { t } from './i18n/index.js';
 import { FG, TONE } from './reasonix/tokens.js';
 

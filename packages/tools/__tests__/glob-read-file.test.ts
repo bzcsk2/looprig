@@ -11,7 +11,7 @@ const ctx = (cwd: string) => ({ cwd, signal: new AbortController().signal }) as 
 describe("read_file", () => {
   let tmpDir: string
   beforeEach(() => {
-    tmpDir = join(tmpdir(), `deepreef-read-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tmpDir = join(tmpdir(), `covalo-read-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(tmpDir, { recursive: true })
   })
   afterEach(() => { try { rmSync(tmpDir, { recursive: true, force: true }) } catch {} })
@@ -129,7 +129,7 @@ describe("read_file", () => {
 describe("write_file", () => {
   let tmpDir: string
   beforeEach(() => {
-    tmpDir = join(tmpdir(), `deepreef-write-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tmpDir = join(tmpdir(), `covalo-write-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(tmpDir, { recursive: true })
   })
   afterEach(() => { try { rmSync(tmpDir, { recursive: true, force: true }) } catch {} })
@@ -227,7 +227,7 @@ describe("glob - Bun.Glob fallback", () => {
 describe("glob", () => {
   let tmpDir: string
   beforeEach(() => {
-    tmpDir = join(tmpdir(), `deepreef-glob-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tmpDir = join(tmpdir(), `covalo-glob-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(tmpDir, { recursive: true })
     writeFileSync(join(tmpDir, "a.ts"), "a", "utf-8")
     writeFileSync(join(tmpDir, "b.ts"), "b", "utf-8")
@@ -325,7 +325,7 @@ describe("grep", () => {
   const ctx = (cwd: string) => ({ cwd, signal: new AbortController().signal } as any)
 
   beforeEach(() => {
-    tmpDir = join(tmpdir(), `deepreef-grep-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tmpDir = join(tmpdir(), `covalo-grep-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(tmpDir, { recursive: true })
     writeFileSync(join(tmpDir, "normal.txt"), "This is normal content", "utf-8")
     writeFileSync(join(tmpDir, ".env"), "SECRET=value", "utf-8")
@@ -396,7 +396,7 @@ describe("path containment", () => {
   const ctx2 = (cwd: string) => ({ cwd, signal: new AbortController().signal }) as any
 
   beforeEach(() => {
-    tmpDir = join(tmpdir(), `deepreef-containment-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tmpDir = join(tmpdir(), `covalo-containment-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(tmpDir, { recursive: true })
   })
 

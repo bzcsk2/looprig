@@ -87,7 +87,7 @@ function main(): void {
   const summary = summarizeBenchmarkSuite(DEFAULT_AGENT_BENCHMARK_SUITE.id, runs)
   const leaderboard = buildBenchmarkLeaderboard(summary.runs)
 
-  console.log("DeepReef Agent Scoring Benchmark")
+  console.log("Covalo Agent Scoring Benchmark")
   console.log(`suite=${summary.suiteId}`)
   console.log(`cases=${cases.length} models=${selectedModels.length} runs=${runs.length}`)
   console.log(`averageScore=${summary.averageScore.toFixed(1)} completion=${(summary.completionRate * 100).toFixed(1)}% verification=${(summary.verificationPassRate * 100).toFixed(1)}%`)

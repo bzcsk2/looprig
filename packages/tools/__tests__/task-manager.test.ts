@@ -9,8 +9,8 @@ describe("TaskManager", () => {
   let tmpDir: string
 
   beforeEach(() => {
-    tmpDir = join(tmpdir(), `deepreef-task-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-    mkdirSync(join(tmpDir, ".deepreef"), { recursive: true })
+    tmpDir = join(tmpdir(), `covalo-task-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    mkdirSync(join(tmpDir, ".covalo"), { recursive: true })
   })
 
   afterEach(() => {
@@ -87,14 +87,14 @@ describe("TaskManager", () => {
   })
 
   it("should not crash on corrupted tasks.json", () => {
-    writeFileSync(join(tmpDir, ".deepreef", "tasks.json"), "corrupted {{ json", "utf-8")
+    writeFileSync(join(tmpDir, ".covalo", "tasks.json"), "corrupted {{ json", "utf-8")
     const mgr = new TaskManager(tmpDir)
     const tasks = mgr.list()
     expect(tasks).toEqual([])
   })
 
   it("should not crash on empty tasks.json", () => {
-    writeFileSync(join(tmpDir, ".deepreef", "tasks.json"), "", "utf-8")
+    writeFileSync(join(tmpDir, ".covalo", "tasks.json"), "", "utf-8")
     const mgr = new TaskManager(tmpDir)
     const tasks = mgr.list()
     expect(tasks).toEqual([])

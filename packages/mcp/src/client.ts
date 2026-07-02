@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process"
 import { resolve } from "node:path"
 import { readFile } from "node:fs/promises"
-import { terminateProcessTree, normalizePlatform } from "@deepreef/tools"
+import { terminateProcessTree, normalizePlatform } from "@covalo/tools"
 import type { DiagnosticLogger } from "./diagnostics.js"
 import { noopDiagnosticLogger } from "./diagnostics.js"
 
@@ -105,7 +105,7 @@ export class McpClient {
     const result = await this.request("initialize", {
       protocolVersion: "2024-11-05",
       capabilities: {},
-      clientInfo: { name: "deepreef", version: "0.1.0" },
+      clientInfo: { name: "covalo", version: "0.1.0" },
     }).catch((err) => {
       // initialize failed — clean up before rethrowing
       if (this.proc) terminateProcessTree(this.proc, false, this.platform)

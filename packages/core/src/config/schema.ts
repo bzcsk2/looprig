@@ -167,7 +167,7 @@ export const ProvidersConfigSchema = z.record(z.string(), ProviderConfigSchema)
 export type ProvidersConfig = z.infer<typeof ProvidersConfigSchema>
 
 // 主配置 schema
-export const DeepReefConfigSchema = z.object({
+export const CovaloConfigSchema = z.object({
   version: z.number().int().positive(),
   providers: ProvidersConfigSchema,
   agents: AgentsConfigSchema,
@@ -181,10 +181,10 @@ export const DeepReefConfigSchema = z.object({
   trace: TraceConfigSchema,
 })
 
-export type DeepReefConfig = z.infer<typeof DeepReefConfigSchema>
+export type CovaloConfig = z.infer<typeof CovaloConfigSchema>
 
 // 为了向后兼容，导出为DeepreefConfig
-export type DeepreefConfig = DeepReefConfig
+export type DeepreefConfig = CovaloConfig
 
 // 配置源类型
 export type ConfigSource = {
@@ -204,16 +204,16 @@ export interface ConfigLoadOptions {
   cwd: string
   userConfigPath?: string
   projectConfigPath?: string
-  cliOverrides?: Partial<DeepReefConfig>
+  cliOverrides?: Partial<CovaloConfig>
 }
 
 // 解析原始配置（处理 snake_case 到 camelCase 的转换）
-export function parseConfig(raw: unknown): DeepReefConfig {
+export function parseConfig(raw: unknown): CovaloConfig {
   // 先处理 snake_case 到 camelCase 的转换
   const normalized = normalizeSnakeToCamel(raw)
   
   // 使用 zod schema 进行验证和默认值填充
-  const result = DeepReefConfigSchema.safeParse(normalized)
+  const result = CovaloConfigSchema.safeParse(normalized)
   
   if (!result.success) {
     const errors = result.error.issues.map(issue => {

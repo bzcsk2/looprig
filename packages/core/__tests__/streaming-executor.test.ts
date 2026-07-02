@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest"
 import type { AgentTool, ToolResult, LoopEvent } from "../src/interface.js"
-import type { PermissionEngine, HookManager } from "@deepreef/security"
+import type { PermissionEngine, HookManager } from "@covalo/security"
 
 describe("StreamingToolExecutor", () => {
   function makeHandler(name: string, opts?: { concurrency?: string; result?: string; delay?: number; approval?: string; throwOn?: string }): AgentTool {
@@ -314,7 +314,7 @@ describe("StreamingToolExecutor", () => {
     }
     // HookManager accepts multiple hooks via addHooks, not multiple HookManager instances
     // So we need to use real HookManager with multiple hooks
-    const { HookManager } = await import("@deepreef/security")
+    const { HookManager } = await import("@covalo/security")
     const realHook = new HookManager()
     realHook.addHooks({ beforeToolCall: async () => "deny" })
     realHook.addHooks({ beforeToolCall: async () => { secondCalled = true; return "allow" } })

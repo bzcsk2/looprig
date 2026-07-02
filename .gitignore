@@ -14,11 +14,11 @@ LOGSYS/
 .env.*
 api-key
 
-# DeepReef local runtime state
-.deep*/
-.deepreef/
+# Covalo local runtime state
+.covalo/
+
+# Legacy runtime data (pre-rename)
 .looprig/
-.looprig/runs/
 
 # Forbidden git history / bundle artifacts
 *.bundle
@@ -29,7 +29,7 @@ api-key
 .serena/
 
 # Local planning scratch files
-Deepreef*.md
+Covalo*.md
 .worktrees/
 
 

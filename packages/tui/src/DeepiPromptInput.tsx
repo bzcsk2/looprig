@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, forwardRef, useImperativeHandle, type ReactNode } from 'react';
-import { Box, Text, useInput, type InputEvent } from '@deepreef/ink';
+import { Box, Text, useInput, type InputEvent } from '@covalo/ink';
 import { tryReadClipboard } from './clipboard.js';
 import {
   countLines,

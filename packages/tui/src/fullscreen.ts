@@ -19,13 +19,13 @@ export type MouseTrackingMode = 'off' | 'wheel' | 'full';
  * 事件经 ink 解析为 wheelup/wheeldown 按键，由 useMessageScroll 接到
  * ScrollBox 实现历史消息滚动。
  *
- * DEEPREEF_ENABLE_MOUSE 环境变量覆盖：
+ * COVALO_ENABLE_MOUSE 环境变量覆盖：
  *   =0    完全关闭（含滚轮，纯键盘操作）
  *   =1    全功能（含拖拽/悬停，会拦截终端文本选择）
  *   =wheel 仅滚轮（默认）
  */
 export function getMouseTrackingMode(): MouseTrackingMode {
-  const v = process.env.DEEPREEF_ENABLE_MOUSE;
+  const v = process.env.COVALO_ENABLE_MOUSE;
   if (v === '0') return 'off';
   if (v === '1') return 'full';
   return 'wheel';

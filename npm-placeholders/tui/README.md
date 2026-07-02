@@ -1,5 +1,5 @@
-# @deepreef/tui
+# @covalo/tui
 
-Reserved package for the DeepReef terminal UI.
+Reserved package for the Covalo terminal UI.
 
-Project: https://github.com/bzcsk2/DeepReef
+Project: https://github.com/bzcsk2/Covalo

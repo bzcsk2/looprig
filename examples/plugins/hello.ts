@@ -6,8 +6,8 @@
  *
  * 使用方法：
  * 1. 将此文件复制到你的项目中
- * 2. 在 .deepreef/plugins.json 中添加此插件路径
- * 3. 重启 deepreef
+ * 2. 在 .covalo/plugins.json 中添加此插件路径
+ * 3. 重启 covalo
  */
 
 export default {
@@ -19,7 +19,7 @@ export default {
       if (!args?.name || args.name.trim() === "") {
         throw new Error("Invalid input: 'name' must be a non-empty string.")
       }
-      return `Hello, ${args.name.trim()}! Welcome to deepreef!`
+      return `Hello, ${args.name.trim()}! Welcome to covalo!`
     },
 
     /** Current time in ISO format */

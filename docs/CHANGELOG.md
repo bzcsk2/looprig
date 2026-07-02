@@ -106,7 +106,7 @@
 |---|---|---|
 | `CTX-70` 人工验收 | 部分 | README `/context` 文档已补；长会话 trim/compact 需项目负责人人工验证 |
 | `OS-12/13-R` | 待验收 | 需真实 macOS/Windows 终端验证 PTY/ConPTY、中文路径、通知、剪贴板 |
-| Supervisor 免费池 smoke | 可选 | `DEEPREEF_SUPERVISOR_SMOKE=1`；StepFun 候选默认 disabled |
+| Supervisor 免费池 smoke | 可选 | `COVALO_SUPERVISOR_SMOKE=1`；StepFun 候选默认 disabled |
 | ECC content-pack CLI 端到端 | 暂缓 | 非融合主线阻塞项 |
 | AgentMemory 上游测试增强 | 暂缓 | 全仓 `bun test` 仍有 memory 包预置失败 |
 
@@ -166,7 +166,7 @@ bun run typecheck   # 全仓通过
 | Core 事件 | `AsyncGenerator<LoopEvent>`，使用 role-based 事件模型 |
 | 工具并发 | `shared` 并行，`exclusive` 串行 |
 | 工具进度 | 已有 `tool_start`、`tool_progress: running/done` 粗粒度事件 |
-| 会话持久化 | `.deepreef/sessions/*.jsonl`，best-effort append |
+| 会话持久化 | `.covalo/sessions/*.jsonl`，best-effort append |
 | 上下文 | ImmutablePrefix + AppendOnlyLog + VolatileScratch |
 | 权限 | `PermissionEngine` 的 deny → allow → ask 判定 |
 | MainMode | `plan`（只读）+ `build`（完整工具集），`PlanMode` 工具切换 |
@@ -225,7 +225,7 @@ TUI 路由已完成接入，`P3-R` 已收口 bridge 回归测试。
 - Ctrl+C：加载中取消；空闲时双击退出；终端清理顺序已固定。
 - 多行输入、历史记录、Ctrl+方向键跳词、Ctrl+Backspace 删除前词。
 - 斜杠命令自动补全已完成；菜单打开时 ↑↓ 只改变选中项，Enter/Tab 回写命令，Esc 关闭菜单。
-- 中英文 i18n：`zh-CN / en`，`/lang` 切换并写入 `.deepreef/lang.json`。
+- 中英文 i18n：`zh-CN / en`，`/lang` 切换并写入 `.covalo/lang.json`。
 - 长会话显示优化：React.memo、useMemo 和 Ink viewport culling。
 - `Ctrl+F` 消息搜索与屏幕空间高亮。
 - `/context` 菜单已完成：居中弹窗，支持 strategy 切换、trigger/target 比例调整、当前用量显示和 `Run now` 立即执行。
@@ -282,7 +282,7 @@ Skills 已接入：
 - `createRuntimeLoggerFromEnv()`：从环境变量创建 logger。
 - `registerShutdownFlush()`：优雅退出时 flush 日志。
 - `cleanupOldLogs()`：后台清理过期日志。
-- `checkDeprecatedDebugEnv()`：弃用 `DEEPREEF_DEBUG` 提示。
+- `checkDeprecatedDebugEnv()`：弃用 `COVALO_DEBUG` 提示。
 
 **已实现事件（全流程覆盖）：**
 
@@ -297,21 +297,21 @@ Skills 已接入：
 **配置：**
 
 ```text
-DEEPREEF_LOG_LEVEL=debug|info|warn|error|off
-DEEPREEF_LOG_FILE=<path>
-DEEPREEF_LOG_FILTER=<pattern>
-DEEPREEF_LOG_RETENTION_DAYS=7
-DEEPREEF_LOG_MAX_TOTAL_MB=100
-DEEPREEF_LOG_SYMLINK=1
-DEEPREEF_TUI_DEBUG=1
-DEEPREEF_TRACE=1
+COVALO_LOG_LEVEL=debug|info|warn|error|off
+COVALO_LOG_FILE=<path>
+COVALO_LOG_FILTER=<pattern>
+COVALO_LOG_RETENTION_DAYS=7
+COVALO_LOG_MAX_TOTAL_MB=100
+COVALO_LOG_SYMLINK=1
+COVALO_TUI_DEBUG=1
+COVALO_TRACE=1
 ```
 
 **Perfetto 追踪：**
 
 - 简化版 Chrome Trace Event JSON 输出。
 - Span 层级：interaction → llm_request → tool_batch → tool。
-- 输出到 `.deepreef/traces/trace-<session-id>.json`。
+- 输出到 `.covalo/traces/trace-<session-id>.json`。
 
 ### 3.8 自动推理模式切换（历史已实现，待删除）
 
@@ -399,7 +399,7 @@ DEEPREEF_TRACE=1
 | L2 | SessionWriter 有界队列 |
 | L5 | 编辑链路 CRLF 归一化并恢复原格式 |
 | N1 | NotebookEdit 异步原子写 |
-| N2 | `/skill` 使用 `@deepreef/tools` 跨包导入 |
+| N2 | `/skill` 使用 `@covalo/tools` 跨包导入 |
 | N3 | SessionPicker 避免卸载后 setState |
 | N4 | 空 tool call id 规范化 |
 | N5 | client.ts 类型断言收紧 |
@@ -459,7 +459,7 @@ DEEPREEF_TRACE=1
 **实现边界：**
 
 - 新增 `packages/core/src/context/policy.ts`：定义 `ContextPolicy` 类型、`DEFAULT_CONTEXT_POLICY`、`validateContextPolicy()` 和 `mergeContextPolicy()`。
-- 新增 `packages/core/src/context/policy-store.ts`：负责从 `.deepreef/context.json` 读取和写回策略配置，读失败回退默认值。
+- 新增 `packages/core/src/context/policy-store.ts`：负责从 `.covalo/context.json` 读取和写回策略配置，读失败回退默认值。
 - `ReasonixEngine` 接入 `ContextPolicyStore`：启动时异步加载配置，`setContextPolicy()` 异步保存到文件。
 - `setContextPolicy()` 改为异步方法，TUI 调用点已适配。
 - 新增 `packages/core/__tests__/context-policy.test.ts`：覆盖策略验证、合并和持久化逻辑（26 个测试）。
@@ -474,7 +474,7 @@ bun test
 
 **保留限制：**
 
-- `.deepreef/context.json` 独立持久化，不混入主配置文件。
+- `.covalo/context.json` 独立持久化，不混入主配置文件。
 - 读取失败回退默认值，不阻塞启动。
 - `setContextPolicy()` 异步保存，best-effort。
 
@@ -839,7 +839,7 @@ bun test packages/mcp/__tests__/mcp-host.test.ts
 
 ### CL-31：Result persistence 磁盘扫描初始化
 
-- `maybePersistResult` 首次 overflow 时扫描 `.deepreef/results/<sessionId>/` 初始化用量。
+- `maybePersistResult` 首次 overflow 时扫描 `.covalo/results/<sessionId>/` 初始化用量。
 - 每个 session 只扫描一次（`sessionInitialized` 集合）。
 - 未超过 threshold 的小结果不触发扫描。
 - `cleanupOldFiles` 删除文件后同步减去内存计数（`subtractByteUsage`）。
@@ -859,14 +859,14 @@ bun test packages/mcp/__tests__/mcp-host.test.ts
 
 ### CL-40：Workspace 包边界整理
 
-- `tsconfig.json` 新增 `@deepreef/core` 和 `@deepreef/tui` 的 paths 映射。
-- `@deepreef/tools` 补齐 `exports`、`types` 字段，新增 `@deepreef/core` 依赖。
-- `@deepreef/mcp` 补齐 `exports` 条件导出，新增 `@deepreef/core`、`@deepreef/tools` 依赖。
-- `@deepreef/cli` 新增 `@deepreef/tools`、`@deepreef/mcp`、`@deepreef/tui` 依赖。
-- `@deepreef/tui` 补齐 `exports`、`types` 字段。
+- `tsconfig.json` 新增 `@covalo/core` 和 `@covalo/tui` 的 paths 映射。
+- `@covalo/tools` 补齐 `exports`、`types` 字段，新增 `@covalo/core` 依赖。
+- `@covalo/mcp` 补齐 `exports` 条件导出，新增 `@covalo/core`、`@covalo/tools` 依赖。
+- `@covalo/cli` 新增 `@covalo/tools`、`@covalo/mcp`、`@covalo/tui` 依赖。
+- `@covalo/tui` 补齐 `exports`、`types` 字段。
 - `packages/tools/src/index.ts` 新增 `safeStringify`、`hasBinaryEncoding`、`clearReadTracker` 导出。
 - `packages/core/src/index.ts` 新增 `ToolProgressUpdate` 类型导出。
-- 38 个源文件的 `../../core/src/...`、`../../tools/src/...`、`../../mcp/src/...` 相对路径 import 全部替换为包名 import（`@deepreef/core`、`@deepreef/tools`、`@deepreef/mcp`、`@deepreef/tui`）。
+- 38 个源文件的 `../../core/src/...`、`../../tools/src/...`、`../../mcp/src/...` 相对路径 import 全部替换为包名 import（`@covalo/core`、`@covalo/tools`、`@covalo/mcp`、`@covalo/tui`）。
 - 验收：typecheck 通过 + 774/774 测试通过 + 0 跨包相对路径引用残留。
 
 ### CL-41：工具注册表收敛
@@ -944,7 +944,7 @@ bun test packages/mcp/__tests__/mcp-host.test.ts
 
 - `packages/tools/src/platform/scheduler-backend.ts` 大幅扩展：新增 `listJobs()`、`createJob()`、`deleteJob()` 统一入口，内部包含 crontab 和 schtasks 两条实现路径：
   - Crontab（POSIX）：保持原有 `getCrontab`/`setCrontab`/`parseCronJobs`/`removeCronJob` 逻辑。
-  - Schtasks（Windows）：新增 `listSchTasksJobs()`、`createSchTaskJob()`、`deleteSchTaskJob()`，任务名前加 `DEEPREEF_TASK_PREFIX`。
+  - Schtasks（Windows）：新增 `listSchTasksJobs()`、`createSchTaskJob()`、`deleteSchTaskJob()`，任务名前加 `COVALO_TASK_PREFIX`。
   - `cronToSchTaskSchedule()`：支持 MINUTE、HOURLY、DAILY、WEEKLY、MONTHLY 子集映射；不支持表达式返回明确错误。
 - `packages/tools/src/cron.ts` 完全重写为调用 `scheduler-backend.ts` 统一入口，不再直接操作 `crontab`。
 - `getSchedulerBackend()` 和 `normalizePlatform()` 保持导出。
@@ -976,7 +976,7 @@ bun test packages/mcp/__tests__/mcp-host.test.ts
 
 - `buildSystemPrompt()` 新增 `options` 参数（`{ osPlatform?, shellBackend? }`），允许调用方传入平台信息。
 - `packages/cli/src/tui.ts` 在设置 system prompt 前调用 `normalizePlatform()` + `resolveShellBackend()` 获取平台能力，传给 `buildSystemPrompt()`。
-- 未传入 options 时保持向后兼容：自动使用 `process.platform` 和 `DEEPREEF_SHELL` 环境变量。
+- 未传入 options 时保持向后兼容：自动使用 `process.platform` 和 `COVALO_SHELL` 环境变量。
 - 验收：typecheck 通过；81/81 core 测试通过。
 
 ### OS-17：三平台 CI scaffold
@@ -1127,7 +1127,7 @@ bun test packages/mcp/__tests__/mcp-host.test.ts
 | LSP-30：Manager 和文档同步 | ✅ 已完成 | LspManager 类、文档同步、12 个测试 |
 | LSP-40：完整动作集 | ✅ 已完成 | 14 个 actions + 5 个别名、28 个测试 |
 | LSP-50：真实语言服务器 smoke | ✅ 已完成 | TypeScript/Python/Go/Rust smoke tests、14 个测试 |
-| LSP-60：工具链集成和可观测性 | ✅ 已完成 | LspLogger、9 种事件、12 个测试、@deepreef/core 导出 RuntimeLogger |
+| LSP-60：工具链集成和可观测性 | ✅ 已完成 | LspLogger、9 种事件、12 个测试、@covalo/core 导出 RuntimeLogger |
 
 ### 6.2 仍然有效的设计决策
 
@@ -1410,7 +1410,7 @@ bun test packages/core/__tests__/config.test.ts
 
 | 文件 | 定位 |
 |------|------|
-| `packages/plugin/src/define-tool.ts` | `definePluginTool()` helper — 接受 `{ description, inputSchema, execute }`，返回带 `deepreefTool` 元数据的函数 |
+| `packages/plugin/src/define-tool.ts` | `definePluginTool()` helper — 接受 `{ description, inputSchema, execute }`，返回带 `covaloTool` 元数据的函数 |
 | `packages/plugin/src/schema-adapter.ts` | `StandardSchemaLike` 最小契约类型、`convertSchemaToJsonSpec()`、`validateSchemaArgs()` |
 | `packages/plugin/src/schemas.ts` | `PluginSpecSchema` / `PluginConfigSchema`（Zod schema 定义） |
 | `packages/mcp/src/schemas.ts` | `McpConfigSchema` / `McpAuthStoreSchema` / `McpAuthEntrySchema` |
@@ -1445,7 +1445,7 @@ bun test packages/core/__tests__/config.test.ts
 
 - 普通函数插件无需修改即可继续工作
 - `PluginHooks` 仍为 `Record<string, Function>`，loader 无需修改
-- `definePluginTool()` 返回可调用函数，通过 `deepreefTool` 属性携带元数据
+- `definePluginTool()` 返回可调用函数，通过 `covaloTool` 属性携带元数据
 
 ### 12.6 依赖分布
 
@@ -1481,7 +1481,7 @@ bun test                   # 1134 pass, 5 pre-existing fail (mode-selector + bri
 ### 14.1 整体状态：部分完成，代码就绪但端到端接入未验收
 
 代码架构层面的修复（类型系统、解析器、安全策略、接线管道）已全部完成并通过单元测试验证，
-**但缺少最后一步生产接线**：`PluginRuntime.init()` 从 `.deepreef/plugins.json` 读取配置，
+**但缺少最后一步生产接线**：`PluginRuntime.init()` 从 `.covalo/plugins.json` 读取配置，
 当前未创建该文件，CLI 启动时不会实际加载 ECC 内容包。
 
 **Resolver 和管线逻辑已验证可正确运行**（185 个测试全部通过，含 ECC smoke 验证），
@@ -1593,7 +1593,7 @@ bun test             # 185 pass, 0 fail
 
 要将 ECC 真正接入生产管线，还需：
 
-1. 创建 `.deepreef/plugins.json`，配置 ECC content-pack 条目：
+1. 创建 `.covalo/plugins.json`，配置 ECC content-pack 条目：
 ```json
 [
   {
@@ -1601,7 +1601,7 @@ bun test             # 185 pass, 0 fail
     "options": {
       "type": "content-pack",
       "profile": "developer",
-      "target": "deepreef",
+      "target": "covalo",
       "targetMode": "compatible",
       "hooks": { "enabled": false },
       "mcp": { "enabled": false }
@@ -1657,7 +1657,7 @@ bun test             # 185 pass, 0 fail
 ### 14.12 保留限制
 
 - **Lifecycle Hooks**：`SessionStart`/`SessionEnd` 在生产中不会触发，这是 Deepreef 引擎行为限制（`loop.ts` 只产出 `role: "done"` 事件，未发出 `startup`/`shutdown` LoopEvent），不是适配器代码缺陷。`Stop` hook（对应 `role: "done"`）可正常执行。
-- ECC 端到端接入未完成（缺少 `.deepreef/plugins.json` 和完整 CLI 验收）
+- ECC 端到端接入未完成（缺少 `.covalo/plugins.json` 和完整 CLI 验收）
 - `packages/memory/` 因依赖 `zod` 模块缺失存在 typecheck 错误（预置问题，非本修复引入）
 - P1-10（Manifest Schema 校验）仍标记为 P1 最小集
 
@@ -1675,10 +1675,10 @@ bun test             # 185 pass, 0 fail
 | providers / prompts / eval / health / viewer / mcp 复制 | ✅ 已完成 | 全部源自 agentmemory |
 | `iii-sdk` 导入替换 | ✅ 已完成 | 全部替换为 `../runtime/index.js` |
 | `MemoryRuntimeSdk` 实现 | ✅ 已完成 | 进程内 ISdk，`registerFunction()` / `trigger()` / `registerTrigger()` |
-| `MemoryStore` 文件型 KV | ✅ 已完成 | `~/.deepreef/memory/state/<scope>/<key>.json` |
+| `MemoryStore` 文件型 KV | ✅ 已完成 | `~/.covalo/memory/state/<scope>/<key>.json` |
 | `MemoryService` 完整初始化 | ✅ 已完成 | 57 个 function 注册 + 定时器管道 |
 | `DeepreefMemoryBridge` | ✅ 已完成 | Session/tool 生命周期 hooks |
-| `config.ts` 路径迁移 | ✅ 已完成 | `.agentmemory` → `.deepreef/memory` |
+| `config.ts` 路径迁移 | ✅ 已完成 | `.agentmemory` → `.covalo/memory` |
 | 独立 typecheck 通过 | ✅ 已完成 | 0 个 TSC 错误 |
 | LICENSE / NOTICE 文件 | ✅ 已完成 | `LICENSE.agentmemory`（Apache-2.0）、`NOTICE.md`（上游 commit `749c280`） |
 | 测试文件复制 | ✅ 已完成 | 129 个 test 文件从 agentmemory 复制 |
@@ -1710,7 +1710,7 @@ bun test             # 185 pass, 0 fail
 | mem::context 注入 system prompt | ⚠️ 已修复 | 启动时调用 `mem::context`，内容追加后重新调用 `engine.setSystemPrompt()` |
 | Session 生命周期 | ✅ 已完成 | `onSessionEnd` 已接线；`onSessionStart` 已修复接入；`onGenerationComplete` 已接入（`onLoopEvent` 检测 `role === "done"`）；`onPreToolUse` 明确不接入（DONE 已列为限制） |
 | 故障隔离 | ✅ 已完成 | 所有 bridge 调用 try/catch，初始化失败不阻断启动 |
-| 开关控制 | ✅ 已完成 | `DEEPREEF_MEMORY=false` 环境变量禁用 |
+| 开关控制 | ✅ 已完成 | `COVALO_MEMORY=false` 环境变量禁用 |
 | hooks/ 死代码清理 | ✅ 已完成 | 独立脚本添加 `@ts-nocheck`，被 bridge 替代 |
 
 ### 16.1 接线架构
@@ -1756,8 +1756,8 @@ tui.ts (CLI)
 
 ### 17.1 保留限制
 
-- 高级工具（graph、consolidation、mesh 等）未默认注册，需 `DEEPREEF_MEMORY_ADVANCED=true` 环境变量开启
-- MCP、REST、Viewer、`deepreef memory *` CLI 命令尚未实现
+- 高级工具（graph、consolidation、mesh 等）未默认注册，需 `COVALO_MEMORY_ADVANCED=true` 环境变量开启
+- MCP、REST、Viewer、`covalo memory *` CLI 命令尚未实现
 
 ---
 
@@ -1766,7 +1766,7 @@ tui.ts (CLI)
 | 子项 | 状态 | 说明 |
 |------|------|------|
 | `MemoryServiceConfig` 高级开关 | ⚠️ 已修复 | 构造函数现在保存并消费完整 config，不再丢弃 |
-| 环境变量门控 | ✅ 已完成 | `DEEPREEF_MEMORY_ADVANCED/GRAPH/CONSOLIDATE/REFLECT/SLOTS` |
+| 环境变量门控 | ✅ 已完成 | `COVALO_MEMORY_ADVANCED/GRAPH/CONSOLIDATE/REFLECT/SLOTS` |
 | `~/.agentmemory` 迁移 | ✅ 已完成 | `migrateFromAgentMemory()` 复制 state 目录，跳过已存在的文件 |
 | `memory_migrate` 工具 | ⚠️ 已修复 | 已导出并注册到 CLI，已移除无用 store 参数 |
 | typecheck | ✅ 已完成 | 0 错误 |
@@ -1782,7 +1782,7 @@ tui.ts (CLI)
 | 无 iii-engine 依赖 | ✅ 已完成 | 无 `iii-sdk`、`iii-engine` 引用 |
 | 启动故障隔离 | ✅ 已验证 | Memory init 失败不阻断 CLI 启动 |
 | 关闭清理 | ✅ 已完成 | `finally` 中 `memoryService.stop()` 清理所有 timer |
-| 记忆开关 `DEEPREEF_MEMORY=false` | ✅ 已完成 | 禁用后不加载 `@deepreef/memory` 模块（动态 import）、不初始化 MemoryService、不注册工具、不读写数据 |
+| 记忆开关 `COVALO_MEMORY=false` | ✅ 已完成 | 禁用后不加载 `@covalo/memory` 模块（动态 import）、不初始化 MemoryService、不注册工具、不读写数据 |
 
 ### 19.1 最终架构总结
 
@@ -1803,13 +1803,13 @@ packages/cli/src/tui.ts  — MemoryService init + HookManager 接线 + 工具注
 
 packages/tui/src/bridge.tsx  — createBridge 新增 onUserInput 回调
 
-依赖关系：@deepreef/memory → @deepreef/core（AgentTool 类型）
-         @deepreef/cli → @deepreef/memory（创建 + 接线）
+依赖关系：@covalo/memory → @covalo/core（AgentTool 类型）
+         @covalo/cli → @covalo/memory（创建 + 接线）
 ```
 
 ### 19.2 与原始 agentmemory 的功能对照
 
-| 能力 | agentmemory (iii-engine) | deepreef memory |
+| 能力 | agentmemory (iii-engine) | covalo memory |
 |------|------------------------|-----------------|
 | 记忆存储 | iii-engine KV | `MemoryStore` 文件 KV |
 | 函数注册 | `iii-sdk.registerFunction()` | `MemoryRuntimeSdk.registerFunction()` |
@@ -1819,7 +1819,7 @@ packages/tui/src/bridge.tsx  — createBridge 新增 onUserInput 回调
 | BM25 索引 | iii-engine | `IndexPersistence` 文件持久化 |
 | 向量索引 | iii-engine | `VectorIndex` 内存 + 文件持久化 |
 | 工具暴露 | 53 个 MCP 工具 | 7 个原生 AgentTool（含 memory_migrate，高级工具可配） |
-| AgentMemory 数据 | `~/.agentmemory` | `~/.deepreef/memory`（可迁移） |
+| AgentMemory 数据 | `~/.agentmemory` | `~/.covalo/memory`（可迁移） |
 
 ---
 
@@ -1839,8 +1839,8 @@ packages/tui/src/bridge.tsx  — createBridge 新增 onUserInput 回调
 | P1-1 | P1 | 接入 `onSessionStart()`，hook adapter 引用已保存 | `tui.ts` |
 | P1-2 | P1 | `MemoryServiceConfig` 完整消费，开关实际控制函数注册和定时器 | `memory-service.ts` |
 | P1-3 | P1 | 导出并注册 `memory_migrate`，移除无用 store 参数 | `migrate.ts`, `index.ts`, `tui.ts` |
-| P1-4 | P1 | memory 改为动态 `import()`，`DEEPREEF_MEMORY=false` 时不加载模块 | `tui.ts` |
-| P1-5 | P1 | 日志前缀从 `[agentmemory]` 改为 `[deepreef:memory]` | `logger.ts` |
+| P1-4 | P1 | memory 改为动态 `import()`，`COVALO_MEMORY=false` 时不加载模块 | `tui.ts` |
+| P1-5 | P1 | 日志前缀从 `[agentmemory]` 改为 `[covalo:memory]` | `logger.ts` |
 
 **第二轮（a4be2b0）**
 
@@ -1898,9 +1898,9 @@ packages/tui/src/bridge.tsx  — createBridge 新增 onUserInput 回调
 **P1-4：动态 import**
 
 ```text
-旧：文件顶部静态 import { MemoryService, ... } from "@deepreef/memory"
-新：if (enableMemory) { const memory = await import("@deepreef/memory") ... }
-效果：DEEPREEF_MEMORY=false 时完全不加载 memory 模块
+旧：文件顶部静态 import { MemoryService, ... } from "@covalo/memory"
+新：if (enableMemory) { const memory = await import("@covalo/memory") ... }
+效果：COVALO_MEMORY=false 时完全不加载 memory 模块
 ```
 
 **P1-2：配置优先级**
@@ -1926,7 +1926,7 @@ packages/tui/src/bridge.tsx  — createBridge 新增 onUserInput 回调
 ```text
 旧：无论 memoryInjectContext 是否关闭，启动时都调用 mem::context
 新：if (memoryInjectContext) { ... mem::context ... }
-    → DEEPREEF_MEMORY_INJECT_CONTEXT=false 时不调用，不污染 system prompt
+    → COVALO_MEMORY_INJECT_CONTEXT=false 时不调用，不污染 system prompt
 ```
 
 **FIX-6v2：ignored 输入不再观察（修正版）**
@@ -1966,10 +1966,10 @@ bun run test:memory-native   # 独立脚本，可接入 CI
 
 | 测试文件 | 覆盖内容 | 状态 |
 |----------|----------|------|
-| `test/deepreef-memory-service.test.ts` | service start/stop/CRUD/evict | ✅ 5/5 |
-| `test/deepreef-memory-tools.test.ts` | agent tool shape/execute/full flow | ✅ 8/8 |
-| `test/deepreef-memory-bridge.test.ts` | bridge hook lifecycle/autoObserve | ✅ 11/11 |
-| `test/deepreef-memory-migration.test.ts` | migrate tool shape/schema/execute | ✅ 3/3 |
+| `test/covalo-memory-service.test.ts` | service start/stop/CRUD/evict | ✅ 5/5 |
+| `test/covalo-memory-tools.test.ts` | agent tool shape/execute/full flow | ✅ 8/8 |
+| `test/covalo-memory-bridge.test.ts` | bridge hook lifecycle/autoObserve | ✅ 11/11 |
+| `test/covalo-memory-migration.test.ts` | migrate tool shape/schema/execute | ✅ 3/3 |
 | `packages/cli/src/__tests__/memory-integration.test.ts` | CLI import/tool registration/service lifecycle | ✅ 5/5 |
 
 ### 20.5 未纳入完成结论
@@ -1983,18 +1983,18 @@ bun run test:memory-native   # 独立脚本，可接入 CI
 
 ## 21. CodeGraph MCP Server 内置集成
 
-基于 CodeGraph（`@colbymchenry/codegraph`）项目的分析与评估，将其作为内置 MCP Server 自动接入 deepreef。
+基于 CodeGraph（`@colbymchenry/codegraph`）项目的分析与评估，将其作为内置 MCP Server 自动接入 covalo。
 
 ### 21.1 背景与决策
 
-CodeGraph 是一个本地代码智能库（tree-sitter 解析 + SQLite 知识图谱），通过 MCP 协议暴露代码符号关系、调用图和影响半径。与 deepreef 通过 MCP 协议集成，不需要代码合并。
+CodeGraph 是一个本地代码智能库（tree-sitter 解析 + SQLite 知识图谱），通过 MCP 协议暴露代码符号关系、调用图和影响半径。与 covalo 通过 MCP 协议集成，不需要代码合并。
 
 **集成方式决策**：
 
 | 方案 | 结论 | 原因 |
 |------|------|------|
 | 代码合并（merge） | ❌ 不适合 | 运行时冲突（Bun vs Node.js）、native addon 依赖（better-sqlite3）、产品边界清晰（独立 npm 包） |
-| MCP 协议集成 | ✅ 采用 | deepreef 已有完整 MCP 客户端系统，CodeGraph 自身就是 MCP Server，零代码修改即可使用 |
+| MCP 协议集成 | ✅ 采用 | covalo 已有完整 MCP 客户端系统，CodeGraph 自身就是 MCP Server，零代码修改即可使用 |
 
 **协同价值**：
 
@@ -2003,7 +2003,7 @@ CodeGraph 是一个本地代码智能库（tree-sitter 解析 + SQLite 知识图
 | "这个函数被谁调用？" | grep → 读多个文件 → 分析调用关系，大量 token | `codegraph_callers` 一次调用，毫秒级返回 |
 | "修改 AuthService 会影响什么？" | Agent 猜测影响范围 | `codegraph_impact` 返回完整影响半径 |
 | Agent 探索性工具调用 | grep + read 循环，每轮消耗 token | 减少约 58% 工具调用 |
-| **对 deepreef 省钱目标** | — | CodeGraph 减少工具调用 × deepreef 减少 cache miss = **双重节省** |
+| **对 covalo 省钱目标** | — | CodeGraph 减少工具调用 × covalo 减少 cache miss = **双重节省** |
 
 ### 21.2 修改内容
 
@@ -2035,7 +2035,7 @@ CodeGraph 是一个本地代码智能库（tree-sitter 解析 + SQLite 知识图
    ```
 
 4. **`loadConfig()` 修改**：
-   - 读取用户 `.deepreef/mcp.json` 配置后，自动合并内置 Server
+   - 读取用户 `.covalo/mcp.json` 配置后，自动合并内置 Server
    - 用户配置优先：如果用户已配置同名 Server，跳过内置
    - 命令可用性检查：如果 `codegraph` 不在 PATH 上，静默跳过
    - 内置 Server 连接失败：不计入 `failed` 数组，不计入 `serverCount`，不产生警告日志
@@ -2078,7 +2078,7 @@ bun test packages/mcp                      # 34 pass, 0 fail
 
 ### 21.4 保留限制
 
-- 用户安装 deepreef 后需额外安装 CodeGraph（`npm i -g @colbymchenry/codegraph`）才能使用
+- 用户安装 covalo 后需额外安装 CodeGraph（`npm i -g @colbymchenry/codegraph`）才能使用
 - CodeGraph 需要在项目中初始化（`codegraph init -i`）才能产生有效的知识图谱数据
 - CodeGraph MCP Server 运行在本机，不涉及网络通信
 
@@ -2211,7 +2211,7 @@ bun test packages/mcp                      # 34 pass, 0 fail
 - Zen、Kilo 等免费 provider 仍能被用户明确选择并正常调用。
 - keyless provider 不发送 Authorization header。
 - `/model` 不再出现 `free-auto`，但仍显示各免费 provider/model。
-- 历史 `.deepreef/last-config.json` 若保存了 `provider: "free-auto"`，加载时安全回退到默认 provider（zen）。
+- 历史 `.covalo/last-config.json` 若保存了 `provider: "free-auto"`，加载时安全回退到默认 provider（zen）。
 
 ### 22.3 适配点
 
@@ -2277,7 +2277,7 @@ git diff --check
 - `/thinking off|open|high` 仍然由用户显式选择，不会被运行时自动修改。
 - Provider thinking capabilities 映射（off/open/high）保留。
 - Zen/Kilo 等 provider 的 thinking 参数映射保留。
-- 历史 `.deepreef/last-config.json` 若保存了 `thinkingMode: "auto"`，加载时安全回退到 `"off"`。
+- 历史 `.covalo/last-config.json` 若保存了 `thinkingMode: "auto"`，加载时安全回退到 `"off"`。
 
 ### 23.3 验收命令
 
@@ -2585,7 +2585,7 @@ git diff --check
 - `resolveModelTarget()`、`createClientForTarget()`、`targetToConfig()`
 - `SubagentRunOptions.target` / `SubagentDefinition.target` 支持
 - `SubagentRunner` 按 target 创建独立 child client，不再共享父级 client
-- `DeepreefConfig.modelTargets` 支持项目级覆盖（`.deepreef/model-targets.json`）
+- `DeepreefConfig.modelTargets` 支持项目级覆盖（`.covalo/model-targets.json`）
 
 ### 28.3 验证命令
 
@@ -2760,7 +2760,7 @@ bun run typecheck
 ### 36.1 目标文件
 
 - `packages/core/src/supervisor/pool.ts`、`router.ts`、`budget.ts`、`smoke.ts`
-- 配置：`.deepreef/supervisor-pool.json`
+- 配置：`.covalo/supervisor-pool.json`
 
 ---
 
@@ -2842,7 +2842,7 @@ bun run packages/core/scripts/benchmark-matrix.ts
 - `packages/tui-opentui/` 整个目录（30 个文件）
 - `packages/cli/src/tui-wrapper.ts`（OpenTUI session 隔离）
 - `packages/cli/src/tui.ts` 中 OpenTUI 分支和 `TUI_MODE` 常量
-- `packages/cli/package.json` 中 `@deepreef/tui-opentui`、`@opentui/core`、`@opentui/react` 依赖
+- `packages/cli/package.json` 中 `@covalo/tui-opentui`、`@opentui/core`、`@opentui/react` 依赖
 
 **验收：**
 - `typecheck` 通过（tui-opentui 预置错误消除）
@@ -3043,7 +3043,7 @@ bun run packages/core/scripts/benchmark-matrix.ts
 | ADV-HAR-01 | ✅ 已完成 | `HarnessStrictness` 类型 + `EffectiveHarnessPolicy` + 优先级解析器 + `/harness` TUI 菜单 |
 | ADV-HAR-02 | ✅ 已完成 | `Engine.submit()` 入口固化策略，传递 `effectivePolicy` 到 `LoopOptions` |
 | ADV-HAR-03 | ✅ 已完成 | 根据 `shellPolicy` 自动启用 dual-track bash 工具 |
-| ADV-HAR-04 | ✅ 已完成 | Supervisor 池默认空，用户必须显式配置 `.deepreef/supervisor-pool.json` |
+| ADV-HAR-04 | ✅ 已完成 | Supervisor 池默认空，用户必须显式配置 `.covalo/supervisor-pool.json` |
 | ADV-HAR-05 | ✅ 已完成 | `ReadTracker` 按 `readBeforeWrite` 策略分级（block/warn/off） |
 | ADV-HAR-06 | ✅ 已完成 | `EarlyStopDetector` 按 `earlyStop` 策略分级（aggressive/standard/critical-only） |
 | ADV-HAR-07 | ✅ 已完成 | `toolRouting` 策略传入 LoopOptions + runLoop 解构并在每轮通过 `resolveToolRouting` 应用 |
@@ -3054,7 +3054,7 @@ bun run packages/core/scripts/benchmark-matrix.ts
 **新增文件：**
 - `packages/core/src/harness/strictness.ts` — `resolveHarnessStrictness()`、`readProjectHarnessConfig()`、`resolveDefaultStrictness()`
 - `packages/core/src/harness/policy.ts` — `resolveEffectiveHarnessPolicy()`、`getBasePolicy()`
-- `packages/core/src/harness/config.ts` — 读写 `.deepreef/harness.json`
+- `packages/core/src/harness/config.ts` — 读写 `.covalo/harness.json`
 
 **修改文件：**
 - `packages/core/src/model-profile/types.ts` — 新增 `HarnessStrictness`、`EffectiveHarnessPolicy`、`ProjectHarnessConfig` 类型
@@ -3339,9 +3339,9 @@ const ProjectHarnessConfigSchema = z.object({
 
 ### 46.3 运行时接线位置
 
-- 配置文件路径：`.deepreef/agents.json`
-- 旧配置文件：`.deepreef/ui-settings.json`（自动迁移）
-- 迁移触发：首次加载 `.deepreef/agents.json` 时检测旧格式并自动转换
+- 配置文件路径：`.covalo/agents.json`
+- 旧配置文件：`.covalo/ui-settings.json`（自动迁移）
+- 迁移触发：首次加载 `.covalo/agents.json` 时检测旧格式并自动转换
 
 ### 46.4 测试命令与真实结果
 
@@ -3392,11 +3392,11 @@ const ProjectHarnessConfigSchema = z.object({
 ### 47.3 运行时接线位置
 
 - 模块路径：`packages/core/src/capability-catalog/`
-- 导出路径：`@deepreef/core`
+- 导出路径：`@covalo/core`
 
 ### 47.4 设计决策
 
-- **Supervisor 工具权限由用户配置决定**：默认配置中 supervisor 的 deny 列表包含写工具，但用户可以通过修改 `.deepreef/agents.json` 来调整
+- **Supervisor 工具权限由用户配置决定**：默认配置中 supervisor 的 deny 列表包含写工具，但用户可以通过修改 `.covalo/agents.json` 来调整
 - **不硬编码只读逻辑**：RoleCapabilityView 只根据用户的 allow/deny 配置过滤工具，不进行额外的角色限制
 - **工具 tier 自动分类**：根据工具名称自动分类为 read/write/exec，用于权限和治理
 
@@ -3451,7 +3451,7 @@ const ProjectHarnessConfigSchema = z.object({
 ### 48.3 运行时接线位置
 
 - 模块路径：`packages/core/src/dual-agent-runtime/`
-- 导出路径：`@deepreef/core`
+- 导出路径：`@covalo/core`
 
 ### 48.4 设计决策
 
@@ -3510,7 +3510,7 @@ const ProjectHarnessConfigSchema = z.object({
 ### 49.3 运行时接线位置
 
 - 模块路径：`packages/core/src/workflow-coordinator/`
-- 导出路径：`@deepreef/core`
+- 导出路径：`@covalo/core`
 
 ### 49.4 设计决策
 
@@ -3569,7 +3569,7 @@ const ProjectHarnessConfigSchema = z.object({
 ### 50.3 运行时接线位置
 
 - 模块路径：`packages/core/src/dual-session/`
-- 导出路径：`@deepreef/core`
+- 导出路径：`@covalo/core`
 
 ### 50.4 设计决策
 
@@ -3607,7 +3607,7 @@ const ProjectHarnessConfigSchema = z.object({
 
 - `packages/tui/src/components/workflow/WorkflowStatusBar.tsx` — 新增
   - 实现 `WorkflowStatusBar` 组件，显示 Workflow 状态
-  - 第一行：DeepReef + Workflow 阶段链 + loops
+  - 第一行：Covalo + Workflow 阶段链 + loops
   - 第二行：Supervisor | Worker | goal 三段卡片
 - `packages/tui/src/components/workflow/DualTabSystem.tsx` — 新增
   - 实现 `DualTabSystem` 组件，管理双角色 Tab 系统
@@ -3627,14 +3627,14 @@ const ProjectHarnessConfigSchema = z.object({
 ### 51.3 运行时接线位置
 
 - 模块路径：`packages/tui/src/components/workflow/`
-- 导出路径：`@deepreef/tui`
+- 导出路径：`@covalo/tui`
 
 ### 51.4 设计决策
 
 - **固定布局**：状态栏固定在输入框正上方，属于 bottomContent
 - **Tab 切换**：无覆盖层时 Tab 切换 Supervisor/Worker 对话和输入目标
 - **独立状态**：两个 Tab 分别保存草稿、消息列表和滚动锁定位置
-- **阶段标识**：[D] analyse 表示 DeepReef 调度 Supervisor 分析；[W] do/report 表示 Worker 实施和报告
+- **阶段标识**：[D] analyse 表示 Covalo 调度 Supervisor 分析；[W] do/report 表示 Worker 实施和报告
 - **当前阶段高亮**：当前阶段通过颜色或粗体高亮
 
 ### 51.5 测试命令与真实结果
@@ -3681,7 +3681,7 @@ const ProjectHarnessConfigSchema = z.object({
 ### 52.3 运行时接线位置
 
 - 模块路径：`packages/core/src/`、`packages/tui/src/`
-- 导出路径：`@deepreef/core`、`@deepreef/tui`
+- 导出路径：`@covalo/core`、`@covalo/tui`
 
 ### 52.4 设计决策
 
@@ -3726,7 +3726,7 @@ const ProjectHarnessConfigSchema = z.object({
 ### 53.3 运行时接线位置
 
 - 模块路径：`packages/core/src/agent-profile/`
-- 导出路径：`@deepreef/core`
+- 导出路径：`@covalo/core`
 
 ### 53.4 设计决策
 
@@ -3767,7 +3767,7 @@ const ProjectHarnessConfigSchema = z.object({
 ### 54.3 运行时接线位置
 
 - 模块路径：`packages/core/src/capability-catalog/`
-- 导出路径：`@deepreef/core`
+- 导出路径：`@covalo/core`
 
 ### 54.4 设计决策
 
@@ -4386,12 +4386,12 @@ DA-R 系列任务（DA-R0 到 DA-R7）已完成双角色运行时的修复、集
 
 **目标**：worker 和 supervisor 各自持有独立的 model/provider 配置，`/model` 与底部状态栏跟随当前 `activeRole`，配置持久化到磁盘，向后兼容旧的单模型配置。
 
-**决策：** Tab 切换既切消息路由，也切显示/配置上下文；持久化新建 `.deepreef/role-config.json`，不动 `last-config.json`（作为单模型 fallback）。
+**决策：** Tab 切换既切消息路由，也切显示/配置上下文；持久化新建 `.covalo/role-config.json`，不动 `last-config.json`（作为单模型 fallback）。
 
 **实现边界（跨 core / cli / tui 三包）：**
 
 - **core/engine.ts**：新增 `getModel(): string` 与 `getProvider(): string` 公共 getter（`config` 原为 private 且无任何访问器）。
-- **core/config.ts + schemas/config.ts**：新增 `RoleConfig` 类型、`RoleConfigSchema`、`saveRoleConfig(role, cfg)`、`loadRoleConfig(role)`。文件 `.deepreef/role-config.json` 结构为 `{ worker: {provider, model, baseUrl}, supervisor: {...} }`，部分写入（读-改-写，保留另一 role）。`apiKey` 不持久化。
+- **core/config.ts + schemas/config.ts**：新增 `RoleConfig` 类型、`RoleConfigSchema`、`saveRoleConfig(role, cfg)`、`loadRoleConfig(role)`。文件 `.covalo/role-config.json` 结构为 `{ worker: {provider, model, baseUrl}, supervisor: {...} }`，部分写入（读-改-写，保留另一 role）。`apiKey` 不持久化。
 - **core/index.ts**：导出 `saveRoleConfig` / `loadRoleConfig` / `RoleConfig`。
 - **cli/tui.ts**：启动时分别 `loadRoleConfig("worker")` / `("supervisor")`，若存在则覆盖到各自 config 块；worker 引擎热更新，supervisor 引擎按其 role config 独立创建。
 - **tui/App.tsx**：新增 `roleConfig: Record<'worker'|'supervisor', {provider, model}>` 状态；`activeModel`/`activeProvider` 改为从 `roleConfig[activeRole]` 派生。`handleModelSelect` 改为 role-aware：`activeRole === 'supervisor' && dualRuntime` 时取 `dualRuntime.getSupervisor().getEngine()`，否则 worker engine；更新 `roleConfig` + `saveRoleConfig` + `saveLastConfig`（后者作全局 fallback）。
@@ -4407,7 +4407,7 @@ DA-R 系列任务（DA-R0 到 DA-R7）已完成双角色运行时的修复、集
 
 **目标**：每个 role 绑定独立的 Agent 身份（system prompt），Tab 切换时状态栏最左侧显示该 role 绑定的 Agent 名，`/agent` 针对当前 role 绑定。删除 `build`/`plan` 原生身份，原生只留 worker/supervisor。
 
-**决策：** per-role agent 持久化复用现有 `.deepreef/agents.json`（agent-profile 系统），给 `AgentRoleProfile` 加 `agent` 字段；不塞进 `role-config.json`（那个只管 model）。
+**决策：** per-role agent 持久化复用现有 `.covalo/agents.json`（agent-profile 系统），给 `AgentRoleProfile` 加 `agent` 字段；不塞进 `role-config.json`（那个只管 model）。
 
 **实现边界（core + tui 两包）：**
 
@@ -4433,7 +4433,7 @@ DA-R 系列任务（DA-R0 到 DA-R7）已完成双角色运行时的修复、集
 
 **症状**：per-role 模型配置落地后，supervisor 配置为 `zen` provider 时，`bun run dev` 抛 `supervisorConfig is required with baseUrl and model`，尽管 baseUrl/model 都有值。
 
-**根因**：`DualAgentRuntime` 构造时的 `requiresApiKey()` 只检查 `keyless` 字段，不认 `requiresKey: false`。DeepReef 有两种"不需要用户提供 key"的表达：
+**根因**：`DualAgentRuntime` 构造时的 `requiresApiKey()` 只检查 `keyless` 字段，不认 `requiresKey: false`。Covalo 有两种"不需要用户提供 key"的表达：
 - `keyless: true`（kilo 等）—— 完全无 key 通道
 - `requiresKey: false` + `defaultKey`（zen 等）—— 有兜底 public key
 
@@ -4528,7 +4528,7 @@ bun test packages/tui/__tests__/workflow-mode-router.test.ts         # 16 pass
 - 8 个 pre-existing 测试已修复（2026-06-15）：更新 agent.test.ts / engine-tools.test.ts / commands.test.ts / message-scroll.test.ts 以匹配 `build`/`plan` agent 移除后的当前代码。
 - `packages/memory` 已从默认测试套件中排除（接口保留，`bun test` 只跑融合包）。运行 `bun run test:memory` 可单独执行 memory 测试，`bun run test:all` 全量运行。
 - 全仓 `bun test` 另有 484 个失败集中在 `packages/memory/` / `packages/agentmemory/`，与本任务无关，未在 §SFR 验收范围内。
-- 远程 Supervisor smoke 测试默认跳过，需要 `DEEPREEF_SUPERVISOR_SMOKE=1`。
+- 远程 Supervisor smoke 测试默认跳过，需要 `COVALO_SUPERVISOR_SMOKE=1`。
 
 **全仓基线对齐：**
 
@@ -4577,7 +4577,7 @@ SFR commit `bd62d56` 之前工作区存在 4 个未提交 `docs/CodeReviewReport
   - `systemSetStatus` 供系统层控制任意状态
   - `clearGoal` 删除文件，getGoal 返回 null
   - `setTokenBudget` 更新活跃 goal 预算
-  - 持久化到 `.deepreef/sessions/<sessionId>/goal.json`
+  - 持久化到 `.covalo/sessions/<sessionId>/goal.json`
 - 新增 31 个测试覆盖所有核心路径
 - 验证：1128 tests pass, typecheck pass
 

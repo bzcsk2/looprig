@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { Box, Text, useInput } from '@deepreef/ink';
-import type { EvalEnvironmentId } from '@deepreef/core';
+import { Box, Text, useInput } from '@covalo/ink';
+import type { EvalEnvironmentId } from '@covalo/core';
 import { ModalShell } from '../ModalShell.js';
 import { TONE } from '../reasonix/tokens.js';
 

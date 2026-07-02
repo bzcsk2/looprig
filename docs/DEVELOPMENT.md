@@ -307,7 +307,7 @@ Tests: `__tests__/memory-fixes.test.ts` — 4 tests: set, delete, append succeed
 
 `InMemoryKV` (`in-memory-kv.ts`):
 - `set` and `delete` call `this.persist()` automatically after mutation.
-- `persist()` writes through a temp file (`path + .deepreef_tmp_${uuid}`) then `renameSync` for atomicity.
+- `persist()` writes through a temp file (`path + .covalo_tmp_${uuid}`) then `renameSync` for atomicity.
 - `getLastPersistError()` surfaces the last error string for diagnostics.
 
 Tests: `__tests__/memory-fixes.test.ts` — 6 tests: auto-persist after set/delete, load on construction, no persist without path, error reporting, temp file cleanup.
@@ -330,7 +330,7 @@ These items are lower priority. Fix only after higher-priority packs unless they
 
 ## Eval Assets (Self-Contained NPM)
 
-LoopRig now ships eval benchmark assets inside the npm package. No external bundle downloads or manual `.pt` file placement needed.
+Covalo now ships eval benchmark assets inside the npm package. No external bundle downloads or manual `.pt` file placement needed.
 
 ### Directory Structure
 
@@ -354,7 +354,7 @@ resources/eval-assets/
 
 1. **No more git bundles**: SWE-bench materializer uses `baseCommit` snapshots (`tar.gz`) instead of full git history bundles. Repos are checked out at the base commit, `.git` removed, and packed reproducibly.
 2. **No PyTorch large-weight tasks**: `pytorch-model-recovery` and `pytorch-model-cli` removed from packaged lock. They required ~10MB `.pt`/`.pth` files. If re-added, they must use small generated assets (`< 2MB`).
-3. **Asset resolver**: `getEvalAssetsRoot()` searches `LOOPRIG_EVAL_ASSETS_DIR` → npm package root → repo root → dev fallback (`curated/`).
+3. **Asset resolver**: `getEvalAssetsRoot()` searches `COVALO_EVAL_ASSETS_DIR` → npm package root → repo root → dev fallback (`curated/`).
 4. **Safe extraction**: `extractSafeTarGz()` validates all tar entries for path traversal before extracting.
 
 ### Build Commands
@@ -418,11 +418,11 @@ These previous audit claims were checked against the current tree and are false,
 Use the commands that match the changed package. Prefer narrower tests when available.
 
 ```bash
-pnpm --filter @deepreef/tools test
-pnpm --filter @deepreef/core test
-pnpm --filter @deepreef/tui test
-pnpm --filter @deepreef/memory test
-pnpm --filter @deepreef/cli test
+pnpm --filter @covalo/tools test
+pnpm --filter @covalo/core test
+pnpm --filter @covalo/tui test
+pnpm --filter @covalo/memory test
+pnpm --filter @covalo/cli test
 pnpm test
 ```
 

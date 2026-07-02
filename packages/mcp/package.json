@@ -1,5 +1,5 @@
 {
-  "name": "@deepreef/mcp",
+  "name": "@covalo/mcp",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,8 +16,8 @@
     }
   },
   "dependencies": {
-    "@deepreef/core": "workspace:*",
-    "@deepreef/tools": "workspace:*",
+    "@covalo/core": "workspace:*",
+    "@covalo/tools": "workspace:*",
     "zod": "4.4.3"
   }
 }

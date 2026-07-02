@@ -3,15 +3,15 @@ import { mkdir, rm, readdir, readFile, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { maybePersistResult, DEFAULT_MAX_RESULT_CHARS, resetSessionByteUsage, getSessionByteUsage } from "../src/result-persistence.js"
 
-const TEST_DIR = join(process.cwd(), ".deepreef", "results", "test-session")
+const TEST_DIR = join(process.cwd(), ".covalo", "results", "test-session")
 
 describe("P4: Result Overflow Persistence", () => {
   beforeEach(async () => {
-    await rm(join(process.cwd(), ".deepreef", "results"), { recursive: true, force: true })
+    await rm(join(process.cwd(), ".covalo", "results"), { recursive: true, force: true })
   })
 
   afterEach(async () => {
-    await rm(join(process.cwd(), ".deepreef", "results"), { recursive: true, force: true })
+    await rm(join(process.cwd(), ".covalo", "results"), { recursive: true, force: true })
   })
 
   it("returns original content when under threshold", async () => {
@@ -50,7 +50,7 @@ describe("P4: Result Overflow Persistence", () => {
   it("creates directory with 0700 permissions", async () => {
     const largeContent = "z".repeat(DEFAULT_MAX_RESULT_CHARS + 100)
     await maybePersistResult(largeContent, "session-3", "read_file")
-    const dir = join(process.cwd(), ".deepreef", "results", "session-3")
+    const dir = join(process.cwd(), ".covalo", "results", "session-3")
     const dirStat = await stat(dir)
     expect(dirStat.isDirectory()).toBe(true)
   })
@@ -61,9 +61,9 @@ describe("P4: Result Overflow Persistence", () => {
     expect(r.persisted).toBeDefined()
     // Key: no path traversal (..) in the final path
     expect(r.persisted!.persistedPath).not.toContain("..")
-    // The path should be under .deepreef/results/
+    // The path should be under .covalo/results/
     const normalizedPath = r.persisted!.persistedPath.replace(/\\/g, "/")
-    expect(normalizedPath).toContain(".deepreef/results/")
+    expect(normalizedPath).toContain(".covalo/results/")
   })
 
   it("sanitizes tool name in filename", async () => {
@@ -109,12 +109,12 @@ describe("P4: Result Overflow Persistence", () => {
 
 describe("AUD-02: session quota and cleanup", () => {
   beforeEach(async () => {
-    await rm(join(process.cwd(), ".deepreef", "results"), { recursive: true, force: true })
+    await rm(join(process.cwd(), ".covalo", "results"), { recursive: true, force: true })
     resetSessionByteUsage()
   })
 
   afterEach(async () => {
-    await rm(join(process.cwd(), ".deepreef", "results"), { recursive: true, force: true })
+    await rm(join(process.cwd(), ".covalo", "results"), { recursive: true, force: true })
     resetSessionByteUsage()
   })
 
@@ -179,7 +179,7 @@ describe("AUD-02: session quota and cleanup", () => {
     // Wait for async cleanup
     await new Promise(r => setTimeout(r, 200))
 
-    const dir = join(process.cwd(), ".deepreef", "results", "cleanup-session")
+    const dir = join(process.cwd(), ".covalo", "results", "cleanup-session")
     let files: string[]
     try {
       files = await readdir(dir)
@@ -201,18 +201,18 @@ describe("AUD-02: session quota and cleanup", () => {
 
 describe("CL-31: Disk-based session usage initialization", () => {
   beforeEach(async () => {
-    await rm(join(process.cwd(), ".deepreef", "results"), { recursive: true, force: true })
+    await rm(join(process.cwd(), ".covalo", "results"), { recursive: true, force: true })
     resetSessionByteUsage()
   })
 
   afterEach(async () => {
-    await rm(join(process.cwd(), ".deepreef", "results"), { recursive: true, force: true })
+    await rm(join(process.cwd(), ".covalo", "results"), { recursive: true, force: true })
     resetSessionByteUsage()
   })
 
   it("initializes usage from existing files on disk", async () => {
     // Write a file manually to simulate existing persistence
-    const dir = join(process.cwd(), ".deepreef", "results", "legacy-session")
+    const dir = join(process.cwd(), ".covalo", "results", "legacy-session")
     await mkdir(dir, { recursive: true, mode: 0o700 })
     const existingContent = "x".repeat(10_000)
     const existingFile = join(dir, "legacy-tool.txt")
@@ -230,7 +230,7 @@ describe("CL-31: Disk-based session usage initialization", () => {
 
   it("does not scan disk for small results (under threshold)", async () => {
     // Previously persisted big files for this session
-    const dir = join(process.cwd(), ".deepreef", "results", "small-session")
+    const dir = join(process.cwd(), ".covalo", "results", "small-session")
     await mkdir(dir, { recursive: true, mode: 0o700 })
     await writeFile(join(dir, "old-big.txt"), "z".repeat(50_000), { mode: 0o600 })
 
@@ -263,7 +263,7 @@ describe("CL-31: Disk-based session usage initialization", () => {
     }
     await new Promise(r => setTimeout(r, 200))
 
-    const dir = join(process.cwd(), ".deepreef", "results", "recal-session")
+    const dir = join(process.cwd(), ".covalo", "results", "recal-session")
     const files = await readdir(dir)
     expect(files.length).toBeLessThanOrEqual(3)
 

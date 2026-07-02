@@ -1,5 +1,5 @@
-import type { AgentTool } from "@deepreef/core"
-import { safeStringify } from "@deepreef/tools"
+import type { AgentTool } from "@covalo/core"
+import { safeStringify } from "@covalo/tools"
 import { getMcpHost } from "./mcp-host-global.js"
 
 export function createCallMcpToolTool(): AgentTool {

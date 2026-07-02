@@ -1,33 +1,33 @@
 import { stdin as input, stdout as output, stderr as errorOutput } from "node:process"
 import { readFileSync, writeSync } from "node:fs"
 import { resolve } from "node:path"
-import { loadConfig, loadRoleConfig, getModelContextWindow, ReasonixEngine, SessionLoader, defaultAgentRegistry, loadAgentProfiles, getAgentProfile, resolveApiKey, ConfigManager, setGlobalConfigManager } from "@deepreef/core"
-import { buildSystemPrompt, loadPromptLocaleFromDisk, setPromptLocale, getPromptLocale } from "@deepreef/core"
-import { DualAgentRuntime } from "@deepreef/core/dual-agent-runtime/dual-runtime.js"
-import { WorkflowCoordinator } from "@deepreef/core/workflow-coordinator/coordinator.js"
-import { QuestionService } from "@deepreef/core/question/service.js"
-import { GoalStore } from "@deepreef/core/goal/store.js"
-import { Mailbox } from "@deepreef/core/agent-comm/mailbox.js"
-import { AgentScoreStore } from "@deepreef/core/scoring/index.js"
-import { createGoalTools } from "@deepreef/core/goal/tools.js"
-import { createMailboxTools } from "@deepreef/core/agent-comm/tools.js"
-import { createDefaultTools, clearReadTracker, normalizePlatform, resolveShellBackend, createAgentToolTool, createAskUserQuestionTool, createReadFileTool, createGrepTool, createListDirTool, createTodoWriteTool } from "@deepreef/tools"
-import { McpHost, createListMcpResourcesTool, createReadMcpResourceTool, createMcpAuthTool, createListMcpToolsTool, createCallMcpToolTool, setMcpHost } from "@deepreef/mcp"
-import { PluginRuntime, pluginToolsToAgentTools } from "@deepreef/plugin"
-import type { ToolCallHooks } from "@deepreef/security"
-// P1-4: Memory is dynamically imported when enabled to avoid loading when DEEPREEF_MEMORY=false
+import { loadConfig, loadRoleConfig, getModelContextWindow, ReasonixEngine, SessionLoader, defaultAgentRegistry, loadAgentProfiles, getAgentProfile, resolveApiKey, ConfigManager, setGlobalConfigManager } from "@covalo/core"
+import { buildSystemPrompt, loadPromptLocaleFromDisk, setPromptLocale, getPromptLocale } from "@covalo/core"
+import { DualAgentRuntime } from "@covalo/core/dual-agent-runtime/dual-runtime.js"
+import { WorkflowCoordinator } from "@covalo/core/workflow-coordinator/coordinator.js"
+import { QuestionService } from "@covalo/core/question/service.js"
+import { GoalStore } from "@covalo/core/goal/store.js"
+import { Mailbox } from "@covalo/core/agent-comm/mailbox.js"
+import { AgentScoreStore } from "@covalo/core/scoring/index.js"
+import { createGoalTools } from "@covalo/core/goal/tools.js"
+import { createMailboxTools } from "@covalo/core/agent-comm/tools.js"
+import { createDefaultTools, clearReadTracker, normalizePlatform, resolveShellBackend, createAgentToolTool, createAskUserQuestionTool, createReadFileTool, createGrepTool, createListDirTool, createTodoWriteTool } from "@covalo/tools"
+import { McpHost, createListMcpResourcesTool, createReadMcpResourceTool, createMcpAuthTool, createListMcpToolsTool, createCallMcpToolTool, setMcpHost } from "@covalo/mcp"
+import { PluginRuntime, pluginToolsToAgentTools } from "@covalo/plugin"
+import type { ToolCallHooks } from "@covalo/security"
+// P1-4: Memory is dynamically imported when enabled to avoid loading when COVALO_MEMORY=false
 import React from "react"
-import { wrappedRender as render } from "@deepreef/ink"
-import { App, createFrameMetricsHandler } from "@deepreef/tui"
+import { wrappedRender as render } from "@covalo/ink"
+import { App, createFrameMetricsHandler } from "@covalo/tui"
 
 
 
 function printHelp(): void {
-  output.write(`deepreef
+  output.write(`covalo
 
 Usage:
-  deepreef
-  echo "你好" | deepreef
+  covalo
+  echo "你好" | covalo
 
 Commands:
   /exit, /bye    exit the interactive session
@@ -56,10 +56,10 @@ async function main(): Promise<void> {
   setMcpHost(mcpHost)
   let mcpLoadPromise = mcpHost.loadConfig().then((summary) => {
     if (summary.failed.length > 0) {
-      errorOutput.write(`[deepreef] MCP loaded with ${summary.failed.length}/${summary.serverCount} server failure(s)\n`)
+      errorOutput.write(`[covalo] MCP loaded with ${summary.failed.length}/${summary.serverCount} server failure(s)\n`)
     }
   }).catch((error) => {
-    errorOutput.write(`[deepreef] MCP config load failed: ${error instanceof Error ? error.message : String(error)}\n`)
+    errorOutput.write(`[covalo] MCP config load failed: ${error instanceof Error ? error.message : String(error)}\n`)
   })
 
   const engine = sessionId
@@ -71,7 +71,7 @@ async function main(): Promise<void> {
   // Load persisted prompt locale at startup
   const promptLocale = loadPromptLocaleFromDisk(process.cwd()) ?? "zh-CN"
   setPromptLocale(promptLocale)
-  let currentPromptLocale: import("@deepreef/core").PromptLocale = promptLocale
+  let currentPromptLocale: import("@covalo/core").PromptLocale = promptLocale
   let pluginRulesPrompt = ""
   let memoryContextPrompt = ""
 
@@ -120,7 +120,7 @@ async function main(): Promise<void> {
         engine.setSystemPrompt(baseSystemPrompt)
       }
 
-      const preloadedSkills: import('@deepreef/tools').SkillDef[] = []
+      const preloadedSkills: import('@covalo/tools').SkillDef[] = []
       for (const cs of pluginRuntime.loadCommandSkills()) {
         preloadedSkills.push({ name: cs.name, description: cs.description, content: cs.content })
       }
@@ -139,39 +139,39 @@ async function main(): Promise<void> {
       if (mcpConfigs.length > 0) {
         mcpLoadPromise = mcpLoadPromise.then(() => mcpHost.addSources(mcpConfigs)).then((summary) => {
           if (summary.failed.length > 0) {
-            errorOutput.write(`[deepreef] Content pack MCP: ${summary.failed.length}/${summary.serverCount} server failure(s)\n`)
+            errorOutput.write(`[covalo] Content pack MCP: ${summary.failed.length}/${summary.serverCount} server failure(s)\n`)
           }
         })
       }
     } catch (e) {
-      errorOutput.write(`[deepreef] Plugin init skipped: ${e instanceof Error ? e.message : String(e)}\n`)
+      errorOutput.write(`[covalo] Plugin init skipped: ${e instanceof Error ? e.message : String(e)}\n`)
       // Preserve a usable agent even when plugin discovery fails.
       for (const tool of createDefaultTools([], [])) engine.registerTool(tool)
     }
   })
 
   // Memory is fully background-loaded and never gates the first model request.
-  let memoryService: import("@deepreef/memory").MemoryService | undefined
-  let memoryBridge: import("@deepreef/memory").DeepreefMemoryBridge | undefined
+  let memoryService: import("@covalo/memory").MemoryService | undefined
+  let memoryBridge: import("@covalo/memory").DeepreefMemoryBridge | undefined
   let memoryHookAdapter: ToolCallHooks | undefined
-  const enableMemory = process.env.DEEPREEF_MEMORY !== "false"
+  const enableMemory = process.env.COVALO_MEMORY !== "false"
   const memoryReady = deferTask(async () => {
     if (!enableMemory) return
     try {
-      const memory = await import("@deepreef/memory")
+      const memory = await import("@covalo/memory")
       // P1-2: Config from env vars with sensible defaults
-      const memoryAutoObserve = process.env.DEEPREEF_MEMORY_AUTO_OBSERVE !== "false"
-      const memoryInjectContext = process.env.DEEPREEF_MEMORY_INJECT_CONTEXT !== "false"
-      const memoryAdvanced = process.env.DEEPREEF_MEMORY_ADVANCED === "true"
+      const memoryAutoObserve = process.env.COVALO_MEMORY_AUTO_OBSERVE !== "false"
+      const memoryInjectContext = process.env.COVALO_MEMORY_INJECT_CONTEXT !== "false"
+      const memoryAdvanced = process.env.COVALO_MEMORY_ADVANCED === "true"
 
       memoryService = new memory.MemoryService({
         autoObserve: memoryAutoObserve,
         injectContext: memoryInjectContext,
         advancedTools: memoryAdvanced,
-        enableGraph: process.env.DEEPREEF_MEMORY_GRAPH === "true",
-        enableConsolidation: process.env.DEEPREEF_MEMORY_CONSOLIDATE === "true",
-        enableReflect: process.env.DEEPREEF_MEMORY_REFLECT === "true",
-        enableSlots: process.env.DEEPREEF_MEMORY_SLOTS === "true",
+        enableGraph: process.env.COVALO_MEMORY_GRAPH === "true",
+        enableConsolidation: process.env.COVALO_MEMORY_CONSOLIDATE === "true",
+        enableReflect: process.env.COVALO_MEMORY_REFLECT === "true",
+        enableSlots: process.env.COVALO_MEMORY_SLOTS === "true",
       })
       await memoryService.start()
       memoryBridge = new memory.DeepreefMemoryBridge(memoryService, { autoObserve: memoryAutoObserve, injectContext: memoryInjectContext })
@@ -190,7 +190,7 @@ async function main(): Promise<void> {
         }).catch(() => null)
         if (memContext && typeof memContext === "object" && "context" in memContext) {
           const ctx = (memContext as { context: string }).context
-          if (ctx) memoryContextPrompt = `<deepreef-memory-context>\n${ctx}\n</deepreef-memory-context>`
+          if (ctx) memoryContextPrompt = `<covalo-memory-context>\n${ctx}\n</covalo-memory-context>`
         }
         // P0-1: Re-set system prompt after memory context is appended
         baseSystemPrompt = rebuildBaseSystemPrompt()
@@ -227,9 +227,9 @@ async function main(): Promise<void> {
       engine.registerTool(memory.createMemoryStatusTool(memoryService))
       engine.registerTool(memory.createMemoryMigrateTool())
 
-      process.stderr.write(`[deepreef] Memory initialized\n`)
+      process.stderr.write(`[covalo] Memory initialized\n`)
     } catch (e) {
-      process.stderr.write(`[deepreef] Memory init skipped: ${e instanceof Error ? e.message : String(e)}\n`)
+      process.stderr.write(`[covalo] Memory init skipped: ${e instanceof Error ? e.message : String(e)}\n`)
       memoryService = undefined
       memoryBridge = undefined
     }
@@ -305,8 +305,8 @@ async function main(): Promise<void> {
     const { value: supervisorApiKey } = resolveApiKey(supervisorConfig.provider ?? "zen")
 
     const dualRuntime = new DualAgentRuntime({
-      workerClient: engine as unknown as import("@deepreef/core").ChatClient,
-      supervisorClient: supervisorEngine as unknown as import("@deepreef/core").ChatClient,
+      workerClient: engine as unknown as import("@covalo/core").ChatClient,
+      supervisorClient: supervisorEngine as unknown as import("@covalo/core").ChatClient,
       workerSystemPrompt: baseSystemPrompt,
       supervisorSystemPrompt: baseSystemPrompt,
       config: {
@@ -338,8 +338,8 @@ async function main(): Promise<void> {
     })
 
     // SFR-40: 启动时输出角色配置诊断
-    process.stderr.write(`[deepreef] Worker:  model=${workerEffectiveModel}  thinking=${workerProfile.thinking}\n`)
-    process.stderr.write(`[deepreef] Supervisor:  model=${supervisorConfig.model}  thinking=${supervisorProfile.thinking}  tools=6\n`)
+    process.stderr.write(`[covalo] Worker:  model=${workerEffectiveModel}  thinking=${workerProfile.thinking}\n`)
+    process.stderr.write(`[covalo] Supervisor:  model=${supervisorConfig.model}  thinking=${supervisorProfile.thinking}  tools=6\n`)
 
     // WF-FIX-40: QuestionService with timeout wrapper to prevent indefinite blocking
     const questionService = new QuestionService()
@@ -421,7 +421,7 @@ async function main(): Promise<void> {
   }
 }
 
-async function runPipeMode(engine: ReasonixEngine, memoryBridge?: import("@deepreef/memory").DeepreefMemoryBridge): Promise<void> {
+async function runPipeMode(engine: ReasonixEngine, memoryBridge?: import("@covalo/memory").DeepreefMemoryBridge): Promise<void> {
   const chunks: Buffer[] = []
   for await (const chunk of input) chunks.push(Buffer.from(chunk))
   const prompt = Buffer.concat(chunks).toString("utf8").trim()
@@ -475,13 +475,13 @@ async function runTUIMode(
   config: ReturnType<typeof loadConfig>,
   pluginRuntime: PluginRuntime,
   mcpConfigCount: number = 0,
-  getMemoryBridge?: () => import("@deepreef/memory").DeepreefMemoryBridge | undefined,
+  getMemoryBridge?: () => import("@covalo/memory").DeepreefMemoryBridge | undefined,
   beforeSubmit?: () => Promise<void>,
   memoryReady?: Promise<void>,
   dualRuntime?: DualAgentRuntime,
   workflowCoordinator?: WorkflowCoordinator,
   platformInfo?: { os: string; shell: string; shellBackend: string },
-  rebuildBaseSystemPrompt?: (locale?: import("@deepreef/core").PromptLocale) => string,
+  rebuildBaseSystemPrompt?: (locale?: import("@covalo/core").PromptLocale) => string,
 ): Promise<void> {
   const status = pluginRuntime.getStatus()
   const pluginCount = status.loadedPlugins.length
@@ -523,7 +523,7 @@ async function runTUIMode(
 
 function readConfiguredMcpCount(): number {
   try {
-    const raw = readFileSync(resolve(process.cwd(), ".deepreef", "mcp.json"), "utf8")
+    const raw = readFileSync(resolve(process.cwd(), ".covalo", "mcp.json"), "utf8")
     const parsed = JSON.parse(raw) as { mcpServers?: Record<string, unknown> }
     return Object.keys(parsed.mcpServers ?? {}).length
   } catch {

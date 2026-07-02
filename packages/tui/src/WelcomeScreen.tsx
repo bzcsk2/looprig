@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Text } from '@deepreef/ink';
+import { Box, Text } from '@covalo/ink';
 import { FG, TONE } from './reasonix/tokens.js';
 import { t } from './i18n/index.js';
 import figlet from 'figlet';
@@ -17,17 +17,17 @@ interface WelcomeScreenProps {
   diagnosticCounts: { errors: number; warnings: number };
 }
 
-let DEEPREEF_ASCII: string[] = []
+let COVALO_ASCII: string[] = []
 try {
-  DEEPREEF_ASCII = figlet.textSync('deepreef', { font: 'ANSI Regular' }).trim().split('\n')
+  COVALO_ASCII = figlet.textSync('covalo', { font: 'ANSI Regular' }).trim().split('\n')
 } catch {}
-const DEEPREEF_COLORS: any[] = ['#4FA3F7', '#5C94F9', '#6985FA', '#7676FC', '#866FFB', '#9868F9', '#B064F6', '#C15FF3', '#CA5FF2'];
+const COVALO_COLORS: any[] = ['#4FA3F7', '#5C94F9', '#6985FA', '#7676FC', '#866FFB', '#9868F9', '#B064F6', '#C15FF3', '#CA5FF2'];
 
 function Title(): React.ReactElement {
   return (
     <Box flexDirection="column" justifyContent="center">
-      {DEEPREEF_ASCII.map((line, i) => (
-        <Text key={i} bold color={DEEPREEF_COLORS[i % DEEPREEF_COLORS.length]}>{line}</Text>
+      {COVALO_ASCII.map((line, i) => (
+        <Text key={i} bold color={COVALO_COLORS[i % COVALO_COLORS.length]}>{line}</Text>
       ))}
     </Box>
   );

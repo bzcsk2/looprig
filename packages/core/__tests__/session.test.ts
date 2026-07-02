@@ -9,7 +9,7 @@ describe("AsyncSessionWriter", () => {
   let sessionPath: string
 
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `deepreef-session-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tmpDir = join(tmpdir(), `covalo-session-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     await mkdir(tmpDir, { recursive: true })
     sessionPath = join(tmpDir, "test-session.jsonl")
   })
@@ -90,7 +90,7 @@ describe("SessionLoader.read", () => {
   let sessDir: string
 
   beforeEach(() => {
-    sessDir = join(tmpdir(), `deepreef-session-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    sessDir = join(tmpdir(), `covalo-session-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     SessionLoader.sessionDir = sessDir
   })
 
@@ -203,7 +203,7 @@ describe("SessionLoader.list", () => {
   let sessDir: string
 
   beforeEach(() => {
-    sessDir = join(tmpdir(), `deepreef-session-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    sessDir = join(tmpdir(), `covalo-session-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     SessionLoader.sessionDir = sessDir
   })
 
@@ -278,8 +278,8 @@ describe("SessionLoader - cross-directory isolation", () => {
   let dirB: string
 
   beforeEach(() => {
-    dirA = join(tmpdir(), `deepreef-session-a-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-    dirB = join(tmpdir(), `deepreef-session-b-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    dirA = join(tmpdir(), `covalo-session-a-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    dirB = join(tmpdir(), `covalo-session-b-${Date.now()}-${Math.random().toString(36).slice(2)}`)
   })
 
   afterEach(async () => {
@@ -330,7 +330,7 @@ describe("SessionLoader - system message behavior", () => {
   let sessDir: string
 
   beforeEach(() => {
-    sessDir = join(tmpdir(), `deepreef-session-sys-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    sessDir = join(tmpdir(), `covalo-session-sys-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     SessionLoader.sessionDir = sessDir
   })
 
@@ -357,8 +357,8 @@ describe("M4: system message filtering", () => {
   let sessionDir: string
 
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `deepreef-session-filter-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-    sessionDir = join(tmpDir, ".deepreef", "sessions")
+    tmpDir = join(tmpdir(), `covalo-session-filter-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    sessionDir = join(tmpDir, ".covalo", "sessions")
     await mkdir(sessionDir, { recursive: true })
     SessionLoader.sessionDir = sessionDir
   })
@@ -410,8 +410,8 @@ describe("M5: loadSession", () => {
   let sessionDir: string
 
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `deepreef-loadsession-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-    sessionDir = join(tmpDir, ".deepreef", "sessions")
+    tmpDir = join(tmpdir(), `covalo-loadsession-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    sessionDir = join(tmpDir, ".covalo", "sessions")
     await mkdir(sessionDir, { recursive: true })
     SessionLoader.sessionDir = sessionDir
   })
@@ -455,8 +455,8 @@ describe("M6: recover", () => {
   let sessionDir: string
 
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `deepreef-recover-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-    sessionDir = join(tmpDir, ".deepreef", "sessions")
+    tmpDir = join(tmpdir(), `covalo-recover-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    sessionDir = join(tmpDir, ".covalo", "sessions")
     await mkdir(sessionDir, { recursive: true })
     SessionLoader.sessionDir = sessionDir
   })
@@ -489,7 +489,7 @@ describe("M9: SessionWriter enqueue", () => {
   let tmpDir: string
 
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `deepreef-enqueue-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tmpDir = join(tmpdir(), `covalo-enqueue-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     await mkdir(tmpDir, { recursive: true })
   })
 
@@ -578,8 +578,8 @@ describe("S1: session switching with full rebind", () => {
   let sessionDir: string
 
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `deepreef-s1-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-    sessionDir = join(tmpDir, ".deepreef", "sessions")
+    tmpDir = join(tmpdir(), `covalo-s1-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    sessionDir = join(tmpDir, ".covalo", "sessions")
     await mkdir(sessionDir, { recursive: true })
     SessionLoader.sessionDir = sessionDir
   })
@@ -632,7 +632,7 @@ describe("S2: session ID validation and list correctness", () => {
   let sessDir: string
 
   beforeEach(() => {
-    sessDir = join(tmpdir(), `deepreef-s2-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    sessDir = join(tmpdir(), `covalo-s2-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     SessionLoader.sessionDir = sessDir
   })
 
@@ -728,8 +728,8 @@ describe("S2: session ID validation and list correctness", () => {
     let sessionDir: string
 
     beforeEach(async () => {
-      tmpDir = join(tmpdir(), `deepreef-s2-engine-${Date.now()}-${Math.random().toString(36).slice(2)}`)
-      sessionDir = join(tmpDir, ".deepreef", "sessions")
+      tmpDir = join(tmpdir(), `covalo-s2-engine-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+      sessionDir = join(tmpDir, ".covalo", "sessions")
       await mkdir(sessionDir, { recursive: true })
       SessionLoader.sessionDir = sessionDir
     })
@@ -757,7 +757,7 @@ describe("CL-11: Session stats compatibility", () => {
   let tmpDir: string
 
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `deepreef-cl11-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tmpDir = join(tmpdir(), `covalo-cl11-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     await mkdir(tmpDir, { recursive: true })
     SessionLoader.sessionDir = tmpDir
   })
@@ -826,7 +826,7 @@ describe("CL-32: Session writer observability", () => {
   }
 
   beforeEach(async () => {
-    tmpDir = join(tmpdir(), `deepreef-cl32-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tmpDir = join(tmpdir(), `covalo-cl32-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     await mkdir(tmpDir, { recursive: true })
     logLines = []
   })

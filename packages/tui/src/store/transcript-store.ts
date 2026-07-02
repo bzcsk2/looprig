@@ -1,4 +1,4 @@
-import type { ChatMessage, AgentRole } from '@deepreef/core';
+import type { ChatMessage, AgentRole } from '@covalo/core';
 import type { TimelineItem, ToolStatus } from '../bridge.js';
 import { mergeTimelineEntries } from './hydration-merge.js';
 

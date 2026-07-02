@@ -60,7 +60,7 @@ export class InMemoryKV {
       for (const [scope, entries] of this.store) {
         data[scope] = Object.fromEntries(entries);
       }
-      const tmpPath = this.persistPath + ".deepreef_tmp_" + randomUUID();
+      const tmpPath = this.persistPath + ".covalo_tmp_" + randomUUID();
       writeFileSync(tmpPath, JSON.stringify(data), "utf-8");
       renameSync(tmpPath, this.persistPath);
     } catch (err) {

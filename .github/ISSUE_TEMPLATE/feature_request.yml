@@ -14,7 +14,7 @@ body:
     id: proposal
     attributes:
       label: Proposal
-      description: What should DeepReef do?
+      description: What should Covalo do?
     validations:
       required: true
   - type: dropdown

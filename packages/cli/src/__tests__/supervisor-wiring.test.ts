@@ -5,8 +5,8 @@
  * thinkingMode / config 互不影响。
  */
 import { describe, it, expect } from 'bun:test';
-import { loadAgentProfiles, getAgentProfile } from '@deepreef/core';
-import type { ReasonixEngine } from '@deepreef/core';
+import { loadAgentProfiles, getAgentProfile } from '@covalo/core';
+import type { ReasonixEngine } from '@covalo/core';
 
 describe('SFR-40: supervisor wiring', () => {
   it('loadAgentProfiles returns profiles for both roles', () => {

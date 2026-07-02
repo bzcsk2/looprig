@@ -3,8 +3,8 @@ import { resolve, join, dirname } from "node:path"
 import type { ContentPackManifest, ManifestSourceKind } from "./types.js"
 
 const MANIFEST_NAMES = [
-  ".deepreef-plugin.json",
-  "deepreef-plugin.json",
+  ".covalo-plugin.json",
+  "covalo-plugin.json",
   ".codex-plugin/plugin.json",
   ".claude-plugin/plugin.json",
 ]
@@ -13,7 +13,7 @@ export function findManifest(specPath: string): { manifestPath?: string; sourceK
   for (const name of MANIFEST_NAMES) {
     const fullPath = resolve(specPath, name)
     if (existsSync(fullPath)) {
-      const kind = name.includes("deepreef") ? "deepreef" : name.includes("codex") ? "codex" : "claude"
+      const kind = name.includes("covalo") ? "covalo" : name.includes("codex") ? "codex" : "claude"
       return { manifestPath: fullPath, sourceKind: kind }
     }
   }

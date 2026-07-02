@@ -3,7 +3,7 @@ import { ExperienceStore } from "../src/harness-evolution/experience/experience-
 import { formatExperienceForPrompt, buildRecallFilter, DEFAULT_RECALL_POLICY } from "../src/harness-evolution/experience/recall-policy";
 import type { ExperienceRecord } from "../src/harness-evolution/experience/experience-types";
 
-const BASE_DIR = "/tmp/looprig-test-experience-" + Math.random().toString(36).slice(2, 8);
+const BASE_DIR = "/tmp/covalo-test-experience-" + Math.random().toString(36).slice(2, 8);
 
 function makeRecord(overrides: Partial<ExperienceRecord> = {}): ExperienceRecord {
   return {

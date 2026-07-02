@@ -1,4 +1,4 @@
-import type { HookManager, ToolCallHooks, BeforeToolCallContext, ToolCallResult } from "@deepreef/security"
+import type { HookManager, ToolCallHooks, BeforeToolCallContext, ToolCallResult } from "@covalo/security"
 import type { BridgedHook } from "./hook-bridge.js"
 import { parseEccHooks } from "./hook-bridge.js"
 import type { ResolvedContentPack, ContentPackDiagnostic } from "./types.js"
@@ -48,9 +48,9 @@ function eccToDeepreefToolName(eccName: string): string {
 function matchToolMatcher(matcher: string, toolName: string): boolean {
   if (!matcher || matcher === "*") return true
   const parts = matcher.split("|").map(p => p.trim())
-  const deepreefName = eccToDeepreefToolName(toolName)
+  const covaloName = eccToDeepreefToolName(toolName)
   return parts.some(part => {
-    return part === toolName || part === deepreefName || eccToDeepreefToolName(part) === toolName || eccToDeepreefToolName(part) === deepreefName
+    return part === toolName || part === covaloName || eccToDeepreefToolName(part) === toolName || eccToDeepreefToolName(part) === covaloName
   })
 }
 

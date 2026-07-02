@@ -1,4 +1,4 @@
-import type { AgentTool } from "@deepreef/core"
+import type { AgentTool } from "@covalo/core"
 
 import { ToolRegistry } from "./registry.js"
 import { createReadFileTool } from "./file-ops.js"

@@ -1,5 +1,5 @@
-import { useInput, type InputEvent } from '@deepreef/ink';
-import type { ScrollBoxHandle } from '@deepreef/ink';
+import { useInput, type InputEvent } from '@covalo/ink';
+import type { ScrollBoxHandle } from '@covalo/ink';
 import type React from 'react';
 
 type MessageScrollKey = {

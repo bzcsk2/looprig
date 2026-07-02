@@ -101,8 +101,8 @@ export const AGENT_BENCHMARK_CASES: AgentBenchmarkCase[] = [
     tags: ["private-suite", "github-issue", "before-after"],
   },
   {
-    id: "deepreef-tool-recovery",
-    source: "deepreef-regression",
+    id: "covalo-tool-recovery",
+    source: "covalo-regression",
     title: "Tool failure recovery",
     difficulty: "medium",
     taskType: "tool-recovery",
@@ -114,8 +114,8 @@ export const AGENT_BENCHMARK_CASES: AgentBenchmarkCase[] = [
 ]
 
 export const DEFAULT_AGENT_BENCHMARK_SUITE: AgentBenchmarkSuite = {
-  id: "deepreef-agent-scoring-v1",
-  title: "DeepReef Agent Run Scoring Suite",
+  id: "covalo-agent-scoring-v1",
+  title: "Covalo Agent Run Scoring Suite",
   description: "A mixed suite inspired by common GitHub issue repair, academic coding-agent benchmarks, and public agent-eval tooling.",
   cases: AGENT_BENCHMARK_CASES,
 }

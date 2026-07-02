@@ -9,7 +9,7 @@
 
 import React, { createContext, useContext, useSyncExternalStore } from 'react';
 import { OrchestrationStore, type OrchestrationState, type LoopPhase } from '../../store/orchestration-store.js';
-import type { WorkerSnapshot, SupervisorSnapshot } from '@deepreef/core';
+import type { WorkerSnapshot, SupervisorSnapshot } from '@covalo/core';
 import type { WorkerDisplayData, WorkerStatus } from '../agents/AgentGroupDisplay.js';
 
 /**

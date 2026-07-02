@@ -1,4 +1,4 @@
-import type { EngineStatusSnapshot } from "@deepreef/core"
+import type { EngineStatusSnapshot } from "@covalo/core"
 import { t } from "../i18n/index.js"
 
 export interface FormatOptions {

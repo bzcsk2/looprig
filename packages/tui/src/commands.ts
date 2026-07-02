@@ -3,7 +3,7 @@
  * Testable without rendering any Ink components.
  */
 
-import { AGENTS, defaultAgentRegistry } from "@deepreef/core"
+import { AGENTS, defaultAgentRegistry } from "@covalo/core"
 import type { Strings } from "./i18n/strings.js"
 
 export type SlashCommand =

@@ -7,7 +7,7 @@ import {
   toGoalRuntimeConfig,
 } from "../src/config/adapter.js"
 import { DEFAULT_CONFIG } from "../src/config/defaults.js"
-import type { DeepReefConfig } from "../src/config/schema.js"
+import type { CovaloConfig } from "../src/config/schema.js"
 
 describe("Tool Policy", () => {
   describe("isHardDeniedForSupervisorLoop", () => {
@@ -42,7 +42,7 @@ describe("Tool Policy", () => {
 
   describe("isToolAllowed", () => {
     it("should deny tools in deny list", () => {
-      const config: DeepReefConfig = {
+      const config: CovaloConfig = {
         ...DEFAULT_CONFIG,
         tools: {
           ...DEFAULT_CONFIG.tools,
@@ -65,7 +65,7 @@ describe("Tool Policy", () => {
     })
 
     it("should only allow tools in allow list when specified", () => {
-      const config: DeepReefConfig = {
+      const config: CovaloConfig = {
         ...DEFAULT_CONFIG,
         tools: {
           ...DEFAULT_CONFIG.tools,
@@ -88,7 +88,7 @@ describe("Tool Policy", () => {
     })
 
     it("should allow all tools when allow list is empty and deny list is empty", () => {
-      const config: DeepReefConfig = {
+      const config: CovaloConfig = {
         ...DEFAULT_CONFIG,
         tools: {
           ...DEFAULT_CONFIG.tools,
@@ -114,7 +114,7 @@ describe("Tool Policy", () => {
 describe("Config Adapters", () => {
   describe("toWorkflowCoordinatorConfig", () => {
     it("should convert workflow config", () => {
-      const config: DeepReefConfig = {
+      const config: CovaloConfig = {
         ...DEFAULT_CONFIG,
         workflow: {
           ...DEFAULT_CONFIG.workflow,
@@ -133,7 +133,7 @@ describe("Config Adapters", () => {
 
   describe("toGoalRuntimeConfig", () => {
     it("should convert goal config", () => {
-      const config: DeepReefConfig = {
+      const config: CovaloConfig = {
         ...DEFAULT_CONFIG,
         goal: {
           ...DEFAULT_CONFIG.goal,

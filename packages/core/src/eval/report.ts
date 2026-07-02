@@ -4,12 +4,12 @@ import { join } from "node:path";
 import type { EvalRunReport, CaseResult } from "./types";
 import type { ScoreKind } from "../sandbox/types";
 
-function getDeepReefRoot(): string {
-  return process.env.DEEPRREF_ROOT ?? ".deepreef";
+function getCovaloRoot(): string {
+  return process.env.COVALO_ROOT ?? ".covalo";
 }
 
 function getEvalsDir(): string {
-  return join(getDeepReefRoot(), "evals");
+  return join(getCovaloRoot(), "evals");
 }
 
 export async function saveEvalReport(
@@ -94,13 +94,13 @@ export async function saveEvalReport(
     if (existsSync(packetsPath)) {
       const content = readFileSync(packetsPath, "utf-8");
       const packetArtifactMap: Record<string, string> = {
-        "looprig.task-digest.v1": "task-digest.json",
-        "looprig.runtime-guard.v1": "runtime-guard.json",
-        "looprig.action-certificate.v1": "action-certificate.json",
-        "looprig.review-packet.v1": "review-packet.json",
-        "looprig.incident-packet.v1": "incident-packet.json",
-        "looprig.recovery-packet.v1": "recovery-packet.json",
-        "looprig.harness-patch.v1": "harness-patch.json",
+        "covalo.task-digest.v1": "task-digest.json",
+        "covalo.runtime-guard.v1": "runtime-guard.json",
+        "covalo.action-certificate.v1": "action-certificate.json",
+        "covalo.review-packet.v1": "review-packet.json",
+        "covalo.incident-packet.v1": "incident-packet.json",
+        "covalo.recovery-packet.v1": "recovery-packet.json",
+        "covalo.harness-patch.v1": "harness-patch.json",
       };
       for (const line of content.trim().split("\n").filter(Boolean)) {
         try {
@@ -176,7 +176,7 @@ function generateMarkdownReport(report: EvalRunReport): string {
   const { meta, suiteSummary, overallScore } = report;
   const lines: string[] = [];
 
-  lines.push(`# LoopRig Eval Report`);
+  lines.push(`# Covalo Eval Report`);
   lines.push(``);
   lines.push(`- **Run ID**: \`${meta.runId}\``);
   lines.push(`- **Category**: ${meta.categoryId}`);

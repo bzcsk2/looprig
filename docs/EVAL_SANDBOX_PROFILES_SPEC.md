@@ -1,6 +1,6 @@
 # Eval Sandbox Profiles Implementation Spec
 
-本文档是给后续 agent 实施的开发规范。目标是用轻量 sandbox profile 体系替代当前未实现的 Docker/Podman container 路线，同时保持 LoopRig npm 包尽量小。
+本文档是给后续 agent 实施的开发规范。目标是用轻量 sandbox profile 体系替代当前未实现的 Docker/Podman container 路线，同时保持 Covalo npm 包尽量小。
 
 ## 结论
 
@@ -9,18 +9,18 @@
 ```text
 sandbox.benchmark
   标准评测沙箱。
-  LoopRig 管理固定版本工具链。
+  Covalo 管理固定版本工具链。
   首次运行或显式 prepare 时按需下载安装。
   可作为 official benchmark score。
 
 sandbox.local
   本地适配沙箱。
   使用用户本机已有工具链。
-  严重缺失时安装 fallback 工具链到 LoopRig cache。
+  严重缺失时安装 fallback 工具链到 Covalo cache。
   默认只作为 diagnostic / local compatibility score。
 ```
 
-这条路线比 Docker 更轻，更适合 npm 分发。npm 包不应携带 Node/Bun/Python/uv/rg/jq 等大工具链。用户首次选择 `sandbox.benchmark` 或执行 `looprig eval prepare sandbox.benchmark` 时，再下载和校验所需工具链。
+这条路线比 Docker 更轻，更适合 npm 分发。npm 包不应携带 Node/Bun/Python/uv/rg/jq 等大工具链。用户首次选择 `sandbox.benchmark` 或执行 `covalo eval prepare sandbox.benchmark` 时，再下载和校验所需工具链。
 
 ## 方案优劣
 
@@ -98,15 +98,15 @@ dependencies:
 ```text
 1. sandbox.benchmark
    标准工具链评测环境。
-   LoopRig 会准备固定版本工具链。
+   Covalo 会准备固定版本工具链。
    适合模型能力对比和官方评分。
    首次运行可能需要下载工具链。
 
 2. sandbox.local
    本地工具链沙箱环境。
    使用你机器上的 Node/Bun/Python 等版本。
-   严重缺失时由 LoopRig 安装 fallback 工具。
-   适合检查 LoopRig 在你本机环境里的可用性。
+   严重缺失时由 Covalo 安装 fallback 工具。
+   适合检查 Covalo 在你本机环境里的可用性。
 ```
 
 不要让用户直接选择 `benchmark-node`、`benchmark-python`、`local-node`。这些由 case manifest 自动选择。
@@ -172,7 +172,7 @@ tools:
   git: 2.45.x
   rg: 14.1.1
   jq: 1.7.1
-installRoot: ~/.looprig/toolchains/benchmark/node
+installRoot: ~/.covalo/toolchains/benchmark/node
 pathOrder:
   - node/bin
   - bun/bin
@@ -194,7 +194,7 @@ tools:
   git: 2.45.x
   rg: 14.1.1
   jq: 1.7.1
-installRoot: ~/.looprig/toolchains/benchmark/python
+installRoot: ~/.covalo/toolchains/benchmark/python
 sha256Required: true
 ```
 
@@ -205,7 +205,7 @@ id: local-node
 environment: sandbox.local
 officialScore: false
 hostAccepted: true
-fallbackRoot: ~/.looprig/toolchains/local-fallback
+fallbackRoot: ~/.covalo/toolchains/local-fallback
 minimumVersions:
   node: ">=20"
   bun: ">=1.2"
@@ -218,14 +218,14 @@ fallbackInstall:
 
 ## Toolchain Cache Policy
 
-LoopRig npm package must not include managed toolchains.
+Covalo npm package must not include managed toolchains.
 
 Use:
 
 ```text
-~/.looprig/toolchains/benchmark/<profile>/<version>/
-~/.looprig/toolchains/local-fallback/<tool>/<version>/
-~/.looprig/cache/eval/
+~/.covalo/toolchains/benchmark/<profile>/<version>/
+~/.covalo/toolchains/local-fallback/<tool>/<version>/
+~/.covalo/cache/eval/
 ```
 
 Each installed tool must have:
@@ -247,10 +247,10 @@ Do not install into project workspace. Do not mutate system PATH globally.
 Add CLI commands:
 
 ```bash
-looprig eval doctor
-looprig eval prepare sandbox.benchmark
-looprig eval prepare sandbox.local
-looprig eval clean-toolchains
+covalo eval doctor
+covalo eval prepare sandbox.benchmark
+covalo eval prepare sandbox.local
+covalo eval clean-toolchains
 ```
 
 `doctor` output should be human-readable and machine-readable with `--json`.
@@ -258,7 +258,7 @@ looprig eval clean-toolchains
 Example:
 
 ```text
-LoopRig Eval Doctor
+Covalo Eval Doctor
 
 sandbox.benchmark:
   bwrap               installed
@@ -316,7 +316,7 @@ When user selects `sandbox.local`:
 ```text
 1. Detect host tools from current PATH.
 2. Validate minimum versions.
-3. For required missing tools, install fallback into ~/.looprig/toolchains/local-fallback or return infra_error if install fails.
+3. For required missing tools, install fallback into ~/.covalo/toolchains/local-fallback or return infra_error if install fails.
 4. For recommended missing tools, install fallback if allowed; otherwise warn.
 5. For optional missing tools, warn only.
 6. Create isolated workspace.
@@ -434,13 +434,13 @@ Every report must include:
   "toolchainProfile": "node",
   "toolchain": {
     "node": {
-      "source": "looprig-managed",
+      "source": "covalo-managed",
       "version": "22.17.0",
-      "path": "~/.looprig/toolchains/benchmark/node/node-22.17.0/bin/node",
+      "path": "~/.covalo/toolchains/benchmark/node/node-22.17.0/bin/node",
       "sha256": "..."
     },
     "bun": {
-      "source": "looprig-managed",
+      "source": "covalo-managed",
       "version": "1.3.1",
       "sha256": "..."
     }
@@ -465,7 +465,7 @@ For local:
       "version": "22.14.0"
     },
     "bun": {
-      "source": "looprig-fallback",
+      "source": "covalo-fallback",
       "version": "1.3.1"
     }
   }
@@ -526,7 +526,7 @@ localenv:
   removed from user-facing eval environments
   migrate to sandbox.benchmark or sandbox.local
 
-LoopRig-Real:
+Covalo-Real:
   removed entirely from current eval registry, menus, generated metadata, and reports
   do not reintroduce as sandbox.local unless a separate design is approved
 
@@ -730,7 +730,7 @@ SWE-bench:
   create sandbox.benchmark entries only after per-repo profile exists
   otherwise create sandbox.local entries or pending-profile metadata
 
-LoopRig-Real:
+Covalo-Real:
   create no entries
 ```
 
@@ -828,9 +828,9 @@ If bundled `bwrap` remains, keep it small and optional. Full toolchains must be 
 
 ### P0: Toolchain Doctor and Prepare
 
-- Implement `looprig eval doctor`.
-- Implement `looprig eval prepare sandbox.benchmark`.
-- Implement `looprig eval prepare sandbox.local`.
+- Implement `covalo eval doctor`.
+- Implement `covalo eval prepare sandbox.benchmark`.
+- Implement `covalo eval prepare sandbox.local`.
 - Add JSON output for CI/debugging.
 - Do not download anything during npm install.
 
@@ -844,7 +844,7 @@ If bundled `bwrap` remains, keep it small and optional. Full toolchains must be 
 
 ### P1: Managed Toolchain Installer
 
-- Download pinned tools into `~/.looprig/toolchains`.
+- Download pinned tools into `~/.covalo/toolchains`.
 - Verify sha256.
 - Support Linux x64 first.
 - Mark unsupported platforms as `infra_error` or diagnostic-only.
@@ -862,7 +862,7 @@ If bundled `bwrap` remains, keep it small and optional. Full toolchains must be 
 
 - Native fixtures should be available in both profiles.
 - Terminal-Bench/SWE-bench should not be official until benchmark profiles and setup contracts are verified.
-- Remove LoopRig-Real completely from source loading, generated registry, tests, docs, and descriptions.
+- Remove Covalo-Real completely from source loading, generated registry, tests, docs, and descriptions.
 
 ### P2: Cross-Platform
 
@@ -893,7 +893,7 @@ Worker bash in eval calls provider.run()
 setup/verifier/Worker shell share same provider/profile
 officialScore=false when host tools are used
 container is hidden or disabled
-LoopRig-Real manifests are absent
+Covalo-Real manifests are absent
 ```
 
 Manual verification:
@@ -913,7 +913,7 @@ Manual verification:
 - Do not implement Docker/Podman provider in this iteration.
 - Do not bundle full toolchains in npm.
 - Do not make local scores comparable to official benchmark scores.
-- Do not reintroduce LoopRig-Real as an eval source in this migration.
+- Do not reintroduce Covalo-Real as an eval source in this migration.
 
 ## Final Rule
 

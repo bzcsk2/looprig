@@ -45,7 +45,7 @@ describe("McpAuth", () => {
   it("should store, list, and delete a credential without exposing the secret", async () => {
     const { createMcpAuthTool } = await import("../src/auth.js")
     const tool = createMcpAuthTool()
-    const ctx = { cwd: mkdtempSync(join(tmpdir(), "deepreef-mcp-auth-")) } as any
+    const ctx = { cwd: mkdtempSync(join(tmpdir(), "covalo-mcp-auth-")) } as any
     expect((await tool.execute({ action: "set", server: "demo", api_key: "sk-1234567890" }, ctx)).isError).toBe(false)
     const listed = JSON.parse((await tool.execute({ action: "list" }, ctx)).content as string)
     expect(listed.configured[0].server).toBe("demo")

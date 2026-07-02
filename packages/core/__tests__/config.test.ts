@@ -53,9 +53,9 @@ describe("loadConfig - 环境变量", () => {
   let tmpDir: string
 
   beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "deepreef-config-"))
+    tmpDir = mkdtempSync(join(tmpdir(), "covalo-config-"))
     vi.spyOn(process, "cwd").mockReturnValue(tmpDir)
-    delete process.env.DEEPREEF_PROVIDER
+    delete process.env.COVALO_PROVIDER
     delete process.env.DEEPSEEK_MODEL
     delete process.env.DEEPSEEK_BASE_URL
     delete process.env.ZEN_MODEL
@@ -68,15 +68,15 @@ describe("loadConfig - 环境变量", () => {
     rmSync(tmpDir, { recursive: true, force: true })
   })
 
-  it("should use DEEPREEF_PROVIDER env var to override provider", () => {
-    process.env.DEEPREEF_PROVIDER = "mimo"
+  it("should use COVALO_PROVIDER env var to override provider", () => {
+    process.env.COVALO_PROVIDER = "mimo"
     const cfg = loadConfig()
     expect(cfg.provider).toBe("mimo")
     expect(cfg.baseUrl).toContain("mimo")
   })
 
   it("should use ZEN_API_KEY env var when provider is zen", () => {
-    process.env.DEEPREEF_PROVIDER = "zen"
+    process.env.COVALO_PROVIDER = "zen"
     process.env.ZEN_API_KEY = "zen-key-from-env"
     const cfg = loadConfig()
     expect(cfg.provider).toBe("zen")
@@ -84,7 +84,7 @@ describe("loadConfig - 环境变量", () => {
   })
 
   it("should use DEEPSEEK_API_KEY env var for deepseek", () => {
-    process.env.DEEPREEF_PROVIDER = "deepseek"
+    process.env.COVALO_PROVIDER = "deepseek"
     process.env.DEEPSEEK_API_KEY = "ds-key-from-env"
     const cfg = loadConfig()
     expect(cfg.provider).toBe("deepseek")
@@ -92,7 +92,7 @@ describe("loadConfig - 环境变量", () => {
   })
 
   it("should fall back to defaultKey for zen when no env var set", () => {
-    process.env.DEEPREEF_PROVIDER = "zen"
+    process.env.COVALO_PROVIDER = "zen"
     delete process.env.ZEN_API_KEY
     const cfg = loadConfig()
     expect(cfg.apiKey).toBe("public")
@@ -100,7 +100,7 @@ describe("loadConfig - 环境变量", () => {
   })
 
   it("should use provider-specific model and base URL env vars for zen", () => {
-    process.env.DEEPREEF_PROVIDER = "zen"
+    process.env.COVALO_PROVIDER = "zen"
     process.env.ZEN_MODEL = "mimo-v2.5-free"
     process.env.ZEN_BASE_URL = "https://opencode.ai/zen/v1"
 
@@ -111,7 +111,7 @@ describe("loadConfig - 环境变量", () => {
   })
 
   it("should not let legacy DeepSeek env vars override zen", () => {
-    process.env.DEEPREEF_PROVIDER = "zen"
+    process.env.COVALO_PROVIDER = "zen"
     process.env.DEEPSEEK_MODEL = "deepseek-v4-flash"
     process.env.DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 
@@ -122,7 +122,7 @@ describe("loadConfig - 环境变量", () => {
   })
 
   it("should default to zen provider when no env and no last-config", () => {
-    delete process.env.DEEPREEF_PROVIDER
+    delete process.env.COVALO_PROVIDER
     const cfg = loadConfig()
     expect(cfg.provider).toBe("zen")
     expect(cfg.model).toBe("deepseek-v4-flash-free")
@@ -136,9 +136,9 @@ describe("saveLastConfig / loadConfig 持久化", () => {
   let tmpDir: string
 
   beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "deepreef-config-"))
+    tmpDir = mkdtempSync(join(tmpdir(), "covalo-config-"))
     vi.spyOn(process, "cwd").mockReturnValue(tmpDir)
-    delete process.env.DEEPREEF_PROVIDER
+    delete process.env.COVALO_PROVIDER
     delete process.env.DEEPSEEK_API_KEY
     delete process.env.ZEN_API_KEY
     delete process.env.DEEPSEEK_MODEL
@@ -156,7 +156,7 @@ describe("saveLastConfig / loadConfig 持久化", () => {
   it("should persist provider/model/baseUrl and restore them via loadConfig", () => {
     saveLastConfig({ provider: "mimo", model: "mimo-v2.5", baseUrl: "https://api.mimo.ai/v1" })
 
-    const configPath = join(tmpDir, ".deepreef", "last-config.json")
+    const configPath = join(tmpDir, ".covalo", "last-config.json")
     expect(existsSync(configPath)).toBe(true)
     const saved = JSON.parse(readFileSync(configPath, "utf8"))
     expect(saved.provider).toBe("mimo")
@@ -180,7 +180,7 @@ describe("saveLastConfig / loadConfig 持久化", () => {
 
   it("should ignore last-config from a different provider when env provider is set", () => {
     saveLastConfig({ provider: "deepseek", model: "deepseek-v4-pro", baseUrl: "https://api.deepseek.com" })
-    process.env.DEEPREEF_PROVIDER = "zen"
+    process.env.COVALO_PROVIDER = "zen"
 
     const cfg = loadConfig()
     expect(cfg.provider).toBe("zen")
@@ -197,7 +197,7 @@ describe("saveLastConfig / loadConfig 持久化", () => {
   })
 
   it("should not crash when last-config file is corrupted JSON", () => {
-    const dir = join(tmpDir, ".deepreef")
+    const dir = join(tmpDir, ".covalo")
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, "last-config.json"), "{invalid json!!!}", "utf8")
 
@@ -206,7 +206,7 @@ describe("saveLastConfig / loadConfig 持久化", () => {
   })
 
   it("should not crash when last-config file is empty", () => {
-    const dir = join(tmpDir, ".deepreef")
+    const dir = join(tmpDir, ".covalo")
     mkdirSync(dir, { recursive: true })
     writeFileSync(join(dir, "last-config.json"), "", "utf8")
 
@@ -254,7 +254,7 @@ describe("saveLastConfig / loadConfig 持久化", () => {
     })
 
     it("should allow any model name", () => {
-      process.env.DEEPREEF_PROVIDER = "openai-compatible"
+      process.env.COVALO_PROVIDER = "openai-compatible"
       process.env.OPENAI_COMPATIBLE_MODEL = "my-custom-model"
       process.env.OPENAI_COMPATIBLE_BASE_URL = "http://localhost:8080/v1"
       const cfg = loadConfig()
@@ -262,7 +262,7 @@ describe("saveLastConfig / loadConfig 持久化", () => {
       expect(cfg.model).toBe("my-custom-model")
       expect(cfg.apiKey).toBe("")
       expect(cfg.baseUrl).toBe("http://localhost:8080/v1")
-      delete process.env.DEEPREEF_PROVIDER
+      delete process.env.COVALO_PROVIDER
       delete process.env.OPENAI_COMPATIBLE_MODEL
       delete process.env.OPENAI_COMPATIBLE_BASE_URL
     })
@@ -270,11 +270,11 @@ describe("saveLastConfig / loadConfig 持久化", () => {
 
   describe("loadConfig with keyless providers", () => {
     it("should handle kilo without API key", () => {
-      process.env.DEEPREEF_PROVIDER = "kilo"
+      process.env.COVALO_PROVIDER = "kilo"
       const cfg = loadConfig()
       expect(cfg.provider).toBe("kilo")
       expect(cfg.apiKey).toBe("")
-      delete process.env.DEEPREEF_PROVIDER
+      delete process.env.COVALO_PROVIDER
     })
 
 

@@ -45,7 +45,7 @@ export interface SessionWriterStatus {
 }
 
 export class SessionLoader {
-  static sessionDir = resolve(process.cwd(), ".deepreef", "sessions")
+  static sessionDir = resolve(process.cwd(), ".covalo", "sessions")
 
   static validateSessionId(id: string): boolean {
     if (!id || typeof id !== "string") return false
@@ -233,7 +233,7 @@ export class SessionLoader {
         deleted++
       } catch (err) {
         // FG-60-R: 低噪音日志，不覆盖原始错误语义
-        if (process.env.DEEPREEF_DEBUG?.includes("session")) {
+        if (process.env.COVALO_DEBUG?.includes("session")) {
           console.debug(`[session] cleanup unlink failed: ${path}`, err)
         }
       }

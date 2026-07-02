@@ -1,5 +1,5 @@
 {
-  "name": "@deepreef/plugin",
+  "name": "@covalo/plugin",
   "version": "0.1.0",
   "type": "module",
   "main": "src/index.ts",
@@ -15,7 +15,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@deepreef/core": "workspace:*",
+    "@covalo/core": "workspace:*",
     "zod": "4.4.3"
   },
   "devDependencies": {

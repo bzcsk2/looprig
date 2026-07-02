@@ -23,8 +23,8 @@ function getScriptDir(): string {
 }
 
 export function getEvalAssetsRoot(): string {
-  if (process.env.LOOPRIG_EVAL_ASSETS_DIR) {
-    const envDir = resolve(process.env.LOOPRIG_EVAL_ASSETS_DIR);
+  if (process.env.COVALO_EVAL_ASSETS_DIR) {
+    const envDir = resolve(process.env.COVALO_EVAL_ASSETS_DIR);
     if (existsSync(envDir)) return envDir;
   }
 
@@ -45,7 +45,7 @@ export function getEvalAssetsRoot(): string {
   if (existsSync(devFallback)) return devFallback;
 
   throw new Error(
-    "Cannot locate eval assets root. Set LOOPRIG_EVAL_ASSETS_DIR or run from within the package/repo.",
+    "Cannot locate eval assets root. Set COVALO_EVAL_ASSETS_DIR or run from within the package/repo.",
   );
 }
 

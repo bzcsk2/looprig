@@ -1,6 +1,6 @@
-import { FREE_MODEL_TARGETS, PROVIDERS } from "@deepreef/core"
-import type { ApiKeySource } from "@deepreef/core"
-import { loadRoleConfig } from "@deepreef/core"
+import { FREE_MODEL_TARGETS, PROVIDERS } from "@covalo/core"
+import type { ApiKeySource } from "@covalo/core"
+import { loadRoleConfig } from "@covalo/core"
 
 export interface ModelSelection {
   provider: string

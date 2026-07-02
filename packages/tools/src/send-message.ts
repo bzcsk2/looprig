@@ -1,4 +1,4 @@
-import type { AgentTool } from "@deepreef/core"
+import type { AgentTool } from "@covalo/core"
 import { safeStringify } from "./safe-stringify.js"
 import { appendFile, mkdir, readFile } from "node:fs/promises"
 import { dirname, resolve } from "node:path"
@@ -33,7 +33,7 @@ export function createSendMessageTool(): AgentTool {
       if (action !== "send" && action !== "list") {
         return { content: safeStringify({ error: "action must be 'send' or 'list'" }), isError: true }
       }
-      const filePath = resolve(ctx.cwd, ".deepreef", "messages.jsonl")
+      const filePath = resolve(ctx.cwd, ".covalo", "messages.jsonl")
 
       if (action === "list") {
         const messages = await readMessages(filePath)

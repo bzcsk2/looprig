@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeAll, afterAll } from 'vitest';
-import type { LoopEvent } from '@deepreef/core';
-import type { ReasonixEngine } from '@deepreef/core';
-import * as CoreModule from '@deepreef/core';
+import type { LoopEvent } from '@covalo/core';
+import type { ReasonixEngine } from '@covalo/core';
+import * as CoreModule from '@covalo/core';
 import { createBridge, type BridgeState, type TimelineItem } from '../src/bridge.js';
 
 /** 测试内关闭 delta 合并，避免异步 flush 导致断言竞态。 */

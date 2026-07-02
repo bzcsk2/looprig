@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Text } from '@deepreef/ink';
+import { Box, Text } from '@covalo/ink';
 import type { ToolStatus } from './bridge.js';
 
 interface ToolCallBannerProps {

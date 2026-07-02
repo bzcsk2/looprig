@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test"
-import type { ScrollBoxHandle } from "@deepreef/ink"
+import type { ScrollBoxHandle } from "@covalo/ink"
 import { isMouseTrackingEnabled } from "../src/fullscreen.js"
 import { applyMessageScrollKey, restoreMessageScrollAfterOverlay } from "../src/useMessageScroll.js"
 
@@ -25,13 +25,13 @@ function makeScroll(overrides: Partial<ScrollBoxHandle> = {}) {
 }
 
 afterEach(() => {
-  delete process.env.DEEPREEF_ENABLE_MOUSE
+  delete process.env.COVALO_ENABLE_MOUSE
 })
 
 describe("message scrolling", () => {
   it("enables mouse tracking by default and supports explicit opt-out", () => {
     expect(isMouseTrackingEnabled()).toBe(true)
-    process.env.DEEPREEF_ENABLE_MOUSE = "0"
+    process.env.COVALO_ENABLE_MOUSE = "0"
     expect(isMouseTrackingEnabled()).toBe(false)
   })
 

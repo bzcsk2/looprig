@@ -1,5 +1,5 @@
-import type { HookManager, ToolCallHooks, BeforeToolCallContext, ToolCallResult } from "@deepreef/security"
-import type { PermissionDecision } from "@deepreef/security"
+import type { HookManager, ToolCallHooks, BeforeToolCallContext, ToolCallResult } from "@covalo/security"
+import type { PermissionDecision } from "@covalo/security"
 import type { PluginLoaded } from "./loader.js"
 
 export interface PluginHookAdapter {

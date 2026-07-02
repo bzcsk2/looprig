@@ -1,6 +1,6 @@
 export type PluginKind = "runtime" | "content-pack"
 
-export type ManifestSourceKind = "deepreef" | "codex" | "claude" | "ecc"
+export type ManifestSourceKind = "covalo" | "codex" | "claude" | "ecc"
 
 export interface ContentPackManifest {
   id: string

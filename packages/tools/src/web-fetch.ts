@@ -4,9 +4,9 @@
  * Adapted from opencode's webfetch tool:
  * - Uses TurndownService for proper HTML→Markdown conversion
  * - Uses htmlparser2 for clean HTML→text extraction
- * - Retains deepreef's SSRF protection and approval model
+ * - Retains covalo's SSRF protection and approval model
  */
-import type { AgentTool } from "@deepreef/core"
+import type { AgentTool } from "@covalo/core"
 import { safeStringify } from "./safe-stringify.js"
 import { isIP } from "node:net"
 import { promises as dns } from "node:dns"
@@ -110,7 +110,7 @@ export function createWebFetchTool(): AgentTool {
             signal,
             redirect: "follow",
             headers: {
-              "User-Agent": "Mozilla/5.0 (compatible; Deepreef/1.0; +https://deepreef.dev)",
+              "User-Agent": "Mozilla/5.0 (compatible; Deepreef/1.0; +https://covalo.dev)",
               Accept: acceptHeader(format),
             },
           })

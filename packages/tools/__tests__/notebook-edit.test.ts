@@ -23,7 +23,7 @@ describe("NotebookEdit", () => {
   let nbPath: string
 
   beforeEach(() => {
-    tmpDir = join(tmpdir(), `deepreef-nb-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    tmpDir = join(tmpdir(), `covalo-nb-test-${Date.now()}-${Math.random().toString(36).slice(2)}`)
     mkdirSync(tmpDir, { recursive: true })
     nbPath = join(tmpDir, "test.ipynb")
   })

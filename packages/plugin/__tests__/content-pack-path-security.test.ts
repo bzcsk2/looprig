@@ -3,7 +3,7 @@ import { validateAssetPath } from "../src/content-pack/path-security.js"
 import { resolve as pathResolve } from "node:path"
 import { mkdirSync, writeFileSync, symlinkSync, rmSync, existsSync } from "node:fs"
 
-const TMP_DIR = "/tmp/deepreef-ps-" + Date.now()
+const TMP_DIR = "/tmp/covalo-ps-" + Date.now()
 const TRUSTED_DIR = pathResolve(TMP_DIR, "trusted", "pack")
 const EVIL_DIR = pathResolve(TMP_DIR, "trusted", "pack-evil")
 

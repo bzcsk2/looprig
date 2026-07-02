@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Box, Text, useInput } from '@deepreef/ink';
+import { Box, Text, useInput } from '@covalo/ink';
 
 interface PermissionPromptProps {
   toolName: string;

@@ -4,11 +4,11 @@ import { SurfaceStore } from "../src/harness-evolution/surfaces/surface-store";
 import type { HarnessPatchPacket } from "../src/harness-evolution/self-harness/patch-schema";
 import { generatePatchId } from "../src/harness-evolution/self-harness/patch-proposer";
 
-const TEST_BASE = "/tmp/looprig-test-validator-" + Math.random().toString(36).slice(2, 8);
+const TEST_BASE = "/tmp/covalo-test-validator-" + Math.random().toString(36).slice(2, 8);
 
 function makePatch(overrides: Partial<HarnessPatchPacket> = {}): HarnessPatchPacket {
   const base: HarnessPatchPacket = {
-    schemaVersion: "looprig.harness-patch.v1",
+    schemaVersion: "covalo.harness-patch.v1",
     patchId: generatePatchId("weak:test", "worker-system-prompt"),
     surface: "worker-system-prompt",
     changeType: "append_rule",

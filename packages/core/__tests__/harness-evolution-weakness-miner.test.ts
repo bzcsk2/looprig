@@ -5,7 +5,7 @@ import type { ReviewPacket } from "../src/harness-evolution/packets/review-packe
 
 function makeIncidentPacket(overrides: Partial<IncidentPacket> = {}): IncidentPacket {
   return {
-    schemaVersion: "looprig.incident-packet.v1",
+    schemaVersion: "covalo.incident-packet.v1",
     packetId: "test:inc:1",
     runId: "test",
     mode: "eval",
@@ -19,7 +19,7 @@ function makeIncidentPacket(overrides: Partial<IncidentPacket> = {}): IncidentPa
 
 function makeReviewPacket(verdict: "ACCEPTED" | "NEEDS_FIX" | "UNKNOWN" = "ACCEPTED", emptyEvidence = false): ReviewPacket {
   return {
-    schemaVersion: "looprig.review-packet.v1",
+    schemaVersion: "covalo.review-packet.v1",
     packetId: "test:rv:1",
     runId: "test",
     mode: "eval",

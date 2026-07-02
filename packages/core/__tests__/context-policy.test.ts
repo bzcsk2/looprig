@@ -118,8 +118,8 @@ describe("ContextPolicyStore", () => {
   })
 
   it("should load valid policy from file", async () => {
-    const policyFile = join(tmpDir, ".deepreef", "context.json")
-    await mkdir(join(tmpDir, ".deepreef"), { recursive: true })
+    const policyFile = join(tmpDir, ".covalo", "context.json")
+    await mkdir(join(tmpDir, ".covalo"), { recursive: true })
     await writeFile(policyFile, JSON.stringify({ mode: "compress", triggerRatio: 0.8, targetRatio: 0.2 }))
 
     const loaded = await store.load()
@@ -129,8 +129,8 @@ describe("ContextPolicyStore", () => {
   })
 
   it("should fallback to default for invalid JSON", async () => {
-    const policyFile = join(tmpDir, ".deepreef", "context.json")
-    await mkdir(join(tmpDir, ".deepreef"), { recursive: true })
+    const policyFile = join(tmpDir, ".covalo", "context.json")
+    await mkdir(join(tmpDir, ".covalo"), { recursive: true })
     await writeFile(policyFile, "invalid json")
 
     const loaded = await store.load()
@@ -138,8 +138,8 @@ describe("ContextPolicyStore", () => {
   })
 
   it("should fallback to default for invalid policy", async () => {
-    const policyFile = join(tmpDir, ".deepreef", "context.json")
-    await mkdir(join(tmpDir, ".deepreef"), { recursive: true })
+    const policyFile = join(tmpDir, ".covalo", "context.json")
+    await mkdir(join(tmpDir, ".covalo"), { recursive: true })
     await writeFile(policyFile, JSON.stringify({ mode: "invalid" }))
 
     const loaded = await store.load()
@@ -151,14 +151,14 @@ describe("ContextPolicyStore", () => {
     const saved = await store.save(policy)
     expect(saved).toBe(true)
 
-    const policyFile = join(tmpDir, ".deepreef", "context.json")
+    const policyFile = join(tmpDir, ".covalo", "context.json")
     const content = await readFile(policyFile, "utf-8")
     expect(JSON.parse(content)).toEqual(policy)
   })
 
   it("should return false when save fails", async () => {
     const fileAsWorkspace = join(tmpDir, "not-a-directory")
-    await writeFile(fileAsWorkspace, "blocks nested .deepreef creation")
+    await writeFile(fileAsWorkspace, "blocks nested .covalo creation")
 
     const invalidStore = new ContextPolicyStore(fileAsWorkspace)
     const saved = await invalidStore.save(DEFAULT_CONTEXT_POLICY)
@@ -173,6 +173,6 @@ describe("ContextPolicyStore", () => {
   it("should return correct file path", () => {
     const path = store.getFilePath()
     expect(path).toContain("context.json")
-    expect(path).toContain(".deepreef")
+    expect(path).toContain(".covalo")
   })
 })

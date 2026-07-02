@@ -9,7 +9,7 @@
 
 import { spawn, type ChildProcess } from "node:child_process"
 import { resolve } from "node:path"
-import type { AgentTool, ToolContext, ToolProgressUpdate } from "@deepreef/core"
+import type { AgentTool, ToolContext, ToolProgressUpdate } from "@covalo/core"
 import { safeStringify, hasBinaryEncoding } from "../safe-stringify.js"
 import { normalizePlatform } from "../platform/capabilities.js"
 import { resolveShellBackend, type ShellBackendId } from "../platform/shell-backend.js"

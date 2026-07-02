@@ -1,4 +1,4 @@
-import type { ChatMessage, AgentRole } from '@deepreef/core';
+import type { ChatMessage, AgentRole } from '@covalo/core';
 
 /** 工具调用在 transcript / timeline 中的运行态快照 */
 export interface ToolStatus {

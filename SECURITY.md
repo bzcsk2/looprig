@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-DeepReef is currently pre-1.0. Security fixes are provided for the latest published version and the current default branch when practical.
+Covalo is currently pre-1.0. Security fixes are provided for the latest published version and the current default branch when practical.
 
 | Version | Supported |
 | --- | --- |
@@ -30,7 +30,7 @@ Include:
 
 ## Security-Sensitive Areas
 
-DeepReef is a local agent runtime that can read files, edit files, run commands, call tools, and connect to external services. The following areas are considered security-sensitive:
+Covalo is a local agent runtime that can read files, edit files, run commands, call tools, and connect to external services. The following areas are considered security-sensitive:
 
 - shell execution and command policy bypasses
 - arbitrary file read/write outside the intended workspace
@@ -60,12 +60,12 @@ Public issues are not appropriate for vulnerabilities that enable command execut
 
 ## Security Expectations
 
-DeepReef is not a sandbox. It is a powerful local development assistant. Users should run it only in repositories where they are prepared to review generated changes and command execution requests.
+Covalo is not a sandbox. It is a powerful local development assistant. Users should run it only in repositories where they are prepared to review generated changes and command execution requests.
 
 Recommended usage:
 
 - review file edits before committing
 - avoid running with unnecessary secrets in the environment
 - avoid using production credentials for routine development
-- keep `.env`, `api-key`, `.deepreef/`, and session files out of Git
+- keep `.env`, `api-key`, `.covalo/`, and session files out of Git
 - run risky experiments in disposable repositories or containers

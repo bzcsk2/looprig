@@ -152,13 +152,13 @@ describe("workspace creation", () => {
   let tmpDir: string;
 
   beforeAll(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "deepreef-eval-test-"));
-    process.env.DEEPRREF_ROOT = tmpDir;
+    tmpDir = mkdtempSync(join(tmpdir(), "covalo-eval-test-"));
+    process.env.COVALO_ROOT = tmpDir;
   });
 
   afterAll(() => {
     rmSync(tmpDir, { recursive: true, force: true });
-    delete process.env.DEEPRREF_ROOT;
+    delete process.env.COVALO_ROOT;
   });
 
   it("should create a workspace directory for a case", async () => {
@@ -202,7 +202,7 @@ describe("verifier", () => {
   let tmpDir: string;
 
   beforeAll(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "deepreef-eval-verifier-"));
+    tmpDir = mkdtempSync(join(tmpdir(), "covalo-eval-verifier-"));
   });
 
   afterAll(() => {
@@ -306,7 +306,7 @@ describe("verifier edge cases", () => {
   let tmpDir: string;
 
   beforeAll(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "deepreef-eval-ver-edge-"));
+    tmpDir = mkdtempSync(join(tmpdir(), "covalo-eval-ver-edge-"));
     mkdirSync(tmpDir, { recursive: true });
     writeFileSync(join(tmpDir, "app.ts"), "const greeting: string = 'hello';", "utf-8");
     writeFileSync(join(tmpDir, "secret.txt"), "hidden content", "utf-8");
@@ -462,13 +462,13 @@ describe("runner", () => {
   let tmpDir: string;
 
   beforeAll(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "deepreef-eval-runner-"));
-    process.env.DEEPRREF_ROOT = tmpDir;
+    tmpDir = mkdtempSync(join(tmpdir(), "covalo-eval-runner-"));
+    process.env.COVALO_ROOT = tmpDir;
   });
 
   afterAll(() => {
     rmSync(tmpDir, { recursive: true, force: true });
-    delete process.env.DEEPRREF_ROOT;
+    delete process.env.COVALO_ROOT;
   });
 
   it("should run all cases and emit progress events", async () => {
@@ -534,13 +534,13 @@ describe("report generation", () => {
   let tmpDir: string;
 
   beforeAll(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), "deepreef-eval-report-"));
-    process.env.DEEPRREF_ROOT = tmpDir;
+    tmpDir = mkdtempSync(join(tmpdir(), "covalo-eval-report-"));
+    process.env.COVALO_ROOT = tmpDir;
   });
 
   afterAll(() => {
     rmSync(tmpDir, { recursive: true, force: true });
-    delete process.env.DEEPRREF_ROOT;
+    delete process.env.COVALO_ROOT;
   });
 
   it("should save eval report to disk", async () => {
@@ -654,7 +654,7 @@ describe("report generation", () => {
 
     const { summaryMd, summaryJson } = await saveEvalReport(report);
 
-    expect(summaryMd).toContain("# LoopRig Eval Report");
+    expect(summaryMd).toContain("# Covalo Eval Report");
     expect(summaryMd).toContain("sandbox.benchmark");
     expect(summaryMd).toContain("test-provider");
     expect(summaryMd).toContain("true");

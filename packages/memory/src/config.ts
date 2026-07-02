@@ -16,7 +16,7 @@ function safeParseInt(value: string | undefined, fallback: number): number {
   return Number.isNaN(parsed) ? fallback : parsed;
 }
 
-const DATA_DIR = join(homedir(), ".deepreef", "memory");
+const DATA_DIR = join(homedir(), ".covalo", "memory");
 const ENV_FILE = join(DATA_DIR, ".env");
 
 let warnPremiumModelShown = false;
@@ -82,7 +82,7 @@ function detectProvider(env: Record<string, string>): ProviderConfig {
   if (hasRealValue(env["GEMINI_API_KEY"]) || hasRealValue(env["GOOGLE_API_KEY"])) {
     if (!hasRealValue(env["GEMINI_API_KEY"]) && hasRealValue(env["GOOGLE_API_KEY"])) {
       process.stderr.write(
-        "[deepreef:memory] GOOGLE_API_KEY detected — treating as GEMINI_API_KEY. " +
+        "[covalo:memory] GOOGLE_API_KEY detected — treating as GEMINI_API_KEY. " +
           "Set GEMINI_API_KEY in ~/.agentmemory/.env to silence this warning.\n",
       );
     }
@@ -108,7 +108,7 @@ function detectProvider(env: Record<string, string>): ProviderConfig {
     ) {
       warnPremiumModelShown = true;
       process.stderr.write(
-        `[deepreef:memory] OPENROUTER_MODEL=${model} is in the premium tier. ` +
+        `[covalo:memory] OPENROUTER_MODEL=${model} is in the premium tier. ` +
           `Background compression on this model can cost $5+/day under active use. ` +
           `Cheaper alternatives with comparable quality for memory compression: ` +
           `deepseek/deepseek-v4-pro, deepseek/deepseek-chat, qwen/qwen3-coder. ` +
@@ -128,13 +128,13 @@ function detectProvider(env: Record<string, string>): ProviderConfig {
     // BM25-only memory is Deepreef's normal zero-config mode. Keep startup quiet
     // unless the user explicitly asks for verbose memory diagnostics.
     if (
-      env["DEEPREEF_MEMORY_VERBOSE"] === "1" ||
-      env["DEEPREEF_MEMORY_VERBOSE"] === "true" ||
+      env["COVALO_MEMORY_VERBOSE"] === "1" ||
+      env["COVALO_MEMORY_VERBOSE"] === "true" ||
       env["AGENTMEMORY_VERBOSE"] === "1" ||
       env["AGENTMEMORY_VERBOSE"] === "true"
     ) {
       process.stderr.write(
-        "[deepreef:memory] No LLM provider configured; using BM25-only memory. " +
+        "[covalo:memory] No LLM provider configured; using BM25-only memory. " +
           "LLM-backed compression and summarization are disabled.\n",
       );
     }
@@ -146,7 +146,7 @@ function detectProvider(env: Record<string, string>): ProviderConfig {
   }
 
   process.stderr.write(
-    "[deepreef:memory] WARNING: agent-sdk fallback enabled via AGENTMEMORY_ALLOW_AGENT_SDK=true. " +
+    "[covalo:memory] WARNING: agent-sdk fallback enabled via AGENTMEMORY_ALLOW_AGENT_SDK=true. " +
       "This spawns @anthropic-ai/claude-agent-sdk child sessions that can trigger the Stop-hook " +
       "recursion loop (#149 follow-up). A SDK-child env marker is set to block re-entry, " +
       "but prefer setting a real API key in ~/.agentmemory/.env instead.\n",
@@ -326,7 +326,7 @@ export function loadSnapshotConfig(): {
   return {
     enabled: env["SNAPSHOT_ENABLED"] === "true",
     interval: safeParseInt(env["SNAPSHOT_INTERVAL"], 3600),
-    dir: env["SNAPSHOT_DIR"] || join(homedir(), ".deepreef/memory", "snapshots"),
+    dir: env["SNAPSHOT_DIR"] || join(homedir(), ".covalo/memory", "snapshots"),
   };
 }
 
@@ -413,7 +413,7 @@ export function getStandalonePersistPath(): string {
   const env = getMergedEnv();
   return (
     env["STANDALONE_PERSIST_PATH"] ||
-    join(homedir(), ".deepreef/memory", "standalone.json")
+    join(homedir(), ".covalo/memory", "standalone.json")
   );
 }
 
@@ -445,7 +445,7 @@ export function loadFallbackConfig(): FallbackConfig {
       // detectProvider() returned the noop provider.
       if (p === "agent-sdk" && !allowAgentSdk) {
         process.stderr.write(
-          "[deepreef:memory] Ignoring FALLBACK_PROVIDERS entry 'agent-sdk' " +
+          "[covalo:memory] Ignoring FALLBACK_PROVIDERS entry 'agent-sdk' " +
             "(AGENTMEMORY_ALLOW_AGENT_SDK is not 'true'). The agent-sdk " +
             "fallback can spawn Claude Agent SDK child sessions that trigger " +
             "the Stop-hook recursion loop (#149 follow-up). Opt in explicitly " +

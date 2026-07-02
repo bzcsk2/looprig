@@ -1,5 +1,5 @@
-import type { AgentTool } from "@deepreef/core"
-import { safeStringify } from "@deepreef/tools"
+import type { AgentTool } from "@covalo/core"
+import { safeStringify } from "@covalo/tools"
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, resolve } from "node:path"
 
@@ -71,7 +71,7 @@ export function createMcpAuthTool(): AgentTool {
 }
 
 function authFile(cwd?: string): string {
-  return resolve(cwd ?? process.cwd(), ".deepreef", "mcp-auth.json")
+  return resolve(cwd ?? process.cwd(), ".covalo", "mcp-auth.json")
 }
 
 async function readStore(filePath: string): Promise<AuthStore> {

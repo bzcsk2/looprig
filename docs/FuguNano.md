@@ -1,6 +1,6 @@
-# LoopRig Harness Evolution Spec Inspired by FuguNano
+# Covalo Harness Evolution Spec Inspired by FuguNano
 
-本文档是给后续 agent 实施的开发规范。目标不是把 LoopRig 改造成 FuguNano，也不是引入 OpenFugu / learned conductor，而是在 LoopRig 现有 `Supervisor + Worker + eval + sandbox + observability` 架构上，完整吸收 FuguNano 最有价值的工程机制：
+本文档是给后续 agent 实施的开发规范。目标不是把 Covalo 改造成 FuguNano，也不是引入 OpenFugu / learned conductor，而是在 Covalo 现有 `Supervisor + Worker + eval + sandbox + observability` 架构上，完整吸收 FuguNano 最有价值的工程机制：
 
 ```text
 typed evidence packets
@@ -11,7 +11,7 @@ self-harness evolution
 deterministic eval promotion gates
 ```
 
-最终目标是让 LoopRig 变成高度稳定、可审计、可复盘、harness 可进化的 coding agent 系统。
+最终目标是让 Covalo 变成高度稳定、可审计、可复盘、harness 可进化的 coding agent 系统。
 
 > **实现状态：P0/P1/P2 全部完成** ✅
 > - typecheck: 通过
@@ -34,19 +34,19 @@ deterministic eval promotion gates
 /vol4/Agent/FuguNano/engine/src/app/self-harness-loop.ts
 /vol4/Agent/FuguNano/engine/src/app/evolution-loop.ts
 
-/vol4/Agent/looprig/packages/core/src/loop.ts
-/vol4/Agent/looprig/packages/core/src/supervisor/guided-loop.ts
-/vol4/Agent/looprig/packages/core/src/task-ledger.ts
-/vol4/Agent/looprig/packages/core/src/harness/policy.ts
-/vol4/Agent/looprig/packages/core/src/eval/*
-/vol4/Agent/looprig/packages/core/src/sandbox/*
+/vol4/Agent/covalo/packages/core/src/loop.ts
+/vol4/Agent/covalo/packages/core/src/supervisor/guided-loop.ts
+/vol4/Agent/covalo/packages/core/src/task-ledger.ts
+/vol4/Agent/covalo/packages/core/src/harness/policy.ts
+/vol4/Agent/covalo/packages/core/src/eval/*
+/vol4/Agent/covalo/packages/core/src/sandbox/*
 ```
 
-实施本 spec 的 agent 必须参考 FuguNano 源代码，而不只是参考文档。参考方式是“按 LoopRig 架构重建同类机制”，不是复制 FuguNano 的 CLI 或目录结构。
+实施本 spec 的 agent 必须参考 FuguNano 源代码，而不只是参考文档。参考方式是“按 Covalo 架构重建同类机制”，不是复制 FuguNano 的 CLI 或目录结构。
 
 ### Implementation Reference Map
 
-| LoopRig 目标 | 必须参考的 FuguNano 源码 | 参考内容 | LoopRig 落点 | 状态 |
+| Covalo 目标 | 必须参考的 FuguNano 源码 | 参考内容 | Covalo 落点 | 状态 |
 | --- | --- | --- | --- | --- |
 | ReviewPacket | `/vol4/Agent/FuguNano/engine/src/domain/review-packet.ts` | verdict、findings、evidence、recommendedChecks、issues 的结构化方式 | `packages/core/src/harness-evolution/packets/review-packet.ts` | ✅ |
 | IncidentPacket / RecoveryPacket | `/vol4/Agent/FuguNano/engine/src/domain/incident-packet.ts` | failure pattern、harness layer、evidence line、recovery gate | `packages/core/src/harness-evolution/packets/incident-packet.ts` 和 `recovery-packet.ts` | ✅ |
@@ -58,15 +58,15 @@ deterministic eval promotion gates
 | Evolution lineage | `/vol4/Agent/FuguNano/engine/src/app/evolution-loop.ts` 和 `/vol4/Agent/FuguNano/engine/src/domain/evolution-lineage.ts` | candidate validation、surface safety、lineage 记录 | `packages/core/src/harness-evolution/self-harness/lineage-store.ts` | ✅ |
 | Experience memory | `/vol4/Agent/FuguNano/engine/src/domain/experience.ts` 和 `/vol4/Agent/FuguNano/engine/src/adapters/experience/fs-experience-store.ts` | source/trust/provenance/supersession/freshness 过滤 | `packages/core/src/harness-evolution/experience/*` | ✅ |
 | Task digest / handoff | `/vol4/Agent/FuguNano/engine/src/domain/task-context-digest.ts` 和 `/vol4/Agent/FuguNano/engine/src/domain/task-handoff.ts` | bounded context card、acceptance/evidence handoff | `packages/core/src/harness-evolution/packets/task-digest.ts` | ✅ |
-| Ports/adapters 分层 | `/vol4/Agent/FuguNano/engine/src/domain/ports/*` 和 `/vol4/Agent/FuguNano/engine/src/app/*` | pure domain + adapter IO + app composition | LoopRig 新模块内部结构，不替换现有 core 架构 | ✅ |
+| Ports/adapters 分层 | `/vol4/Agent/FuguNano/engine/src/domain/ports/*` 和 `/vol4/Agent/FuguNano/engine/src/app/*` | pure domain + adapter IO + app composition | Covalo 新模块内部结构，不替换现有 core 架构 | ✅ |
 
 Implementation rules:
 
-- 先读对应 FuguNano 源码和测试，再实现 LoopRig 版本。
+- 先读对应 FuguNano 源码和测试，再实现 Covalo 版本。
 - 可以借鉴类型、状态机、分类规则、acceptance gate 和测试思路。
 - 不要直接引入 FuguNano 包，不要依赖 `fuguectl`，不要复制多 worker/fleet/barrier 运行模型。
-- 所有新代码必须适配 LoopRig 现有 `TaskLedger`、`supervisor/guided-loop`、`eval/runner`、`runtime-logger`、`sandbox/provider`。
-- 如果 FuguNano 逻辑与 LoopRig sandbox/eval/缓存命中目标冲突，以 LoopRig 目标为准，并在实现 PR 中说明差异。
+- 所有新代码必须适配 Covalo 现有 `TaskLedger`、`supervisor/guided-loop`、`eval/runner`、`runtime-logger`、`sandbox/provider`。
+- 如果 FuguNano 逻辑与 Covalo sandbox/eval/缓存命中目标冲突，以 Covalo 目标为准，并在实现 PR 中说明差异。
 
 FuguNano 的核心价值不在多 worker 数量，而在：
 
@@ -79,7 +79,7 @@ FuguNano 的核心价值不在多 worker 数量，而在：
 harness 只在 fixed eval 非回退时进化
 ```
 
-这些机制与 LoopRig 的缓存命中优先设计不冲突。相反，结构化 packet 和稳定 harness surface 会减少提示漂移，提高可复用上下文和缓存命中概率。
+这些机制与 Covalo 的缓存命中优先设计不冲突。相反，结构化 packet 和稳定 harness surface 会减少提示漂移，提高可复用上下文和缓存命中概率。
 
 ## Feasibility Judgment
 
@@ -92,12 +92,12 @@ harness 只在 fixed eval 非回退时进化
 - FuguNano `self-harness-accept.ts` 的 `deltaIn >= 0 && deltaOut >= 0 && max(delta) > 0` 非回退 promotion gate。
 - FuguNano ports/adapters 思路：domain 纯逻辑、adapter 执行 IO、app 组合流程。
 
-### 需要按 LoopRig 重建
+### 需要按 Covalo 重建
 
 - FuguNano 的多 harness dispatch / worktree fleet / join barrier 不应照搬。
-- FuguNano 的 `fuguectl` CLI 不应成为 LoopRig 新运行入口。
-- FuguNano 的 agent registry / allocation strategy 不应替代 LoopRig 现有模型池和 workflow mode。
-- FuguNano 的 shell-wrapper 操作习惯不应进入 LoopRig TUI 主交互。
+- FuguNano 的 `fuguectl` CLI 不应成为 Covalo 新运行入口。
+- FuguNano 的 agent registry / allocation strategy 不应替代 Covalo 现有模型池和 workflow mode。
+- FuguNano 的 shell-wrapper 操作习惯不应进入 Covalo TUI 主交互。
 
 ### 不建议吸收
 
@@ -109,7 +109,7 @@ harness 只在 fixed eval 非回退时进化
 
 ## Target Architecture
 
-LoopRig 保持一条主线：
+Covalo 保持一条主线：
 
 ```text
 User Task
@@ -154,13 +154,13 @@ harness improver   -> offline SelfHarnessLoop
 - 实现 Docker/Podman container。
 - 实现 learned model router。
 - 训练小模型。
-- 替换 LoopRig 当前 TUI。
+- 替换 Covalo 当前 TUI。
 - 改造 eval case 内容。
 - 做 token 级 cache 统计。
 
 token 级 cache 已明确不做。本 spec 只要求 run/case/packet/harness surface 级别的可观测性和进化闭环。
 
-## Existing LoopRig Assets To Reuse
+## Existing Covalo Assets To Reuse
 
 不要新建重复系统。优先接入现有模块：
 
@@ -283,7 +283,7 @@ Rules:
 Add a durable append-only store:
 
 ```text
-.looprig/runs/<runId>/
+.covalo/runs/<runId>/
   run.json
   packets.jsonl
   events.jsonl
@@ -299,7 +299,7 @@ Add a durable append-only store:
 Eval runs may mirror packets into:
 
 ```text
-.deepreef/evals/<evalRunId>/cases/<caseId>/packets.jsonl
+.covalo/evals/<evalRunId>/cases/<caseId>/packets.jsonl
 ```
 
 Do not use model prose as the source of truth when a packet exists.
@@ -310,7 +310,7 @@ Task digest is the contract given to Worker before execution.
 
 ```ts
 interface TaskDigestPacket extends PacketBase {
-  schemaVersion: "looprig.task-digest.v1"
+  schemaVersion: "covalo.task-digest.v1"
   goal: string
   acceptanceCriteria: string[]
   repoFacts: {
@@ -357,7 +357,7 @@ Supervisor review must output structured checks, not just a score.
 type ReviewVerdict = "ACCEPTED" | "NEEDS_FIX" | "UNKNOWN"
 
 interface ReviewPacket extends PacketBase {
-  schemaVersion: "looprig.review-packet.v1"
+  schemaVersion: "covalo.review-packet.v1"
   verdict: ReviewVerdict
   findings: ReviewFinding[]
   requiredChecks: string[]
@@ -423,7 +423,7 @@ type IncidentKind =
   | "unknown"
 
 interface IncidentPacket extends PacketBase {
-  schemaVersion: "looprig.incident-packet.v1"
+  schemaVersion: "covalo.incident-packet.v1"
   incidents: IncidentRecord[]
   issues: Array<{
     kind: "no_incident_detected" | "incident_without_evidence"
@@ -454,7 +454,7 @@ interface IncidentRecord {
 
 ```ts
 interface RecoveryPacket extends PacketBase {
-  schemaVersion: "looprig.recovery-packet.v1"
+  schemaVersion: "covalo.recovery-packet.v1"
   gate: {
     disposition: "ready" | "blocked"
     reasons: string[]
@@ -487,7 +487,7 @@ Acceptance tests:
 
 ## ✅ P0: Bounded Repair Loop Controller
 
-LoopRig must stop uncontrolled self-retry.
+Covalo must stop uncontrolled self-retry.
 
 ```ts
 interface RepairLoopConfig {
@@ -569,13 +569,13 @@ Rules:
 
 ## ✅ P0: Runtime Guard
 
-Before Worker receives a prompt or before a high-risk tool action executes, LoopRig must classify risk.
+Before Worker receives a prompt or before a high-risk tool action executes, Covalo must classify risk.
 
 ```ts
 type RuntimeGuardDisposition = "allow" | "review" | "block"
 
 interface RuntimeGuardPacket extends PacketBase {
-  schemaVersion: "looprig.runtime-guard.v1"
+  schemaVersion: "covalo.runtime-guard.v1"
   disposition: RuntimeGuardDisposition
   findings: Array<{
     id: string
@@ -630,7 +630,7 @@ High-risk actions must produce a sidecar packet before execution.
 
 ```ts
 interface ActionCertificatePacket extends PacketBase {
-  schemaVersion: "looprig.action-certificate.v1"
+  schemaVersion: "covalo.action-certificate.v1"
   actionId: string
   action: {
     toolName: string
@@ -669,7 +669,7 @@ Acceptance tests:
 
 ## ✅ P1: Experience Memory With Provenance
 
-LoopRig should not store arbitrary chat as memory. Store only structured, evidence-backed experiences.
+Covalo should not store arbitrary chat as memory. Store only structured, evidence-backed experiences.
 
 ```ts
 interface ExperienceRecord {
@@ -796,7 +796,7 @@ packages/core/src/harness-evolution/surfaces/defaults/
 Runtime-loaded user overrides may live under:
 
 ```text
-~/.looprig/harness/surfaces/
+~/.covalo/harness/surfaces/
 ```
 
 Rules:
@@ -821,7 +821,7 @@ The proposer must output strict JSON.
 
 ```ts
 interface HarnessPatch {
-  schemaVersion: "looprig.harness-patch.v1"
+  schemaVersion: "covalo.harness-patch.v1"
   patchId: string
   surface: HarnessSurface
   changeType: "append_rule" | "replace_section" | "tighten_policy" | "add_example"
@@ -914,7 +914,7 @@ Every accepted or rejected patch must write lineage.
 
 ```ts
 interface HarnessLineageEntry {
-  schemaVersion: "looprig.harness-lineage.v1"
+  schemaVersion: "covalo.harness-lineage.v1"
   patchId: string
   surface: HarnessSurface
   decision: "accepted" | "rejected" | "blocked" | "manual_required"
@@ -931,8 +931,8 @@ interface HarnessLineageEntry {
 Path:
 
 ```text
-~/.looprig/harness/lineage.jsonl
-~/.looprig/harness/patches/<patchId>.json
+~/.covalo/harness/lineage.jsonl
+~/.covalo/harness/patches/<patchId>.json
 ```
 
 Rules:
@@ -946,14 +946,14 @@ Rules:
 Add CLI commands after core logic is tested:
 
 ```bash
-looprig harness doctor
-looprig harness packets <runId>
-looprig harness mine --from-eval <evalRunId>
-looprig harness propose --weakness <weaknessId>
-looprig harness validate --patch <patchId>
-looprig harness promote --patch <patchId>
-looprig harness history
-looprig harness rollback <rollbackId>
+covalo harness doctor
+covalo harness packets <runId>
+covalo harness mine --from-eval <evalRunId>
+covalo harness propose --weakness <weaknessId>
+covalo harness validate --patch <patchId>
+covalo harness promote --patch <patchId>
+covalo harness history
+covalo harness rollback <rollbackId>
 ```
 
 TUI should not expose self-harness as a modal-heavy submenu. Use normal transcript messages:
@@ -969,7 +969,7 @@ Self-harness must never silently change active runtime behavior during a user ta
 
 ## ✅ P2: Optional Allocation Lessons
 
-FuguNano has allocation strategy and agent profiles. LoopRig should not adopt this as a primary feature now.
+FuguNano has allocation strategy and agent profiles. Covalo should not adopt this as a primary feature now.
 
 If implemented later, keep it training-free and cache-friendly:
 
@@ -1008,7 +1008,7 @@ trace.jsonl             ✅
 Packet artifacts added:
 
 ```text
-.deepreef/evals/<evalRunId>/cases/<caseId>/
+.covalo/evals/<evalRunId>/cases/<caseId>/
   packets.jsonl         ✅ (via PacketStore mirror)
   task-digest.json      ✅ (via saveEvalReport + PacketStore)
   runtime-guard.json    ✅ (via saveEvalReport + PacketStore)
@@ -1163,7 +1163,7 @@ Minimum implementation is accepted only when:
 
 ## Final Design Rule
 
-LoopRig should absorb FuguNano as an engineering discipline, not as a new product architecture:
+Covalo should absorb FuguNano as an engineering discipline, not as a new product architecture:
 
 ```text
 FuguNano multi-agent/fleet ideas: mostly no.
@@ -1175,7 +1175,7 @@ FuguNano lineage/provenance: yes.
 FuguNano learned conductor replacement: no.
 ```
 
-This gives LoopRig a stable path:
+This gives Covalo a stable path:
 
 ```text
 Runtime loop becomes evidence-gated.

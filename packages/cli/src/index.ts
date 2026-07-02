@@ -4,46 +4,46 @@ import { evalCommand } from "./commands/eval.js"
 import { harnessCommand } from "./commands/harness.js"
 
 function printHelp(): void {
-  output.write(`deepreef - Terminal-native AI loop agent runtime
+  output.write(`covalo - Terminal-native AI loop agent runtime
 
 Usage:
-  deepreef                        Start interactive TUI session
-  deepreef config <subcommand>    Configuration management
-  deepreef eval <subcommand>      Eval environment management
-  deepreef harness <subcommand>   Harness evolution management
-  deepreef --help, -h             Show this help
-  deepreef --version, -v          Show version
+  covalo                        Start interactive TUI session
+  covalo config <subcommand>    Configuration management
+  covalo eval <subcommand>      Eval environment management
+  covalo harness <subcommand>   Harness evolution management
+  covalo --help, -h             Show this help
+  covalo --version, -v          Show version
 
 Config Subcommands:
-  deepreef config path              Show config file paths
-  deepreef config print [options]   Print effective config
-  deepreef config validate          Validate config files
-  deepreef config init [options]    Initialize config file
-  deepreef config edit [options]    Open config in editor
-  deepreef config doctor            Check config health
+  covalo config path              Show config file paths
+  covalo config print [options]   Print effective config
+  covalo config validate          Validate config files
+  covalo config init [options]    Initialize config file
+  covalo config edit [options]    Open config in editor
+  covalo config doctor            Check config health
 
 Eval Subcommands:
-  deepreef eval doctor [--json]    Check eval environment health
-  deepreef eval prepare <env>      Prepare an eval environment
+  covalo eval doctor [--json]    Check eval environment health
+  covalo eval prepare <env>      Prepare an eval environment
 
 Harness Subcommands:
-  deepreef harness doctor           Check harness health
-  deepreef harness mine --from-eval  Mine weaknesses from eval
-  deepreef harness propose --weakness  Propose harness patches
-  deepreef harness validate --patch  Validate a patch
-  deepreef harness promote --patch  Promote a patch
-  deepreef harness history          Show evolution history
-  deepreef harness rollback <id>    Rollback a patch
+  covalo harness doctor           Check harness health
+  covalo harness mine --from-eval  Mine weaknesses from eval
+  covalo harness propose --weakness  Propose harness patches
+  covalo harness validate --patch  Validate a patch
+  covalo harness promote --patch  Promote a patch
+  covalo harness history          Show evolution history
+  covalo harness rollback <id>    Rollback a patch
 
 Examples:
-  deepreef config init --template local-first
-  deepreef config print --redact
-  deepreef config validate
-  deepreef config doctor
-  deepreef eval doctor
-  deepreef eval prepare sandbox.benchmark
-  deepreef harness doctor
-  deepreef harness history
+  covalo config init --template local-first
+  covalo config print --redact
+  covalo config validate
+  covalo config doctor
+  covalo eval doctor
+  covalo eval prepare sandbox.benchmark
+  covalo harness doctor
+  covalo harness history
 `)
 }
 
@@ -59,7 +59,7 @@ async function main(): Promise<void> {
   // Handle --version or -v
   if (args.includes("--version") || args.includes("-v")) {
     // Version will be injected by build
-    output.write("deepreef v0.1.1\n")
+    output.write("covalo v0.1.1\n")
     return
   }
   

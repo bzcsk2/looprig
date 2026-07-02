@@ -1,5 +1,5 @@
 {
-  "name": "@deepreef/tui",
+  "name": "@covalo/tui",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,9 +16,9 @@
     }
   },
   "dependencies": {
-    "@deepreef/core": "workspace:*",
-    "@deepreef/ink": "workspace:*",
-    "@deepreef/tools": "workspace:*",
+    "@covalo/core": "workspace:*",
+    "@covalo/ink": "workspace:*",
+    "@covalo/tools": "workspace:*",
     "@types/figlet": "^1.7.0",
     "cli-highlight": "^2.1.11",
     "figlet": "^1.11.0",

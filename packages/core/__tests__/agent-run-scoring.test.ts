@@ -88,7 +88,7 @@ describe("agent run scoring", () => {
   })
 
   it("persists scores by workflow", () => {
-    const basePath = mkdtempSync(join(tmpdir(), "deepreef-score-"))
+    const basePath = mkdtempSync(join(tmpdir(), "covalo-score-"))
     try {
       const store = new AgentScoreStore({ basePath })
       const score = evaluateAgentRunScore({
@@ -122,7 +122,7 @@ describe("agent run scoring", () => {
       "litebench",
       "agentprobe",
       "issuebenchkit",
-      "deepreef-regression",
+      "covalo-regression",
     ]))
     expect(selectBenchmarkCases(["tool-trace"]).map(c => c.id)).toEqual(
       expect.arrayContaining(["litebench-style-agent-rollout", "agentprobe-style-regression"]),

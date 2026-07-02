@@ -1,5 +1,5 @@
 import { useState, type ReactElement } from 'react';
-import { Box, Text, useInput } from '@deepreef/ink';
+import { Box, Text, useInput } from '@covalo/ink';
 import { ModalShell } from './ModalShell.js';
 import { FG, TONE } from './reasonix/tokens.js';
 

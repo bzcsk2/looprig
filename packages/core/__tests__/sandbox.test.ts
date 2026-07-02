@@ -247,7 +247,7 @@ describe("bwrap provider (integration)", () => {
       });
 
       expect(result.exitCode).toBe(0);
-      expect(result.stdout).toContain("/looprig/toolchains/0/mytool");
+      expect(result.stdout).toContain("/covalo/toolchains/0/mytool");
       expect(result.stdout).toContain("managed-ok");
     } finally {
       rmSync(profileToolDir, { recursive: true, force: true });

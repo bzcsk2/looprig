@@ -3,7 +3,7 @@ import { isStandardSchemaLike } from "./schema-adapter.js"
 
 export interface SchemaAwarePluginTool<TInput = unknown, TOutput = unknown> {
   (args: TInput): TOutput | Promise<TOutput>
-  deepreefTool: SchemaAwareToolMeta
+  covaloTool: SchemaAwareToolMeta
 }
 
 export type DefinePluginToolOptions<TInput, TOutput> = {
@@ -20,7 +20,7 @@ export function definePluginTool<TInput, TOutput>(
   }
 
   const fn = (args: TInput): TOutput | Promise<TOutput> => opts.execute(args) as TOutput | Promise<TOutput>
-  ;(fn as SchemaAwarePluginTool<TInput, TOutput>).deepreefTool = {
+  ;(fn as SchemaAwarePluginTool<TInput, TOutput>).covaloTool = {
     description: opts.description,
     inputSchema: opts.inputSchema,
   }
@@ -29,5 +29,5 @@ export function definePluginTool<TInput, TOutput>(
 
 export function isSchemaAwareTool(value: unknown): value is SchemaAwarePluginTool {
   if (typeof value !== "function") return false
-  return "deepreefTool" in (value as unknown as Record<string, unknown>)
+  return "covaloTool" in (value as unknown as Record<string, unknown>)
 }

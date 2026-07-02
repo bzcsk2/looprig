@@ -1,6 +1,6 @@
 /**
  * Minimal diagnostic logger interface for TUI module.
- * Does not depend on @deepreef/core to avoid circular dependencies.
+ * Does not depend on @covalo/core to avoid circular dependencies.
  */
 
 export type LogLevel = "debug" | "info" | "warn" | "error"
@@ -22,7 +22,7 @@ export const noopTuiDiagnosticLogger: TuiDiagnosticLogger = {
 }
 
 export function createTuiDiagnosticLoggerFromEnv(): TuiDiagnosticLogger {
-  if (process.env.DEEPREEF_TUI_DEBUG !== "1") {
+  if (process.env.COVALO_TUI_DEBUG !== "1") {
     return noopTuiDiagnosticLogger
   }
   // Simple console-based logger for TUI debugging

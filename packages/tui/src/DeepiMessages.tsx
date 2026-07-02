@@ -1,7 +1,7 @@
 import React, { memo, useMemo, useState } from 'react';
-import { Box, Text, useInput } from '@deepreef/ink';
-import type { ChatMessage } from '@deepreef/core';
-import type { AgentRole } from '@deepreef/core/agent-profile/types.js';
+import { Box, Text, useInput } from '@covalo/ink';
+import type { ChatMessage } from '@covalo/core';
+import type { AgentRole } from '@covalo/core/agent-profile/types.js';
 import type { TimelineItem, ToolStatus } from './bridge.js';
 import { Markdown } from './MarkdownRenderer.js';
 import { Card } from './reasonix/Card.js';

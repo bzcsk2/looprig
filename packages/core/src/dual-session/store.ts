@@ -4,7 +4,7 @@ import type { DualSessionSnapshot, SessionCheckpoint } from "./types.js"
 import { SESSION_VERSION } from "./types.js"
 import { DualSession } from "./session.js"
 
-const SESSION_DIR = ".deepreef/sessions"
+const SESSION_DIR = ".covalo/sessions"
 const DUAL_SESSION_FILE = "dual-session.json"
 
 export interface SessionStoreOptions {

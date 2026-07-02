@@ -3,7 +3,7 @@ import { OutcomeStore } from "../src/harness-evolution/outcomes/outcome-store";
 import { aggregateByModel, formatModelReport } from "../src/harness-evolution/outcomes/model-outcome";
 import type { ModelOutcomeRecord } from "../src/harness-evolution/outcomes/model-outcome";
 
-const BASE = "/tmp/looprig-test-outcomes-" + Math.random().toString(36).slice(2, 8);
+const BASE = "/tmp/covalo-test-outcomes-" + Math.random().toString(36).slice(2, 8);
 
 function makeRecord(overrides: Partial<ModelOutcomeRecord> = {}): ModelOutcomeRecord {
   return {

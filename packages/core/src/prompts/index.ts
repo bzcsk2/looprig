@@ -1,5 +1,5 @@
 /**
- * Unified prompt catalog — single entry point for all LoopRig-authored prompts.
+ * Unified prompt catalog — single entry point for all Covalo-authored prompts.
  *
  * Modules:
  * - locale:     locale state, persistence, normalization

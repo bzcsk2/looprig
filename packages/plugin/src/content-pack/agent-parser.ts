@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs"
-import type { AgentDefinition } from "@deepreef/core"
+import type { AgentDefinition } from "@covalo/core"
 
 const FRONTMATTER_RE = /^---\n([\s\S]+?)\n---\n([\s\S]*)$/
 
-const DEEPREEF_TOOL_MAP: Record<string, string> = {
+const COVALO_TOOL_MAP: Record<string, string> = {
   Read: "read_file",
   Write: "write_file",
   Edit: "edit",
@@ -69,7 +69,7 @@ export function parseEccAgentMarkdown(filePath: string): AgentParseResult {
     const toolNames: string[] = []
     if (Array.isArray(eccTools)) {
       for (const t of eccTools) {
-        const mapped = DEEPREEF_TOOL_MAP[t as string]
+        const mapped = COVALO_TOOL_MAP[t as string]
         if (mapped) {
           toolNames.push(mapped)
         } else {

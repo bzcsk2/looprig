@@ -23,12 +23,12 @@ export function getEvalSandboxProvider(): SandboxProvider | null {
   return _sandboxProvider;
 }
 
-function getDeepReefRoot(): string {
-  return process.env.DEEPRREF_ROOT ?? resolve(".deepreef");
+function getCovaloRoot(): string {
+  return process.env.COVALO_ROOT ?? resolve(".covalo");
 }
 
 function getEvalsDir(): string {
-  return join(getDeepReefRoot(), "evals");
+  return join(getCovaloRoot(), "evals");
 }
 
 function getFixtureDir(): string {
@@ -117,7 +117,7 @@ export async function createCaseWorkspace(
 
   const { execSync } = await import("node:child_process");
   execSync("git init 2>/dev/null", { cwd: workspaceDir, stdio: "pipe" });
-  execSync("git config user.email eval@deepreef && git config user.name deepreef-eval", { cwd: workspaceDir, stdio: "pipe" });
+  execSync("git config user.email eval@covalo && git config user.name covalo-eval", { cwd: workspaceDir, stdio: "pipe" });
   execSync("git add -A && git commit -m baseline --allow-empty 2>/dev/null", { cwd: workspaceDir, stdio: "pipe" });
 
   return {
@@ -140,7 +140,7 @@ export class SetupFailedError extends Error {
 
 export { getCaseWorkspaceDir };
 export { getFixtureDir };
-export { getDeepReefRoot, getEvalsDir };
+export { getCovaloRoot, getEvalsDir };
 
 export async function writeCaseArtifact(
   caseDir: string,

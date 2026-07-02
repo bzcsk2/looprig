@@ -10,8 +10,8 @@
  * @param onClose - 关闭覆盖层的回调
  */
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { Box, Text, useInput } from '@deepreef/ink';
-import { useSearchHighlight } from '@deepreef/ink';
+import { Box, Text, useInput } from '@covalo/ink';
+import { useSearchHighlight } from '@covalo/ink';
 import { FG, TONE } from './reasonix/tokens.js';
 import { t } from './i18n/index.js';
 import type { TimelineItem } from './bridge.js';

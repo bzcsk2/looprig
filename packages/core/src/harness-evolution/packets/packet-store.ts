@@ -13,7 +13,7 @@ export class PacketStore {
   private packetsDir: string;
 
   constructor(private config: PacketStoreConfig) {
-    this.packetsDir = join(config.baseDir, ".looprig", "runs", config.runId);
+    this.packetsDir = join(config.baseDir, ".covalo", "runs", config.runId);
   }
 
   private get jsonlPath(): string {
@@ -87,12 +87,12 @@ export class PacketStore {
   // Get the eval case packets path for mirroring
   getEvalCasePacketsPath(evalRunId: string, caseId: string): string {
     const base = this.config.baseDir;
-    return join(base, ".deepreef", "evals", evalRunId, "cases", caseId, "packets.jsonl");
+    return join(base, ".covalo", "evals", evalRunId, "cases", caseId, "packets.jsonl");
   }
 
   // Mirror a packet into eval case artifacts
   async mirrorToEvalCase(evalRunId: string, caseId: string, packet: HarnessPacket): Promise<void> {
-    const dir = join(this.config.baseDir, ".deepreef", "evals", evalRunId, "cases", caseId);
+    const dir = join(this.config.baseDir, ".covalo", "evals", evalRunId, "cases", caseId);
     await mkdir(dir, { recursive: true });
     await appendFile(join(dir, "packets.jsonl"), JSON.stringify(packet) + "\n", "utf-8");
   }
